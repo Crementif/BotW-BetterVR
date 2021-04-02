@@ -25,8 +25,6 @@ namespace xr::math {
 
         constexpr bool IsPoseValid(const XrSpaceLocation& location);
         constexpr bool IsPoseTracked(const XrSpaceLocation& location);
-        constexpr bool IsPoseValid(const XrHandJointLocationEXT& jointLocation);
-        constexpr bool IsPoseTracked(const XrHandJointLocationEXT& jointLocation);
         constexpr bool IsPoseValid(const XrViewState& viewState);
         constexpr bool IsPoseTracked(const XrViewState& viewState);
 
@@ -380,14 +378,6 @@ namespace xr::math {
 
         constexpr bool IsPoseTracked(const XrSpaceLocation& spaceLocation) {
             return IsPoseTracked(spaceLocation.locationFlags);
-        }
-
-        constexpr bool IsPoseValid(const XrHandJointLocationEXT& jointLocation) {
-            return IsPoseValid(jointLocation.locationFlags);
-        }
-
-        constexpr bool IsPoseTracked(const XrHandJointLocationEXT& jointLocation) {
-            return IsPoseTracked(jointLocation.locationFlags);
         }
 
         constexpr bool IsPoseValid(const XrViewState& viewState) {

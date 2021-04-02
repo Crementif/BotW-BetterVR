@@ -144,10 +144,7 @@ namespace {
             return SupportedColorFormats;
         }
 
-        void RenderView(const XrRect2Di& imageRect,
-                        const std::vector<xr::math::ViewProjection>& viewProjections,
-                        DXGI_FORMAT colorSwapchainFormat,
-                        ID3D11Texture2D* colorTexture) override {
+        void RenderView(const XrRect2Di& imageRect, const std::vector<xr::math::ViewProjection>& viewProjections, DXGI_FORMAT colorSwapchainFormat, ID3D11Texture2D* colorTexture) override {
             const uint32_t viewInstanceCount = (uint32_t)viewProjections.size();
             CHECK_MSG(viewInstanceCount <= CubeShader::MaxViewInstance, "Sample shader supports 2 or fewer view instances. Adjust shader to accommodate more.")
 

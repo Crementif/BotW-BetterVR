@@ -2,6 +2,14 @@
 #include "BotWHook.h"
 
 
+// Development Mode Selector
+#define GFX_PACK_PASSTHROUGH 0      // Used to make this app as a way to asynchronously feed headset data to the graphic pack which will then calculate the headset position each frame.
+#define APP_CALC_CONVERT 1          // Used as an intermediary for converting the library-dependent code into native graphic pack code.
+#define APP_CALC_LIBRARY 2          // Used for easily testing code using libraries.
+
+#define CALC_MODE GFX_PACK_PASSTHROUGH
+
+
 HWND cemuHWND = NULL;
 DWORD cemuProcessID = NULL;
 HANDLE cemuHandle = NULL;
@@ -25,13 +33,6 @@ float reverseFloatEndianess(float inFloat) {
 
     return retVal;
 }
-
-// Development Mode Selector
-#define GFX_PACK_PASSTHROUGH 0      // Used to make this app as a way to asynchronously feed headset data to the graphic pack which will then calculate the headset position each frame.
-#define APP_CALC_CONVERT 1          // Used as an intermediary for converting the library-dependent code into native graphic pack code.
-#define APP_CALC_LIBRARY 2          // Used for easily testing code using libraries.
-
-#define CALC_MODE GFX_PACK_PASSTHROUGH
 
 
 struct inputDataBuffer {

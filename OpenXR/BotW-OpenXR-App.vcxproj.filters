@@ -65,8 +65,6 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <None Include="packages.config" />
-    <None Include="$(OpenXRLoaderBinaryRoot)\bin\openxr_loader.dll" />
     <None Include="..\Graphic Packs\BreathOfTheWild_BetterVR\patch_BetterVR.asm">
       <Filter>Graphic Packs</Filter>
     </None>
