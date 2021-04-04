@@ -7,7 +7,7 @@
 #define APP_CALC_CONVERT 1          // Used as an intermediary for converting the library-dependent code into native graphic pack code.
 #define APP_CALC_LIBRARY 2          // Used for easily testing code using libraries.
 
-#define CALC_MODE GFX_PACK_PASSTHROUGH
+#define CALC_MODE APP_CALC_LIBRARY
 
 
 HWND cemuHWND = NULL;
