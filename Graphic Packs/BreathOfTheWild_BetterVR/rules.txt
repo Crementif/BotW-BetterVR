@@ -14,7 +14,7 @@ $hudScale = 0.4
 $menuScale = 0.4
 $swappedFlipSide = 0
 $eyeSeparationSetting = 0.067000
-$zoomOutLevelSetting = 1.0
+$zoomOutLevelSetting = 5.0
 
 ; This changes how much moving your headset moves the in-game camera
 $headPositionSensitivity = 1.0
@@ -146,6 +146,13 @@ $menuScale = 0.6
 name = Big
 category = Menu Scale (inventory, map etc.)
 $menuScale = 0.5
+
+[Preset]
+name = Very Big
+category = Menu Scale (inventory, map etc.)
+$menuScale = 0.25
+
+# Swap Sides
 
 [Preset]
 name = Enabled

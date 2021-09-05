@@ -176,9 +176,6 @@ void cameraHookUpdate(PPCInterpreter_t* hCPU) {
 	inputData.newTargetY = inputData.newPosY + ((combinedMatrix[2][1] * -1.0f) * originalCameraDistance);
 	inputData.newTargetZ = inputData.newPosZ + ((combinedMatrix[2][2] * -1.0f) * originalCameraDistance);
 
-
-
-
 	inputData.newRotX = combinedMatrix[1][0];
 	inputData.newRotY = combinedMatrix[1][1];
 	inputData.newRotZ = combinedMatrix[1][2];
