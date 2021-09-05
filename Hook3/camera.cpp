@@ -136,8 +136,10 @@ void cameraHookFrame(PPCInterpreter_t* hCPU) {
 
 	framesSinceLastCameraUpdate++;
 }
-
+int thing = 0;
 void cameraHookUpdate(PPCInterpreter_t* hCPU) {
+	logPrint(std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count() - thing));
+	thing = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
 	//logPrint("Updated the camera positions");
 	hCPU->instructionPointer = hCPU->gpr[7]; // r7 will have the instruction that should be returned to
 
@@ -171,8 +173,8 @@ void cameraHookUpdate(PPCInterpreter_t* hCPU) {
 
 
 	inputData.newPosX = inputData.oldPosX + (hmdPos.x * inputData.headPositionSensitivitySetting) + (hmdPos.x - eyePos.x);
-	inputData.newPosY = inputData.oldPosY + (hmdPos.y * inputData.headPositionSensitivitySetting) + (hmdPos.x - eyePos.x)/* + (inputData.heightPositionOffsetSetting * inputData.headPositionSensitivitySetting)*/;
-	inputData.newPosZ = inputData.oldPosZ + (hmdPos.z * inputData.headPositionSensitivitySetting) + (hmdPos.x - eyePos.x);
+	inputData.newPosY = inputData.oldPosY + (hmdPos.y * inputData.headPositionSensitivitySetting) + (hmdPos.y - eyePos.y)/* + (inputData.heightPositionOffsetSetting * inputData.headPositionSensitivitySetting)*/;
+	inputData.newPosZ = inputData.oldPosZ + (hmdPos.z * inputData.headPositionSensitivitySetting) + (hmdPos.z - eyePos.z);
 
 	inputData.newTargetX = inputData.newPosX + ((combinedMatrix[2][0] * -1.0f) * originalCameraDistance);
 	inputData.newTargetY = inputData.newPosY + ((combinedMatrix[2][1] * -1.0f) * originalCameraDistance);
