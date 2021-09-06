@@ -170,17 +170,30 @@ void cameraHookUpdate(PPCInterpreter_t* hCPU) {
 
 	glm::fvec3 rotatedHmdPos = glm::toMat3(combinedQuat) * eyePos;
 
-	readMemoryBE(0x113444F0 + 0x50, &inputData.newPosX);
-	readMemoryBE(0x113444F0 + 0x54, &inputData.newPosY);
-	readMemoryBE(0x113444F0 + 0x58, &inputData.newPosZ);
+	//TODO: Add graphic pack check for first person
+	if (true)
+	{
+		readMemoryBE(0x113444F0 + 0x50, &inputData.newPosX);
+		readMemoryBE(0x113444F0 + 0x54, &inputData.newPosY);
+		readMemoryBE(0x113444F0 + 0x58, &inputData.newPosZ);
 
-	swapEndianness(inputData.newPosX);
-	swapEndianness(inputData.newPosY);
-	swapEndianness(inputData.newPosZ);
+		swapEndianness(inputData.newPosX);
+		swapEndianness(inputData.newPosY);
+		swapEndianness(inputData.newPosZ);
 
-	inputData.newPosX += (hmdPos.x * inputData.headPositionSensitivitySetting) - (hmdPos.x - eyePos.x);
-	inputData.newPosY += (hmdPos.y * inputData.headPositionSensitivitySetting) - (hmdPos.y - eyePos.y);
-	inputData.newPosZ += (hmdPos.z * inputData.headPositionSensitivitySetting) - (hmdPos.z - eyePos.z);
+		if (inputData.newPosX != 0 && inputData.newPosY != 0 && inputData.newPosZ != 0)
+		{
+			inputData.newPosX += (hmdPos.x * inputData.headPositionSensitivitySetting) - (hmdPos.x - eyePos.x);
+			inputData.newPosY += (hmdPos.y * inputData.headPositionSensitivitySetting) - (hmdPos.y - eyePos.y);
+			inputData.newPosZ += (hmdPos.z * inputData.headPositionSensitivitySetting) - (hmdPos.z - eyePos.z);
+		}
+	}
+	else
+	{
+		inputData.newPosX = inputData.oldPosX + (hmdPos.x * inputData.headPositionSensitivitySetting) + (hmdPos.x - eyePos.x);
+		inputData.newPosY = inputData.oldPosY + (hmdPos.y * inputData.headPositionSensitivitySetting) + (hmdPos.y - eyePos.y);
+		inputData.newPosZ = inputData.oldPosZ + (hmdPos.z * inputData.headPositionSensitivitySetting) + (hmdPos.z - eyePos.z);
+	}
 
 	logPrint(std::to_string(inputData.newPosX) + " | " + std::to_string(inputData.newPosY) + " | " + std::to_string(inputData.newPosZ));
 
