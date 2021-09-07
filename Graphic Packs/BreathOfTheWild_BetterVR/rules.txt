@@ -181,7 +181,7 @@ $headPositionSensitivity = 0.5
 [Preset]
 name = Normal (Default)
 category = Player Size
-$headPositionSensitivity = 1.0
+$headPositionSensitivity = 1.4
 
 [Preset]
 name = Big

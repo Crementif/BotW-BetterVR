@@ -101,7 +101,6 @@ void cameraHookInterface(PPCInterpreter_t* hCPU) {
 	ScreenId newScreenId = (ScreenId)hCPU->gpr[5];
 	switch (newScreenId) {
 		case ScreenId::MainScreen_00:
-		case ScreenId::MainShortCut_00:
 		case ScreenId::Message3D_00:
 		case ScreenId::AppHome_00:
 		case ScreenId::MainScreenMS_00:
@@ -204,10 +203,8 @@ void cameraHookUpdate(PPCInterpreter_t* hCPU) {
 	inputData.newRotZ = combinedMatrix[1][2];
 
 	// Set FOV
-	float horizontalFOV = (leftView.fov.angleRight - leftView.fov.angleLeft);
+	float horizontalFOV = (leftView.fov.angleRight - rightView.fov.angleLeft);
 	float verticalFOV = (leftView.fov.angleUp - leftView.fov.angleDown);
-
-
 
 	//float horizontalFullFovInRadians = 2.0f * atanf(combinedTanHalfFovHorizontal);
 
@@ -216,8 +213,8 @@ void cameraHookUpdate(PPCInterpreter_t* hCPU) {
 	float upHalfFOV = glm::degrees(leftView.fov.angleUp);
 	float downHalfFOV = glm::degrees(leftView.fov.angleDown);
 
-	float horizontalHalfFOV = (abs(leftView.fov.angleLeft) + abs(leftView.fov.angleRight)) * 0.5;
-	float verticalHalfFOV = (abs(leftView.fov.angleUp) + abs(leftView.fov.angleDown)) * 0.5;
+	float horizontalHalfFOV = (abs(leftView.fov.angleLeft) + abs(rightView.fov.angleRight));
+	float verticalHalfFOV = (abs(leftView.fov.angleUp) + abs(leftView.fov.angleDown));
 
 	//float horizontalFullFovInRadians = 2.0f * atanf(combinedTanHalfFovHorizontal);
 
@@ -226,13 +223,12 @@ void cameraHookUpdate(PPCInterpreter_t* hCPU) {
 	float aspectRatioCompare = tanf(diagonalFOV / 2.0f);
 	float aspectRatio = horizontalHalfFOV / verticalHalfFOV; //horizontalHalfFOV / verticalHalfFOV;
 
-
 	//logPrint(std::string("Horizontal FOV in degrees is ") + std::to_string(glm::degrees(horizontalFOV)) + std::string(" and in radians (as used by OpenXR) ") + std::to_string(horizontalFOV));
 	//logPrint(std::string("Vertical FOV in degrees is ") + std::to_string(glm::degrees(verticalFOV)) + std::string(" and in radians (as used by OpenXR) ") + std::to_string(verticalFOV));
 	//logPrint(std::string("Diagonal FOV in degrees is ") + std::to_string(glm::degrees(diagonalFOV)) + std::string(" and in radians (as used by OpenXR) ") + std::to_string(diagonalFOV));
 	//logPrint(std::string("Calculated aspect ratio is ") + std::to_string(aspectRatio));
 
-	inputData.newFOV = horizontalFullFovInRadians;
+	inputData.newFOV = horizontalHalfFOV;
 	inputData.newAspectRatio = aspectRatio;
 
 	swapGraphicPackDataEndianness(&inputData);
