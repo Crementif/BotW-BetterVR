@@ -526,11 +526,11 @@ void dx11RenderLayer(ID3D11Texture2D* swapchainTargetTexture, sideTextureResourc
 	glm::vec3 leftEyePos(leftView.pose.position.x, leftView.pose.position.y, leftView.pose.position.z);
 	glm::vec3 rightEyePos(rightView.pose.position.x, rightView.pose.position.y, rightView.pose.position.z);
 
-	logPrint("Eye separation reported by OpenXR = " + std::to_string(glm::distance(leftEyePos, rightEyePos)));
-	logPrint("FOV left reported by OpenXR = " + std::to_string(leftView.fov.angleLeft));
-	logPrint("FOV right reported by OpenXR = " + std::to_string(leftView.fov.angleRight));
-	logPrint("FOV up reported by OpenXR = " + std::to_string(leftView.fov.angleUp));
-	logPrint("FOV down reported by OpenXR = " + std::to_string(leftView.fov.angleDown));
+	//logPrint("Eye separation reported by OpenXR = " + std::to_string(glm::distance(leftEyePos, rightEyePos)));
+	//logPrint("FOV left reported by OpenXR = " + std::to_string(leftView.fov.angleLeft));
+	//logPrint("FOV right reported by OpenXR = " + std::to_string(leftView.fov.angleRight));
+	//logPrint("FOV up reported by OpenXR = " + std::to_string(leftView.fov.angleUp));
+	//logPrint("FOV down reported by OpenXR = " + std::to_string(leftView.fov.angleDown));
 
 	constantBufferShader renderData;
 	renderData.renderWidth = (float)sideTexture->width;
