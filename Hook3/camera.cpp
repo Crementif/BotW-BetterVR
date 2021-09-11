@@ -191,14 +191,13 @@ void cameraHookUpdate(PPCInterpreter_t* hCPU) {
 
 	glm::fvec3 rotatedHmdPos = glm::toMat3(combinedQuat) * eyePos;
 	
-	if (inputData.viewMode == 1)
-	{
+	if (inputData.viewMode == 1) {
+
 		inputData.newPosX = linkData.posX;
 		inputData.newPosY = linkData.posY;
 		inputData.newPosZ = linkData.posZ;
 
-		if (inputData.firstPersonCameraMovement)
-		{
+		if (inputData.firstPersonCameraMovement) {
 			inputData.newPosX -= (hmdPos.x - eyePos.x);
 			inputData.newPosX += hmdPos.x; // factor in
 			inputData.newPosY -= (hmdPos.y - eyePos.y);
@@ -206,16 +205,14 @@ void cameraHookUpdate(PPCInterpreter_t* hCPU) {
 			inputData.newPosZ -= (hmdPos.z - eyePos.z);
 			inputData.newPosZ += hmdPos.z; // coord value
 		}
-		else
-		{
+		else {
 			inputData.newPosX -= (hmdPos.x - eyePos.x);
 			inputData.newPosY -= (hmdPos.y - eyePos.y);
 			inputData.newPosY += hmdPos.y; // Factor in the hmd y-pos only
 			inputData.newPosZ -= (hmdPos.z - eyePos.z);
 		}
 	}
-	else
-	{
+	else {
 		inputData.newPosX = inputData.oldPosX + (hmdPos.x * inputData.headPositionSensitivitySetting) - (hmdPos.x - eyePos.x);
 		inputData.newPosY = inputData.oldPosY + (hmdPos.y * inputData.headPositionSensitivitySetting) - (hmdPos.y - eyePos.y);
 		inputData.newPosZ = inputData.oldPosZ + (hmdPos.z * inputData.headPositionSensitivitySetting) - (hmdPos.z - eyePos.z);
