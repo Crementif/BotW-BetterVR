@@ -487,6 +487,7 @@ void dx11Render() {
 
 			for (uint32_t i = 0; i < hmdViewCount; i++) {
 				projectionLayerViews[i].pose = views[i].pose;
+				projectionLayerViews[i].fov = views[i].fov;
 				projectionLayerViews[i].subImage.swapchain = xrSwapchainHandle;
 				projectionLayerViews[i].subImage.imageRect = xrSwapchainSize;
 				projectionLayerViews[i].subImage.imageArrayIndex = i;
