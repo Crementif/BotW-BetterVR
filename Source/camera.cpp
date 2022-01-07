@@ -7,13 +7,12 @@ std::atomic<RENDER_STATUS> currRenderStatus = RENDER_STATUS::WAITING;
 typedef void (*osLib_registerHLEFunctionType)(const char* libraryName, const char* functionName, void(*osFunction)(PPCInterpreter_t* hCPU));
 
 struct graphicPackData {
-	int32_t swappedFlipSideSetting;
-	float eyeSeparation;
+	int32_t modeSetting;
+	float eyeSeparationSetting;
 	float headPositionSensitivitySetting;
 	float heightPositionOffsetSetting;
 	float hudScaleSetting;
 	float menuScaleSetting;
-	float zoomOutLevel;
 	// input
 	float oldPosX;
 	float oldPosY;
@@ -36,6 +35,12 @@ struct graphicPackData {
 	float newAspectRatio;
 };
 
+struct LinkData {
+	float posX = 0;
+	float posY = 0;
+	float posZ = 0;
+};
+
 std::mutex currGraphicPackSettingsLock;
 graphicPackData currGraphicPackSettingsData = {};
 
@@ -43,6 +48,19 @@ graphicPackData cameraGetGraphicPackSettings() {
 	graphicPackData retCopy;
 	scoped_lock l(currGraphicPackSettingsLock);
 	retCopy = currGraphicPackSettingsData;
+	return retCopy;
+}
+
+LinkData getLinkData() {
+	LinkData retCopy;
+
+	uint32_t actorSystemStructureOffset = 0;
+	readMemoryBE(0x1046CD00, &actorSystemStructureOffset);
+
+	readMemoryBE((uint64_t)actorSystemStructureOffset + 0x9C + 0x0, &retCopy.posX);
+	readMemoryBE((uint64_t)actorSystemStructureOffset + 0x9C + 0x4, &retCopy.posY);
+	readMemoryBE((uint64_t)actorSystemStructureOffset + 0x9C + 0x8, &retCopy.posZ);
+
 	return retCopy;
 }
 
@@ -60,13 +78,12 @@ void cameraInitialize() {
 }
 
 void swapGraphicPackDataEndianness(graphicPackData* data) {
-	swapEndianness(data->swappedFlipSideSetting);
-	swapEndianness(data->eyeSeparation);
+	swapEndianness(data->modeSetting);
+	swapEndianness(data->eyeSeparationSetting);
 	swapEndianness(data->headPositionSensitivitySetting);
 	swapEndianness(data->heightPositionOffsetSetting);
 	swapEndianness(data->hudScaleSetting);
 	swapEndianness(data->menuScaleSetting);
-	swapEndianness(data->zoomOutLevel);
 	swapEndianness(data->oldPosX);
 	swapEndianness(data->oldPosY);
 	swapEndianness(data->oldPosZ);
@@ -106,7 +123,12 @@ void cameraHookInterface(PPCInterpreter_t* hCPU) {
 		case ScreenId::MainDungeon_00:
 		case ScreenId::AppMenuBtn_00:
 		case ScreenId::PickUp_00:
+		// todo: check out which ones are correct
 		case ScreenId::DoCommand_00:
+		case ScreenId::MessageGet_00:
+		case ScreenId::GameTitle_00:
+		case ScreenId::MessageSp_00:
+		case ScreenId::MessageTips_00:
 			writeMemoryBE(0x102F8CC8, cameraGetGraphicPackSettings().hudScaleSetting);
 			break;
 		default:
@@ -150,13 +172,19 @@ void cameraHookUpdate(PPCInterpreter_t* hCPU) {
 	readMemory(graphicPackDataOffset, &inputData);
 	swapGraphicPackDataEndianness(&inputData);
 
-	XrView* currView = currSwapSide == SWAP_SIDE::RIGHT ? &leftView : &rightView;
-	glm::fvec3 hmdPos(currView->pose.position.x, currView->pose.position.y, currView->pose.position.z);
+	// Current headset view
+	XrView* currView = ((currSwapSide == SWAP_SIDE::LEFT) ? &leftView : &rightView);
+	glm::fvec3 leftEyePos = glm::vec3(leftView.pose.position.x, leftView.pose.position.y, leftView.pose.position.z);
+	glm::fvec3 rightEyePos = glm::vec3(rightView.pose.position.x, rightView.pose.position.y, rightView.pose.position.z);
+	glm::fvec3 eyePos(currView->pose.position.x, currView->pose.position.y, currView->pose.position.z);
+	glm::fvec3 hmdPos = glm::mix(leftEyePos, rightEyePos, 0.5f);
 
+	// Current game view
 	glm::fvec3 oldPosition(inputData.oldPosX, inputData.oldPosY, inputData.oldPosZ);
 	glm::fvec3 oldTarget(inputData.oldTargetX, inputData.oldTargetY, inputData.oldTargetZ);
 	float originalCameraDistance = glm::distance(oldPosition, oldTarget);
 
+	// Calculate new positions and rotations
 	glm::fvec3 forwardVector = oldTarget - oldPosition;
 	forwardVector = glm::normalize(forwardVector);
 	glm::fquat lookAtQuat = glm::quatLookAtRH(forwardVector, {0.0, 1.0, 0.0});
@@ -165,7 +193,7 @@ void cameraHookUpdate(PPCInterpreter_t* hCPU) {
 	glm::fquat combinedQuat = lookAtQuat * hmdQuat;
 	glm::fmat3 combinedMatrix = glm::toMat3(hmdQuat);
 
-	glm::fvec3 rotatedHmdPos = combinedQuat * hmdPos;
+	glm::fvec3 rotatedHmdPos = combinedQuat * eyePos;
 
 	inputData.newTargetX = inputData.oldPosX + ((combinedMatrix[2][0] * -1.0f) * originalCameraDistance) + rotatedHmdPos.x;
 	inputData.newTargetY = inputData.oldPosY + ((combinedMatrix[2][1] * -1.0f) * originalCameraDistance) + rotatedHmdPos.y + inputData.heightPositionOffsetSetting;
@@ -180,10 +208,8 @@ void cameraHookUpdate(PPCInterpreter_t* hCPU) {
 	inputData.newRotZ = combinedMatrix[1][2];
 
 	// Set FOV
-	float horizontalFOV = (leftView.fov.angleRight - leftView.fov.angleLeft);
+	float horizontalFOV = (leftView.fov.angleRight - rightView.fov.angleLeft);
 	float verticalFOV = (leftView.fov.angleUp - leftView.fov.angleDown);
-
-
 
 	//float horizontalFullFovInRadians = 2.0f * atanf(combinedTanHalfFovHorizontal);
 
@@ -214,22 +240,10 @@ void cameraHookUpdate(PPCInterpreter_t* hCPU) {
 	writeMemory(graphicPackDataOffset, inputData);
 }
 
-float cameraGetMenuZoom() {
-	return cameraGetGraphicPackSettings().menuScaleSetting;
-}
-
-bool cameraUseSwappedFlipMode() {
-	return cameraGetGraphicPackSettings().swappedFlipSideSetting == 1;
-}
-
-float cameraGetEyeSeparation() {
-	return cameraGetGraphicPackSettings().eyeSeparation;
-}
-
-float cameraGetZoomOutLevel() {
-	return cameraGetGraphicPackSettings().zoomOutLevel;
-}
-
 bool cameraIsInGame() {
 	return framesSinceLastCameraUpdate < 2;
+}
+
+float cameraGetMenuZoom() {
+	return cameraGetGraphicPackSettings().menuScaleSetting;
 }

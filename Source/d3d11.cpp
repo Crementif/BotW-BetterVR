@@ -564,7 +564,7 @@ void dx11RenderLayer(ID3D11Texture2D* swapchainTargetTexture, sideTextureResourc
 	renderData.showWholeScreen = !sideBySideRenderingMode;
 	renderData.showSingleScreen = (float)!cameraIsInGame();
 	renderData.singleScreenScale = cameraGetMenuZoom();
-	renderData.zoomOutLevel = cameraGetZoomOutLevel();
+	renderData.zoomOutLevel = 1.0;
 	deviceContext->UpdateSubresource(constantBufferResource, 0, NULL, &renderData, sizeof(constantBufferShader), 0);
 
 	LARGE_INTEGER beforeAcquire;
@@ -573,8 +573,8 @@ void dx11RenderLayer(ID3D11Texture2D* swapchainTargetTexture, sideTextureResourc
 	checkMutexHResult(rightEyeResources.keyedMutex->AcquireSync(1, INFINITE));
 	//logTimeElapsed("Acquiring the lock on the dx11 side took ", beforeAcquire);
 
-	deviceContext->PSSetShaderResources(0, 1, cameraUseSwappedFlipMode() ? &rightEyeResources.dx11ResourceView : &leftEyeResources.dx11ResourceView);
-	deviceContext->PSSetShaderResources(1, 1, cameraUseSwappedFlipMode() ? &leftEyeResources.dx11ResourceView : &rightEyeResources.dx11ResourceView);
+	deviceContext->PSSetShaderResources(0, 1, &leftEyeResources.dx11ResourceView);
+	deviceContext->PSSetShaderResources(1, 1, &rightEyeResources.dx11ResourceView);
 	deviceContext->PSSetSamplers(0, 1, &textureSampler);
 
 	deviceContext->OMSetRenderTargets(1, &renderTargetView, NULL);

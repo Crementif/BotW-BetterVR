@@ -6,20 +6,21 @@ description = Used to enable and change VR settings for BetterVR.||Made by Creme
 version = 7
 
 [Default]
-$mode:int = 0
 $FOV = 0.872665
 $cameraDistance = 0.1
 $linkOpacity = 1.0
+
+$mode:int = 0
 $hudScale = 0.4
 $menuScale = 0.4
 $swappedFlipSide = 0
-$eyeSeparationSetting = 0.067000
-$zoomOutLevelSetting = 1.0
+$eyeSeparation = 0.067000
 
 ; This changes how much moving your headset moves the in-game camera
 $headPositionSensitivity = 2.5
 ; This value gets subtracted from the camera height to make the camera look smaller
 $heightPositionOffset = 0.0
+
 
 # Mode selector
 
@@ -29,11 +30,19 @@ category = Camera Mode
 default = 1
 
 [Preset]
-name = First-Person
+name = First-Person (Without Room Scale Movement)
 category = Camera Mode
 $mode:int = 1
 $linkOpacity = 0.0
 $cameraDistance = 0.01
+
+[Preset]
+name = First-Person (With Room Scale Movement)
+category = Camera Mode
+$mode:int = 2
+$linkOpacity = 0.0
+$cameraDistance = 0.01
+
 
 # Third Person - Camera Distance
 

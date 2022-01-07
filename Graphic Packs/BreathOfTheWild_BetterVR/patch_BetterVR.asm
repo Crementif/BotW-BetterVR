@@ -5,10 +5,10 @@ moduleMatches = 0x6267BFD0
 
 ; Additional settings
 startGraphicPackData:
-SwappedFlipSideSetting:
-.int $swappedFlipSide
+ModeSetting:
+.int $mode
 EyeSeparationSetting:
-.float $eyeSeparationSetting
+.float $eyeSeparation
 HeadPositionSensitivitySetting:
 .float $headPositionSensitivity
 HeightPositionOffsetSetting:
@@ -17,8 +17,7 @@ HUDScaleSetting:
 .float $hudScale
 MenuScaleSetting:
 .float $menuScale
-ZoomOutLevelSetting:
-.float $zoomOutLevelSetting
+
 
 oldPosX: ; Input for the calculations done in the Vulkan layer
 .float 0.0
