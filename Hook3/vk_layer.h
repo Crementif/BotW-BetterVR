@@ -646,7 +646,6 @@ typedef struct VkLayerDispatchTable_ {
     PFN_vkDestroyAccelerationStructureKHR DestroyAccelerationStructureKHR;
     PFN_vkDestroyAccelerationStructureNV DestroyAccelerationStructureNV;
     PFN_vkGetAccelerationStructureMemoryRequirementsNV GetAccelerationStructureMemoryRequirementsNV;
-    PFN_vkBindAccelerationStructureMemoryKHR BindAccelerationStructureMemoryKHR;
     PFN_vkBindAccelerationStructureMemoryNV BindAccelerationStructureMemoryNV;
     PFN_vkCmdBuildAccelerationStructureNV CmdBuildAccelerationStructureNV;
     PFN_vkCmdCopyAccelerationStructureNV CmdCopyAccelerationStructureNV;
