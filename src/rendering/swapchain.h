@@ -10,11 +10,10 @@ public:
     void FinishRendering();
 
     XrSwapchain GetHandle() { return m_swapchain; };
+    ID3D12Resource* GetTexture() { return m_swapchainTextures[m_swapchainImageIdx].Get(); };
 
     DXGI_FORMAT GetFormat() { return DXGI_FORMAT_R8G8B8A8_UNORM; };
-
     uint32_t GetWidth() const { return m_width; };
-
     uint32_t GetHeight() const { return m_height; };
 
 private:

@@ -42,6 +42,9 @@ void RND_Renderer::Render(SharedTexture* texture) {
 }
 
 void RND_Renderer::EndFrame() {
+    VRManager::instance().XR->GetSwapchain(OpenXR::EyeSide::LEFT)->StartRendering();
+    VRManager::instance().XR->GetSwapchain(OpenXR::EyeSide::RIGHT)->StartRendering();
+
     if (m_frameState.shouldRender) {
         XrCompositionLayerProjection frameRenderLayer = { XR_TYPE_COMPOSITION_LAYER_PROJECTION };
 
@@ -50,35 +53,21 @@ void RND_Renderer::EndFrame() {
             Swapchain* swapchain = VRManager::instance().XR->GetSwapchain(eye);
             XrView view = VRManager::instance().XR->GetPredictedView(eye);
 
-            if (eye == OpenXR::EyeSide::LEFT) {
-                ID3D12Resource* swapchainImage = swapchain->StartRendering();
+            // fixme: semaphores need to be adjusted so that they can be rendered to two eyes in one frame, or two SharedTextures need to be rendered to one eye each
+            for (SharedTexture* texture : m_textures) {
+                ID3D12Device* device = VRManager::instance().D3D12->GetDevice();
+                ID3D12CommandQueue* queue = VRManager::instance().D3D12->GetCommandQueue();
+                RND_D3D12::CommandContext<false> renderSharedTexture(device, queue, [this, texture, swapchain](ID3D12GraphicsCommandList* cmdList) {
+                    cmdList->SetName(L"RenderSharedTexture");
+                    texture->d3d12WaitForFence(1);
+                    texture->d3d12TransitionLayout(cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+                    m_presentPipeline->BindAttachment(0, texture->d3d12GetTexture());
+                    m_presentPipeline->BindTarget(0, swapchain->GetTexture(), swapchain->GetFormat());
+                    m_presentPipeline->Render(cmdList, swapchain->GetTexture());
+                    texture->d3d12TransitionLayout(cmdList, D3D12_RESOURCE_STATE_COPY_DEST);
+                    texture->d3d12SignalFence(0);
+                });
             }
-            if (eye == OpenXR::EyeSide::RIGHT) {
-                if (m_textures.empty()) {
-                    ID3D12Resource* swapchainImage = swapchain->StartRendering();
-                }
-                else {
-                    // fixme: semaphores need to be adjusted so that they can be rendered to two eyes in one frame, or two SharedTextures need to be rendered to one eye each
-                    for (SharedTexture* texture : m_textures) {
-                        ID3D12Device* device = VRManager::instance().D3D12->GetDevice();
-                        ID3D12CommandQueue* queue = VRManager::instance().D3D12->GetCommandQueue();
-                        RND_D3D12::CommandContext<false> renderSharedTexture(device, queue, [this, texture, swapchain](ID3D12GraphicsCommandList* cmdList) {
-                            cmdList->SetName(L"RenderSharedTexture");
-                            ID3D12Resource* swapchainImage = swapchain->StartRendering();
-
-                            texture->d3d12WaitForFence(1);
-                            texture->d3d12TransitionLayout(cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-                            m_presentPipeline->BindAttachment(0, texture->d3d12GetTexture());
-                            m_presentPipeline->BindTarget(0, swapchainImage, swapchain->GetFormat());
-                            m_presentPipeline->Render(cmdList, swapchainImage);
-                            texture->d3d12TransitionLayout(cmdList, D3D12_RESOURCE_STATE_COPY_DEST);
-                            texture->d3d12SignalFence(0);
-                        });
-                    }
-                }
-            }
-
-            swapchain->FinishRendering();
 
             // float leftHalfFOV = glm::degrees(frameViews[0].fov.angleLeft);
             // float rightHalfFOV = glm::degrees(frameViews[0].fov.angleRight);
@@ -100,6 +89,9 @@ void RND_Renderer::EndFrame() {
         frameRenderLayer.views = m_frameProjectionViews.data();
         m_layers.emplace_back(reinterpret_cast<XrCompositionLayerBaseHeader*>(&frameRenderLayer));
     }
+
+    VRManager::instance().XR->GetSwapchain(OpenXR::EyeSide::LEFT)->FinishRendering();
+    VRManager::instance().XR->GetSwapchain(OpenXR::EyeSide::RIGHT)->FinishRendering();
 
     XrFrameEndInfo frameEndInfo = { XR_TYPE_FRAME_END_INFO };
     frameEndInfo.displayTime = m_frameState.predictedDisplayTime;
