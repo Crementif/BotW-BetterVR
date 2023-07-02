@@ -67,7 +67,7 @@ void RND_Renderer::EndFrame() {
     std::vector<XrCompositionLayerBaseHeader*> compositionLayers;
 
     XrCompositionLayerQuad layer2D = { XR_TYPE_COMPOSITION_LAYER_QUAD };
-    if (m_frameState.shouldRender && m_layer2D.GetStatus() == Layer::Status::RENDERING) {
+    if (m_layer2D.GetStatus() == Layer::Status::RENDERING) {
         // The HUD/menus aren't eye-specific, so just present the most recent one for both eyes at once
         m_layer2D.FlipSide();
         m_layer2D.Render(m_layer2D.GetCurrentSide());
@@ -79,7 +79,7 @@ void RND_Renderer::EndFrame() {
 
     XrCompositionLayerProjection layer3D = { XR_TYPE_COMPOSITION_LAYER_PROJECTION };
     std::array<XrCompositionLayerProjectionView, 2> layer3DViews = { XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW };
-    if (m_frameState.shouldRender && m_layer3D.GetStatus() == Layer::Status::RENDERING) {
+    if (m_layer3D.GetStatus() == Layer::Status::RENDERING) {
         m_layer3D.Render(OpenXR::EyeSide::LEFT);
         m_layer3D.Render(OpenXR::EyeSide::RIGHT);
         layer3DViews = m_layer3D.FinishRendering();
