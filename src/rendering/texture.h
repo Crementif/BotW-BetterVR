@@ -23,6 +23,7 @@ protected:
 
     HANDLE m_d3d12FenceHandle = nullptr;
     ComPtr<ID3D12Fence> m_d3d12Fence;
+    uint64_t m_fenceValue = 0;
 };
 
 class SharedTexture : public Texture {

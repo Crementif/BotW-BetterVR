@@ -9,8 +9,8 @@ struct CaptureTexture {
     VkImage foundImage;
     VkFormat format;
     VkExtent2D minSize;
-    OpenXR::EyeSide eyeSide = OpenXR::EyeSide::LEFT;
     std::array<std::unique_ptr<SharedTexture>, 2> sharedTextures = { nullptr, nullptr };
+    std::array<bool, 2> isCapturingSharedTextures = { false, false };
 
     // current frame state
     VkCommandBuffer captureCmdBuffer = VK_NULL_HANDLE;

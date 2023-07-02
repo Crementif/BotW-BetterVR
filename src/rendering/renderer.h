@@ -19,6 +19,16 @@ public:
         virtual ~Layer() = default;
 
         virtual void PrepareRendering() = 0;
+        void UpdatePredictedTime(XrTime time) { m_predictedTime = time; };
+        void UpdatePoses();
+        void AddTexture(OpenXR::EyeSide side, class SharedTexture* texture) {
+            checkAssert(m_status == Status::PREPARING || m_status == Status::BINDING, "Need to prepare the layer before adding textures to it");
+            m_status = Status::BINDING;
+
+            this->m_textures[side] = texture;
+        }
+        virtual bool ShouldRender() = 0;
+        virtual void Render(OpenXR::EyeSide side) = 0;
         virtual void StartRendering() = 0;
 
         enum class Status {
@@ -27,9 +37,15 @@ public:
             BINDING,
             RENDERING,
         };
-        [[nodiscard]] Status GetStatus() const { return m_status; }
+        [[nodiscard]] Status GetStatus() const { return m_status; };
+        void FlipSide() { this->m_currentSide = (this->m_currentSide == OpenXR::LEFT) ? OpenXR::RIGHT : OpenXR::LEFT; }
+        [[nodiscard]] OpenXR::EyeSide GetCurrentSide() const { return this->m_currentSide; }
     protected:
         Status m_status = Status::NOT_RENDERING;
+        OpenXR::EyeSide m_currentSide = OpenXR::EyeSide::LEFT;
+        XrTime m_predictedTime = 0;
+        std::array<XrView, 2> m_currViews = { XrView{ XR_TYPE_VIEW }, XrView{ XR_TYPE_VIEW } };
+        std::array<class SharedTexture*, 2> m_textures = { nullptr, nullptr };
     };
 
 protected:
@@ -47,12 +63,6 @@ protected:
         };
 
         void PrepareRendering() override;
-        void AddTexture(OpenXR::EyeSide side, class SharedTexture* texture) {
-            checkAssert(m_status == Status::PREPARING || m_status == Status::BINDING, "Need to prepare the layer before adding textures to it");
-            m_status = Status::BINDING;
-
-            this->m_textures[side] = texture;
-        };
         void AddDepthTexture(OpenXR::EyeSide side, class SharedTexture* depthTexture) {
             checkAssert(m_status == Status::PREPARING || m_status == Status::BINDING, "Need to prepare the layer before adding textures to it");
             m_status = Status::BINDING;
@@ -60,13 +70,17 @@ protected:
             this->m_depthTextures[side] = depthTexture;
         };
         void StartRendering() override;
-        void Render(OpenXR::EyeSide side);
+        void Render(OpenXR::EyeSide side) override;
         const std::array<XrCompositionLayerProjectionView, 2>& FinishRendering();
+
+        bool ShouldRender() override { return m_textures[OpenXR::EyeSide::LEFT] != nullptr && m_textures[OpenXR::EyeSide::RIGHT] != nullptr; }
+        [[nodiscard]] XrFovf GetCurrentFOV() const { return m_currViews[m_currentSide].fov; }
+        [[nodiscard]] XrPosef GetCurrentPose() const { return m_currViews[m_currentSide].pose; }
+        [[nodiscard]] XrPosef GetOtherPose() const { return m_currViews[(m_currentSide == OpenXR::EyeSide::LEFT) ? OpenXR::EyeSide::RIGHT : OpenXR::EyeSide::LEFT].pose; }
     private:
         std::array<std::unique_ptr<Swapchain<DXGI_FORMAT_R8G8B8A8_UNORM_SRGB>>, 2> m_swapchains;
         std::array<std::unique_ptr<Swapchain<DXGI_FORMAT_D32_FLOAT>>, 2> m_depthSwapchains;
         std::array<std::unique_ptr<RND_D3D12::PresentPipeline<true>>, 2> m_presentPipelines;
-        std::array<class SharedTexture*, 2> m_textures = { nullptr, nullptr };
         std::array<class SharedTexture*, 2> m_depthTextures = { nullptr, nullptr };
         std::array<XrCompositionLayerProjectionView, 2> m_projectionViews = {};
         std::array<XrCompositionLayerDepthInfoKHR, 2> m_projectionViewsDepthInfo = {};
@@ -81,19 +95,14 @@ protected:
         };
 
         void PrepareRendering() override;
-        void AddTexture(class SharedTexture* texture) {
-            checkAssert(m_status == Status::PREPARING, "Need to prepare the layer before adding textures to it");
-            m_status = Status::BINDING;
-
-            this->m_texture = texture;
-        };
         void StartRendering() override;
-        void Render();
+        void Render(OpenXR::EyeSide side) override;
         XrCompositionLayerQuad FinishRendering();
+
+        bool ShouldRender() override { return m_textures[OpenXR::EyeSide::LEFT] != nullptr || m_textures[OpenXR::EyeSide::RIGHT] != nullptr; }
     private:
         std::unique_ptr<Swapchain<DXGI_FORMAT_R8G8B8A8_UNORM_SRGB>> m_swapchain;
         std::unique_ptr<RND_D3D12::PresentPipeline<false>> m_presentPipeline;
-        class SharedTexture* m_texture = nullptr;
     };
 
 public:

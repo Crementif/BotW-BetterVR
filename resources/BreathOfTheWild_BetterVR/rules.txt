@@ -11,6 +11,7 @@ $cameraDistance = 0.5 # currently disabled
 $linkOpacity = 1.0
 
 $mode:int = 0
+$AER:int = 0
 $hudScale = 0.4
 $menuScale = 0.4
 $eyeSeparation = 0.067000
@@ -37,6 +38,20 @@ $mode = 1
 name = First-Person Link View
 category = Camera Mode
 $mode = 2
+
+
+# Alternate Eye Rendering
+
+[Preset]
+name = Enabled, Update Camera Separately
+category = Alternate Eye Rendering
+$AER = 1
+
+[Preset]
+name = Disabled, Update Camera Simultaneously (Default)
+category = Alternate Eye Rendering
+default = 1
+$AER = 0
 
 
 # Room Scale Movement Sensitivity

@@ -26,8 +26,6 @@ public:
     ~CemuHooks() {
     };
 
-
-    static OpenXR::EyeSide s_eyeSide;
     static data_VRSettingsIn GetSettings();
 private:
     osLib_registerHLEFunctionPtr_t osLib_registerHLEFunction;

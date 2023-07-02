@@ -25,7 +25,7 @@ public:
     void CreateSession(const XrGraphicsBindingD3D12KHR& d3d12Binding);
     std::array<XrViewConfigurationView, 2> GetViewConfigurations();
     void UpdateTime(EyeSide side, XrTime predictedDisplayTime);
-    void UpdatePoses(EyeSide side);
+    std::optional<XrSpaceLocation> UpdateSpaces(XrTime predictedDisplayTime);
     void ProcessEvents();
 
     XrSession GetSession() { return m_session; }

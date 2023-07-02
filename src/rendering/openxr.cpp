@@ -188,28 +188,18 @@ void OpenXR::UpdateTime(EyeSide side, XrTime predictedDisplayTime) {
     m_frameTimes[side] = predictedDisplayTime;
 }
 
-void OpenXR::UpdatePoses(EyeSide side) {
+std::optional<XrSpaceLocation> OpenXR::UpdateSpaces(XrTime predictedDisplayTime) {
     XrSpaceLocation spaceLocation = { XR_TYPE_SPACE_LOCATION };
-    if (XrResult result = xrLocateSpace(m_headSpace, m_stageSpace, m_frameTimes[side], &spaceLocation); XR_SUCCEEDED(result)) {
+    if (XrResult result = xrLocateSpace(m_headSpace, m_stageSpace, predictedDisplayTime, &spaceLocation); XR_SUCCEEDED(result)) {
         if (result != XR_ERROR_TIME_INVALID) {
             checkXRResult(result, "Failed to get space location!");
         }
+        checkXRResult(result, "Failed to get space location!");
     }
     if ((spaceLocation.locationFlags & XR_SPACE_LOCATION_POSITION_VALID_BIT) == 0)
-        return;
+        return std::nullopt;
 
-    std::array<XrView, 2> views = { XrView{ XR_TYPE_VIEW }, XrView{ XR_TYPE_VIEW } };
-    XrViewLocateInfo viewLocateInfo = { XR_TYPE_VIEW_LOCATE_INFO };
-    viewLocateInfo.viewConfigurationType = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
-    viewLocateInfo.displayTime = m_frameTimes[side];
-    viewLocateInfo.space = m_stageSpace; // locate the rendering views relative to the room, not the headset center
-    XrViewState viewState = { XR_TYPE_VIEW_STATE };
-    uint32_t viewCount = (uint32_t)views.size();
-    checkXRResult(xrLocateViews(m_session, &viewLocateInfo, &viewState, viewCount, &viewCount, views.data()), "Failed to get view information!");
-    if ((viewState.viewStateFlags & XR_VIEW_STATE_ORIENTATION_VALID_BIT) == 0)
-        return;
-    
-    m_updatedViews[side] = views[side];
+    return spaceLocation;
 }
 
 void OpenXR::ProcessEvents() {

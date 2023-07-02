@@ -7,6 +7,8 @@ moduleMatches = 0x6267BFD0
 data_settingsOffset:
 ModeSetting:
 .int $mode
+AlternatingEyeRenderingSetting:
+.int $AER
 EyeSeparationSetting:
 .float $eyeSeparation
 HeadPositionSensitivitySetting:

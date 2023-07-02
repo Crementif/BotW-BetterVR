@@ -173,11 +173,33 @@ void SharedTexture::vkTransitionLayout(VkCommandBuffer cmdBuffer, VkImageLayout 
         .baseArrayLayer = 0,
         .layerCount = 1
     };
-    VRManager::instance().VK->GetDeviceDispatch()->CmdPipelineBarrier(cmdBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
+    VRManager::instance().VK->GetDeviceDispatch()->CmdPipelineBarrier(cmdBuffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
     m_currLayout = layout;
 }
 
 void SharedTexture::CopyFromVkImage(VkCommandBuffer cmdBuffer, VkImage srcImage) {
+    VkMemoryBarrier2KHR memoryBarrier = {
+        .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2_KHR,
+        .srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT_KHR,
+        .srcAccessMask = VK_ACCESS_2_MEMORY_READ_BIT_KHR | VK_ACCESS_2_MEMORY_WRITE_BIT_KHR,
+        .dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT_KHR,
+        .dstAccessMask = VK_ACCESS_2_MEMORY_READ_BIT_KHR | VK_ACCESS_2_MEMORY_WRITE_BIT_KHR,
+    };
+
+    VkDependencyInfoKHR dependencyInfo = {
+        .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO_KHR,
+        .pNext = nullptr,
+        .dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT,
+        .memoryBarrierCount = 1,
+        .pMemoryBarriers = &memoryBarrier,
+        .bufferMemoryBarrierCount = 0,
+        .pBufferMemoryBarriers = nullptr,
+        .imageMemoryBarrierCount = 0,
+        .pImageMemoryBarriers = nullptr,
+    };
+
+    VRManager::instance().VK->GetDeviceDispatch()->CmdPipelineBarrier2KHR(cmdBuffer, &dependencyInfo);
+
     VkImageCopy copyRegion = {
         .srcSubresource = { (VkImageAspectFlags)(D3D12Utils::IsDepthFormat(this->d3d12GetTexture()->GetDesc().Format) ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT), 0, 0, 1 },
         .srcOffset = { 0, 0, 0 },
@@ -187,4 +209,6 @@ void SharedTexture::CopyFromVkImage(VkCommandBuffer cmdBuffer, VkImage srcImage)
     };
 
     VRManager::instance().VK->GetDeviceDispatch()->CmdCopyImage(cmdBuffer, srcImage, VK_IMAGE_LAYOUT_GENERAL, this->m_vkImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyRegion);
+
+    VRManager::instance().VK->GetDeviceDispatch()->CmdPipelineBarrier2KHR(cmdBuffer, &dependencyInfo);
 }

@@ -78,14 +78,19 @@ public:
             // Create commands to upload buffers
             checkHResult(m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, d3d12Allocator, nullptr, IID_PPV_ARGS(&this->m_cmdList)), "Failed to create D3D12_CommandContext's command list!");
 
-            recordCallback(this->m_cmdList.Get());
+            recordCallback(this);
         }
 
         ~CommandContext() {
             // Close command list and then execute command list in queue
             checkHResult(this->m_cmdList->Close(), "Failed to close D3D12_CommandContext's queue");
             ID3D12CommandList* collectedList[] = { this->m_cmdList.Get() };
+
+            for (auto& [texture, value] : this->m_waitFor)
+                texture->d3d12WaitForFence(value);
             m_queue->ExecuteCommandLists((UINT)std::size(collectedList), collectedList);
+            for (auto& [texture, value] : this->m_signalTo)
+                texture->d3d12SignalFence(value);
 
             // If enabled, wait until the command list and the fence signal has been executed
             if constexpr (blockTillExecuted) {
@@ -103,12 +108,17 @@ public:
             }
         }
 
+        ID3D12GraphicsCommandList* GetRecordList() { return this->m_cmdList.Get(); }
+        void WaitFor(class Texture* texture, uint64_t value) { this->m_waitFor.push_back({ texture, value }); }
+        void Signal(class Texture* texture, uint64_t value) { this->m_signalTo.push_back({ texture, value }); }
     private:
         ID3D12Device* m_device;
         ID3D12CommandQueue* m_queue;
 
         ComPtr<ID3D12GraphicsCommandList> m_cmdList;
         ComPtr<ID3D12Fence> m_blockFence;
+        std::vector<std::pair<class Texture*, uint64_t>> m_waitFor;
+        std::vector<std::pair<class Texture*, uint64_t>> m_signalTo;
     };
 
 private:

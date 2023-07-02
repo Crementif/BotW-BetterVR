@@ -14,13 +14,13 @@ void CemuHooks::hook_UpdateSettings(PPCInterpreter_t* hCPU) {
 
     readMemory(ppc_settingsOffset, &settings);
     swapEndianness(settings.modeSetting);
+    swapEndianness(settings.alternatingEyeRenderingSetting);
     swapEndianness(settings.eyeSeparationSetting);
     swapEndianness(settings.headPositionSensitivitySetting);
     swapEndianness(settings.heightPositionOffsetSetting);
     swapEndianness(settings.hudScaleSetting);
     swapEndianness(settings.menuScaleSetting);
 
-    s_eyeSide = (s_eyeSide == OpenXR::EyeSide::RIGHT) ? OpenXR::EyeSide::LEFT : OpenXR::EyeSide::RIGHT;
     g_settings.store(settings);
 }
 

@@ -17,8 +17,6 @@ oldTargetY:
 .float 0.0
 oldTargetZ:
 .float 0.0
-oldFOV:
-.float 0.0
 
 data_cameraMatrixOut:
 newPosX: ; New post-calculated values from the Vulkan layer
@@ -38,8 +36,6 @@ newRotX:
 newRotY:
 .float 0.0
 newRotZ:
-.float 0.0
-newFOV:
 .float 0.0
 
 CAM_OFFSET_POS = 0x5C0
@@ -72,10 +68,6 @@ stfs f0, oldTargetY@l(r7)
 lfs f0, CAM_OFFSET_TARGET+0x8(r31)
 lis r7, oldTargetZ@ha
 stfs f0, oldTargetZ@l(r7)
-
-lfs f0, CAM_OFFSET_FOV(r31)
-lis r7, oldFOV@ha
-stfs f0, oldFOV@l(r7)
 
 lis r7, tempStuff@ha
 stw r31, tempStuff@l(r7)
@@ -115,10 +107,6 @@ stfs f0, CAM_OFFSET_TARGET+0x4(r31)
 lis r7, newTargetZ@ha
 lfs f0, newTargetZ@l(r7)
 stfs f0, CAM_OFFSET_TARGET+0x8(r31)
-
-lis r7, newFOV@ha
-lfs f0, newFOV@l(r7)
-stfs f0, CAM_OFFSET_FOV(r31)
 
 blr
 

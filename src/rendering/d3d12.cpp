@@ -175,7 +175,7 @@ RND_D3D12::PresentPipeline<depth>::PresentPipeline(RND_Renderer* pRenderer) {
         ID3D12Device* device = VRManager::instance().D3D12->GetDevice();
         ID3D12CommandQueue* queue = VRManager::instance().D3D12->GetCommandQueue();
         device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&uploadBufferAllocator));
-        RND_D3D12::CommandContext<true> uploadBufferContext(device, queue, uploadBufferAllocator.Get(), [this, device, &screenIndicesStaging](ID3D12GraphicsCommandList* cmdList) {
+        RND_D3D12::CommandContext<true> uploadBufferContext(device, queue, uploadBufferAllocator.Get(), [this, device, &screenIndicesStaging](RND_D3D12::CommandContext<true>* context) {
             m_screenIndicesBuffer = D3D12Utils::CreateConstantBuffer(device, D3D12_HEAP_TYPE_DEFAULT, sizeof(screenIndices));
 
             screenIndicesStaging = D3D12Utils::CreateConstantBuffer(device, D3D12_HEAP_TYPE_UPLOAD, sizeof(screenIndices));
@@ -185,7 +185,7 @@ RND_D3D12::PresentPipeline<depth>::PresentPipeline(RND_Renderer* pRenderer) {
             memcpy(data, screenIndices, sizeof(screenIndices));
             screenIndicesStaging->Unmap(0, nullptr);
 
-            cmdList->CopyBufferRegion(m_screenIndicesBuffer.Get(), 0, screenIndicesStaging.Get(), 0, sizeof(screenIndices));
+            context->GetRecordList()->CopyBufferRegion(m_screenIndicesBuffer.Get(), 0, screenIndicesStaging.Get(), 0, sizeof(screenIndices));
             m_screenIndicesView = {
                 .BufferLocation = m_screenIndicesBuffer->GetGPUVirtualAddress(),
                 .SizeInBytes = sizeof(screenIndices),
@@ -245,7 +245,7 @@ void RND_D3D12::PresentPipeline<depth>::BindSettings(float screenWidth, float sc
         ID3D12Device* device = VRManager::instance().D3D12->GetDevice();
         ID3D12CommandQueue* queue = VRManager::instance().D3D12->GetCommandQueue();
         device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&newSettingsAllocator));
-        RND_D3D12::CommandContext<true> uploadBufferContext(device, queue, newSettingsAllocator.Get(), [this, device, &newSettingsStaging, screenWidth, screenHeight](ID3D12GraphicsCommandList* cmdList) {
+        RND_D3D12::CommandContext<true> uploadBufferContext(device, queue, newSettingsAllocator.Get(), [this, device, &newSettingsStaging, screenWidth, screenHeight](RND_D3D12::CommandContext<true>* context) {
             m_settingsBuffer = D3D12Utils::CreateConstantBuffer(device, D3D12_HEAP_TYPE_DEFAULT, sizeof(presentSettings));
 
             newSettingsStaging = D3D12Utils::CreateConstantBuffer(device, D3D12_HEAP_TYPE_UPLOAD, sizeof(presentSettings));
@@ -261,7 +261,7 @@ void RND_D3D12::PresentPipeline<depth>::BindSettings(float screenWidth, float sc
             memcpy(data, &settings, sizeof(presentSettings));
             newSettingsStaging->Unmap(0, nullptr);
 
-            cmdList->CopyBufferRegion(m_settingsBuffer.Get(), 0, newSettingsStaging.Get(), 0, sizeof(presentSettings));
+            context->GetRecordList()->CopyBufferRegion(m_settingsBuffer.Get(), 0, newSettingsStaging.Get(), 0, sizeof(presentSettings));
         });
     }
 }

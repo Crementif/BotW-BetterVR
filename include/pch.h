@@ -40,6 +40,7 @@ using Microsoft::WRL::ComPtr;
 
 struct data_VRSettingsIn {
     int32_t modeSetting;
+    int32_t alternatingEyeRenderingSetting;
     float eyeSeparationSetting;
     float headPositionSensitivitySetting;
     float heightPositionOffsetSetting;
@@ -54,14 +55,6 @@ struct data_VRCameraIn {
     float targetX;
     float targetY;
     float targetZ;
-    float fov;
-};
-
-struct data_VRProjectionMatrixOut {
-    float aspectRatio;
-    float fovY;
-    float offsetX;
-    float offsetY;
 };
 
 struct data_VRCameraOut {
@@ -74,7 +67,13 @@ struct data_VRCameraOut {
     float rotX;
     float rotY;
     float rotZ;
-    float fov;
+};
+
+struct data_VRProjectionMatrixOut {
+    float aspectRatio;
+    float fovY;
+    float offsetX;
+    float offsetY;
 };
 
 #include "utils/logger.h"

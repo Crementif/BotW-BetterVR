@@ -43,7 +43,7 @@ PSOutput PSMain(PSInput input) {
     float depthTexture = g_depthTexture.Sample(g_sampler, samplePosition);
 
     PSOutput output;
-	output.Color = float4(colorTexture.x, colorTexture.y, colorTexture.z, colorTexture.w);
+    output.Color = float4(colorTexture.x, colorTexture.y, colorTexture.z, colorTexture.w);
     output.Depth = depthTexture;
     return output;
 }
@@ -91,7 +91,8 @@ PSOutput PSMain(PSInput input) {
     float4 colorTexture = g_colorTexture.Sample(g_sampler, samplePosition);
 
     PSOutput output;
-	output.Color = float4(colorTexture.x, colorTexture.y, colorTexture.z, colorTexture.w);
+	//output.Color = float4(0.0f, 0.0f, 0.0f, 0.0f);
+    output.Color = float4(colorTexture.x, colorTexture.y, colorTexture.z, colorTexture.w);
     return output;
 }
 )hlsl";
