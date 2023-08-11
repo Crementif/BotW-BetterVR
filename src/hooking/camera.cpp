@@ -100,6 +100,8 @@ void CemuHooks::hook_UpdateCameraPositionAndTarget(PPCInterpreter_t* hCPU) {
     swapEndianness(updatedCameraMatrix.targetZ);
     uint32_t ppc_cameraMatrixOffsetOut = hCPU->gpr[3];
     writeMemory(ppc_cameraMatrixOffsetOut, &updatedCameraMatrix);
+
+    s_framesSinceLastCameraUpdate = 0;
 }
 
 void CemuHooks::hook_UpdateCameraRotation(PPCInterpreter_t* hCPU) {

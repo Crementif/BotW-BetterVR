@@ -23,12 +23,14 @@ public:
         osLib_registerHLEFunction("coreinit", "hook_UpdateCameraRotation", &hook_UpdateCameraRotation);
         osLib_registerHLEFunction("coreinit", "hook_UpdateCameraOffset", &hook_UpdateCameraOffset);
         osLib_registerHLEFunction("coreinit", "hook_CalculateCameraAspectRatio", &hook_CalculateCameraAspectRatio);
+        osLib_registerHLEFunction("coreinit", "hook_CreateNewScreen", &hook_CreateNewScreen);
     };
     ~CemuHooks() {
         FreeLibrary(m_cemuHandle);
     };
 
     static data_VRSettingsIn GetSettings();
+    static uint32_t GetFramesSinceLastCameraUpdate() { return s_framesSinceLastCameraUpdate.load(); }
 
 private:
     HMODULE m_cemuHandle;
@@ -38,13 +40,14 @@ private:
     gameMeta_getTitleIdPtr_t gameMeta_getTitleId;
 
     static uint64_t s_memoryBaseAddress;
+    static std::atomic_uint32_t s_framesSinceLastCameraUpdate;
 
     static void hook_UpdateSettings(PPCInterpreter_t* hCPU);
     static void hook_UpdateCameraPositionAndTarget(PPCInterpreter_t* hCPU);
     static void hook_UpdateCameraRotation(PPCInterpreter_t* hCPU);
     static void hook_UpdateCameraOffset(PPCInterpreter_t* hCPU);
     static void hook_CalculateCameraAspectRatio(PPCInterpreter_t* hCPU);
-    // static void hook_UpdateProjectionMatrix(PPCInterpreter_t* hCPU);
+    static void hook_CreateNewScreen(PPCInterpreter_t* hCPU);
 
 #pragma region MEMORY_POINTERS
     template <typename T>
