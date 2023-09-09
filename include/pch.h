@@ -37,57 +37,167 @@ using Microsoft::WRL::ComPtr;
 #include <openxr/openxr.h>
 #include <openxr/openxr_platform.h>
 
+template <typename T>
+inline T swapEndianness(T val) {
+    if constexpr (std::is_floating_point<T>::value) {
+        union {
+            T f;
+            uint32_t i;
+        } bits;
+
+        bits.f = val;
+        bits.i = (bits.i & 0x000000FF) << 24 | (bits.i & 0x0000FF00) << 8  | (bits.i & 0x00FF0000) >> 8  | (bits.i & 0xFF000000) >> 24;
+
+        return bits.f;
+    }
+    else if constexpr (std::is_integral<T>::value) {
+        if constexpr (sizeof(T) == 1) {
+            return val;
+        }
+        else if constexpr (sizeof(T) == 2) {
+            return static_cast<T>((val << 8) | (val >> 8));
+        }
+        else if constexpr (sizeof(T) == 4) {
+            return ((val & 0x000000FF) << 24) | ((val & 0x0000FF00) <<  8) | ((val & 0x00FF0000) >>  8) | ((val & 0xFF000000) >> 24);
+        }
+        else {
+            union U {
+                T val;
+                std::array<std::uint8_t, sizeof(T)> raw;
+            } src, dst;
+
+            src.val = val;
+            std::reverse_copy(src.raw.begin(), src.raw.end(), dst.raw.begin());
+            return dst.val;
+        }
+    }
+    else {
+        union U {
+            T val;
+            std::array<std::uint8_t, sizeof(T)> raw;
+        } src, dst;
+
+        src.val = val;
+        std::reverse_copy(src.raw.begin(), src.raw.end(), dst.raw.begin());
+        return dst.val;
+    }
+}
+
+template<typename T>
+class BEType {
+public:
+    T val;
+
+    explicit operator T() {
+        return swapEndianness(val);
+    }
+
+    BEType<T>& operator =(T x) {
+        val = swapEndianness(x);
+        return *this;
+    }
+
+    BEType<T>& operator =(const BEType<T>& other) {
+        val = other.val;
+        return *this;
+    }
+
+    bool operator ==(const BEType<T>& other) const { return val == other.val; }
+    bool operator ==(const T& other) const { return swapEndianness(val) == other; }
+    friend bool operator ==(const T& lhs, const BEType<T>& rhs) { return lhs == swapEndianness(rhs.val);}
+
+    bool operator !=(const BEType<T>& other) const { return val != other.val; }
+    bool operator !=(const T& other) const { return swapEndianness(val) != other.val; }
+    friend bool operator !=(const T& lhs, const BEType<T>& rhs) { return lhs != swapEndianness(rhs.val); }
+
+    bool operator <(const BEType<T>& other) const { return swapEndianness(val) < swapEndianness(other.val); }
+    bool operator <(const T& other) const { return swapEndianness(val) < other; }
+    friend bool operator <(const T& lhs, const BEType<T>& rhs) { return lhs < swapEndianness(rhs.val); }
+
+    bool operator >(const BEType<T>& other) const { return swapEndianness(val) > swapEndianness(other.val); }
+    bool operator >(const T& other) const { return swapEndianness(val) > other; }
+    friend bool operator >(const T& lhs, const BEType<T>& rhs) { return lhs > swapEndianness(rhs.val); }
+
+    bool operator <=(const BEType<T>& other) const { return swapEndianness(val) <= swapEndianness(other.val); }
+    bool operator <=(const T& other) const { return swapEndianness(val) <= other; }
+    friend bool operator <=(const T& lhs, const BEType<T>& rhs) { return lhs <= swapEndianness(rhs.val); }
+
+    bool operator >=(const BEType<T>& other) const { return swapEndianness(val) >= swapEndianness(other.val); }
+    bool operator >=(const T& other) const { return swapEndianness(val) >= other; }
+    friend bool operator >=(const T& lhs, const BEType<T>& rhs) { return lhs >= swapEndianness(rhs.val); }
+};
+
+struct Matrix34 {
+    float x_x;
+    float y_x;
+    float z_x;
+    float pos_x;
+    float x_y;
+    float y_y;
+    float z_y;
+    float pos_y;
+    float x_z;
+    float y_z;
+    float z_z;
+    float pos_z;
+};
+
+struct Vec3 {
+    float x;
+    float y;
+    float z;
+};
 
 struct data_VRSettingsIn {
-    int32_t cameraModeSetting;
-    int32_t guiFollowSetting;
-    int32_t alternatingEyeRenderingSetting;
+    BEType<int32_t> cameraModeSetting;
+    BEType<int32_t> guiFollowSetting;
+    BEType<int32_t> alternatingEyeRenderingSetting;
 };
 
 struct data_VRCameraIn {
-    float posX;
-    float posY;
-    float posZ;
-    float targetX;
-    float targetY;
-    float targetZ;
+    BEType<float> posX;
+    BEType<float> posY;
+    BEType<float> posZ;
+    BEType<float> targetX;
+    BEType<float> targetY;
+    BEType<float> targetZ;
 };
 
 struct data_VRCameraOut {
-    uint32_t enabled;
-    float posX;
-    float posY;
-    float posZ;
-    float targetX;
-    float targetY;
-    float targetZ;
+    BEType<uint32_t> enabled;
+    BEType<float> posX;
+    BEType<float> posY;
+    BEType<float> posZ;
+    BEType<float> targetX;
+    BEType<float> targetY;
+    BEType<float> targetZ;
 };
 
 struct data_VRCameraRotationOut {
-    uint32_t enabled;
-    float rotX;
-    float rotY;
-    float rotZ;
+    BEType<uint32_t> enabled;
+    BEType<float> rotX;
+    BEType<float> rotY;
+    BEType<float> rotZ;
 };
 
 
 struct data_VRProjectionMatrixOut {
-    float aspectRatio;
-    float fovY;
-    float offsetX;
-    float offsetY;
+    BEType<float> aspectRatio;
+    BEType<float> fovY;
+    BEType<float> offsetX;
+    BEType<float> offsetY;
 };
 
 struct data_VRCameraOffsetOut {
-    float aspectRatio;
-    float fovY;
-    float offsetX;
-    float offsetY;
+    BEType<float> aspectRatio;
+    BEType<float> fovY;
+    BEType<float> offsetX;
+    BEType<float> offsetY;
 };
 
 struct data_VRCameraAspectRatioOut {
-    float aspectRatio;
-    float fovY;
+    BEType<float> aspectRatio;
+    BEType<float> fovY;
 };
 
 enum class ScreenId {

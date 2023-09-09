@@ -24,6 +24,7 @@ public:
         osLib_registerHLEFunction("coreinit", "hook_UpdateCameraOffset", &hook_UpdateCameraOffset);
         osLib_registerHLEFunction("coreinit", "hook_CalculateCameraAspectRatio", &hook_CalculateCameraAspectRatio);
         osLib_registerHLEFunction("coreinit", "hook_CreateNewScreen", &hook_CreateNewScreen);
+        osLib_registerHLEFunction("coreinit", "hook_UpdateActorList", &hook_UpdateActorList);
     };
     ~CemuHooks() {
         FreeLibrary(m_cemuHandle);
@@ -48,23 +49,12 @@ private:
     static void hook_UpdateCameraOffset(PPCInterpreter_t* hCPU);
     static void hook_CalculateCameraAspectRatio(PPCInterpreter_t* hCPU);
     static void hook_CreateNewScreen(PPCInterpreter_t* hCPU);
-
-#pragma region MEMORY_POINTERS
-    template <typename T>
-    static void swapEndianness(T& val) {
-        union U {
-            T val;
-            std::array<std::uint8_t, sizeof(T)> raw;
-        } src, dst;
-
-        src.val = val;
-        std::reverse_copy(src.raw.begin(), src.raw.end(), dst.raw.begin());
-        val = dst.val;
-    }
+    static void hook_UpdateActorList(PPCInterpreter_t* hCPU);
+    static void updateFrames();
 
     template <typename T>
     static void writeMemoryBE(uint64_t offset, T* valuePtr) {
-        swapEndianness(*valuePtr);
+        *valuePtr = swapEndianness(*valuePtr);
         memcpy((void*)(s_memoryBaseAddress + offset), (void*)valuePtr, sizeof(T));
     }
 
@@ -77,7 +67,7 @@ private:
     static void readMemoryBE(uint64_t offset, T* resultPtr) {
         uint64_t memoryAddress = s_memoryBaseAddress + offset;
         memcpy(resultPtr, (void*)memoryAddress, sizeof(T));
-        swapEndianness(*resultPtr);
+        *resultPtr = swapEndianness(*resultPtr);
     }
 
     template <typename T>
@@ -85,5 +75,4 @@ private:
         uint64_t memoryAddress = s_memoryBaseAddress + offset;
         memcpy(resultPtr, (void*)memoryAddress, sizeof(T));
     }
-#pragma endregion
 };

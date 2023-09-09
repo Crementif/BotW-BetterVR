@@ -20,12 +20,12 @@ data_VRProjectionMatrixOut calculateProjectionMatrix(XrFovf viewFOV) {
     float projectionCenter_offsetX = (viewFOV.angleRight + viewFOV.angleLeft) / 2.0f;
     float projectionCenter_offsetY = (viewFOV.angleUp + viewFOV.angleDown) / 2.0f;
 
-    return {
-        .aspectRatio = aspectRatio,
-        .fovY = fovY,
-        .offsetX = projectionCenter_offsetX,
-        .offsetY = projectionCenter_offsetY,
-    };
+    data_VRProjectionMatrixOut ret = {};
+    ret.aspectRatio = aspectRatio;
+    ret.fovY = fovY;
+    ret.offsetX = projectionCenter_offsetX;
+    ret.offsetY = projectionCenter_offsetY;
+    return ret;
 }
 
 OpenXR::EyeSide s_currentEye = OpenXR::EyeSide::RIGHT;
@@ -42,12 +42,6 @@ void CemuHooks::hook_UpdateCameraPositionAndTarget(PPCInterpreter_t* hCPU) {
     data_VRCameraIn origCameraMatrix = {};
 
     readMemory(ppc_cameraMatrixOffsetIn, &origCameraMatrix);
-    swapEndianness(origCameraMatrix.posX);
-    swapEndianness(origCameraMatrix.posY);
-    swapEndianness(origCameraMatrix.posZ);
-    swapEndianness(origCameraMatrix.targetX);
-    swapEndianness(origCameraMatrix.targetY);
-    swapEndianness(origCameraMatrix.targetZ);
 
     // Current VR headset camera matrix
     XrPosef currPose = VRManager::instance().XR->GetRenderer()->m_layer3D.GetPose(s_currentEye);
@@ -73,31 +67,23 @@ void CemuHooks::hook_UpdateCameraPositionAndTarget(PPCInterpreter_t* hCPU) {
     // Rotate the headset position by the in-game rotation
     glm::fvec3 rotatedHmdPos = lookAtQuat * currEyePos;
 
-    data_VRCameraOut updatedCameraMatrix = {
-        .enabled = true,
-        .posX = oldCameraPosition.x + rotatedHmdPos.x,
-        .posY = oldCameraPosition.y + rotatedHmdPos.y,
-        .posZ = oldCameraPosition.z + rotatedHmdPos.z,
-        // pos + rotated headset pos + inverted forward direction after combining both the in-game and HMD rotation
-        .targetX = oldCameraPosition.x + rotatedHmdPos.x + ((combinedMatrix[2][0] * -1.0f) * oldCameraDistance),
-        .targetY = oldCameraPosition.y + rotatedHmdPos.y + ((combinedMatrix[2][1] * -1.0f) * oldCameraDistance),
-        .targetZ = oldCameraPosition.z + rotatedHmdPos.z + ((combinedMatrix[2][2] * -1.0f) * oldCameraDistance),
-    };
-    s_currentCameraRotation = {{
-        .rotX = combinedMatrix[1][0],
-        .rotY = combinedMatrix[1][1],
-        .rotZ = combinedMatrix[1][2],
-    }, s_currentEye};
+    data_VRCameraOut updatedCameraMatrix = {};
+    updatedCameraMatrix.enabled = true;
+    updatedCameraMatrix.posX = oldCameraPosition.x + rotatedHmdPos.x;
+    updatedCameraMatrix.posY = oldCameraPosition.y + rotatedHmdPos.y;
+    updatedCameraMatrix.posZ = oldCameraPosition.z + rotatedHmdPos.z;
+    // pos + rotated headset pos + inverted forward direction after combining both the in-game and HMD rotation
+    updatedCameraMatrix.targetX = oldCameraPosition.x + rotatedHmdPos.x + ((combinedMatrix[2][0] * -1.0f) * oldCameraDistance);
+    updatedCameraMatrix.targetY = oldCameraPosition.y + rotatedHmdPos.y + ((combinedMatrix[2][1] * -1.0f) * oldCameraDistance);
+    updatedCameraMatrix.targetZ = oldCameraPosition.z + rotatedHmdPos.z + ((combinedMatrix[2][2] * -1.0f) * oldCameraDistance);
+
+    s_currentCameraRotation.first.rotY = combinedMatrix[1][1];
+    s_currentCameraRotation.first.rotX = combinedMatrix[1][0];
+    s_currentCameraRotation.first.rotZ = combinedMatrix[1][2];
+    s_currentCameraRotation.second = s_currentEye;
 
     // Write the camera matrix to the game's memory
     // Log::print("[{}] New Game Camera: x={}, y={}, z={}, targetX={}, targetY={}, targetZ={}, rotX={}, rotY={}, rotZ={}", VRManager::instance().XR->GetRenderer()->m_layer3D.GetCurrentSide() == OpenXR::EyeSide::LEFT ? "left" : "right", updatedCameraMatrix.posX, updatedCameraMatrix.posY, updatedCameraMatrix.posZ, updatedCameraMatrix.targetX, updatedCameraMatrix.targetY, updatedCameraMatrix.targetZ, updatedCameraMatrix.rotX, updatedCameraMatrix.rotY, updatedCameraMatrix.rotZ);
-    swapEndianness(updatedCameraMatrix.enabled);
-    swapEndianness(updatedCameraMatrix.posX);
-    swapEndianness(updatedCameraMatrix.posY);
-    swapEndianness(updatedCameraMatrix.posZ);
-    swapEndianness(updatedCameraMatrix.targetX);
-    swapEndianness(updatedCameraMatrix.targetY);
-    swapEndianness(updatedCameraMatrix.targetZ);
     uint32_t ppc_cameraMatrixOffsetOut = hCPU->gpr[3];
     writeMemory(ppc_cameraMatrixOffsetOut, &updatedCameraMatrix);
 
@@ -108,17 +94,12 @@ void CemuHooks::hook_UpdateCameraRotation(PPCInterpreter_t* hCPU) {
     hCPU->instructionPointer = hCPU->sprNew.LR;
     // Log::print("[{}] Updated camera rotation", s_currentCameraRotation.second == OpenXR::EyeSide::LEFT ? "left" : "right");
 
-    data_VRCameraRotationOut updatedCameraMatrix = {
-        .enabled = true,
-        .rotX = s_currentCameraRotation.first.rotX,
-        .rotY = s_currentCameraRotation.first.rotY,
-        .rotZ = s_currentCameraRotation.first.rotZ,
-    };
+    data_VRCameraRotationOut updatedCameraMatrix = {};
+    updatedCameraMatrix.enabled = true;
+    updatedCameraMatrix.rotX = s_currentCameraRotation.first.rotX;
+    updatedCameraMatrix.rotY = s_currentCameraRotation.first.rotY;
+    updatedCameraMatrix.rotZ = s_currentCameraRotation.first.rotZ;
 
-    swapEndianness(updatedCameraMatrix.enabled);
-    swapEndianness(updatedCameraMatrix.rotX);
-    swapEndianness(updatedCameraMatrix.rotY);
-    swapEndianness(updatedCameraMatrix.rotZ);
     uint32_t ppc_cameraMatrixOffsetOut = hCPU->gpr[3];
     writeMemory(ppc_cameraMatrixOffsetOut, &updatedCameraMatrix);
 }
@@ -140,10 +121,6 @@ void CemuHooks::hook_UpdateCameraOffset(PPCInterpreter_t* hCPU) {
         .offsetX = projectionMatrix.offsetX,
         .offsetY = projectionMatrix.offsetY
     };
-    swapEndianness(cameraOffsetOut.aspectRatio);
-    swapEndianness(cameraOffsetOut.fovY);
-    swapEndianness(cameraOffsetOut.offsetX);
-    swapEndianness(cameraOffsetOut.offsetY);
     uint32_t ppc_projectionMatrixOut = hCPU->gpr[11];
     writeMemory(ppc_projectionMatrixOut, &cameraOffsetOut);
 }
@@ -163,8 +140,6 @@ void CemuHooks::hook_CalculateCameraAspectRatio(PPCInterpreter_t* hCPU) {
         .aspectRatio = projectionMatrix.aspectRatio,
         .fovY = projectionMatrix.fovY
     };
-    swapEndianness(cameraOffsetOut.aspectRatio);
-    swapEndianness(cameraOffsetOut.fovY);
     uint32_t ppc_projectionMatrixOut = hCPU->gpr[28];
     writeMemory(ppc_projectionMatrixOut, &cameraOffsetOut);
 }

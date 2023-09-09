@@ -68,6 +68,7 @@ target_sources(BetterVR_Layer PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/src/rendering/texture.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/rendering/vulkan.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/rendering/vulkan.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/hooking/hands.cpp
 )
 
 # Add dependencies for DLL
