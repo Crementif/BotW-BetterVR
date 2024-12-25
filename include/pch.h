@@ -186,6 +186,28 @@ struct BEMatrix34 : BETypeCompatible {
     float DistanceSq(BEMatrix34 other) const {
         return (pos_x.getLE() - other.pos_x.getLE()) * (pos_x.getLE() - other.pos_x.getLE()) + (pos_y.getLE() - other.pos_y.getLE()) * (pos_y.getLE() - other.pos_y.getLE()) + (pos_z.getLE() - other.pos_z.getLE()) * (pos_z.getLE() - other.pos_z.getLE());
     }
+
+    std::array<std::array<float, 4>, 3> getLE() const {
+        std::array<float, 4> row0 = { x_x.getLE(), y_x.getLE(), z_x.getLE(), pos_x.getLE() };
+        std::array<float, 4> row1 = { x_y.getLE(), y_y.getLE(), z_y.getLE(), pos_y.getLE() };
+        std::array<float, 4> row2 = { x_z.getLE(), y_z.getLE(), z_z.getLE(), pos_z.getLE() };
+        return { row0, row1, row2 };
+    }
+
+    void setLE(std::array<std::array<float, 4>, 3> mtx) {
+        x_x = mtx[0][0];
+        y_x = mtx[0][1];
+        z_x = mtx[0][2];
+        pos_x = mtx[0][3];
+        x_y = mtx[1][0];
+        y_y = mtx[1][1];
+        z_y = mtx[1][2];
+        pos_y = mtx[1][3];
+        x_z = mtx[2][0];
+        y_z = mtx[2][1];
+        z_z = mtx[2][2];
+        pos_z = mtx[2][3];
+    }
 };
 
 struct BEVec2 : BETypeCompatible {

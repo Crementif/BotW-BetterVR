@@ -19,8 +19,10 @@ stw r6, 0x14(r1)
 stw r7, 0x18(r1)
 
 ; call C++ code to change the weapon mtx to the hand mtx
+mr r3, r3 ; passes the hackily obtained actor
 lwz r4, 0x18(r31) ; the char array of the weapon name
 addi r5, r1, 0x10 ; the target MTX
+addi r6, r29, 0x34 ; the gsysModel->mtx, maybe used for the location?
 bl import.coreinit.hook_changeWeaponMtx
 
 lwz r3, 0x08(r1)
@@ -38,6 +40,8 @@ lwz r3, 0x58(r1) ; the actor
 mr r3, r31
 
 blr
+
+0x03125438 = li r5, 3
 
 0x0312587C = bla changeWeaponMtx
 

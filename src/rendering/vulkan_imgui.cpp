@@ -270,7 +270,7 @@ void RND_Vulkan::ImGuiOverlay::BeginFrame() {
 
     static char buf[256];
     ImGui::InputText("Filter", buf, std::size(buf));
-    m_filter = toLower(buf);
+    m_filter = buf;
 
     // sort m_entities by priority
     std::multimap<float, std::reference_wrapper<Entity>> sortedEntities;
@@ -290,21 +290,23 @@ void RND_Vulkan::ImGuiOverlay::BeginFrame() {
         ImGui::PushID(id.c_str());
 
         for (auto& value : entity.get().values) {
-            ImGui::Checkbox(("##Frozen_"+value.value_name).c_str(), &value.frozen);
+            ImGui::PushID(value.value_name.c_str());
+
+            ImGui::Checkbox("##Frozen", &value.frozen);
             ImGui::SameLine();
-            if (ImGui::Button(("Copy##"+value.value_name).c_str())) {
+            if (ImGui::Button("Copy")) {
                 ImGui::SetClipboardText(std::format("0x{:08x}", value.value_address).c_str());
             }
             ImGui::SameLine();
 
-            ImGui::BeginDisabled(!value.frozen);
+            ImGui::BeginDisabled(!value.frozen && false);
 
             std::visit([&]<typename T0>(T0&& arg) {
                 using T = std::decay_t<T0>;
 
                 if constexpr (std::is_same_v<T, BEType<uint32_t>>) {
                     uint32_t val = std::get<BEType<uint32_t>>(value.value).getLE();
-                    if (ImGui::DragScalar(("##"+value.value_name).c_str(), ImGuiDataType_U32, &val)) {
+                    if (ImGui::DragScalar(value.value_name.c_str(), ImGuiDataType_U32, &val)) {
                         std::get<BEType<uint32_t>>(value.value) = val;
                     }
                 }
@@ -329,11 +331,28 @@ void RND_Vulkan::ImGuiOverlay::BeginFrame() {
                     }
                 }
                 else if constexpr (std::is_same_v<T, BEMatrix34>) {
-                    float xyz[3] = { std::get<BEMatrix34>(value.value).pos_x.getLE(), std::get<BEMatrix34>(value.value).pos_y.getLE(), std::get<BEMatrix34>(value.value).pos_z.getLE() };
-                    if (ImGui::DragFloat3(value.value_name.c_str(), xyz)) {
-                        std::get<BEMatrix34>(value.value).pos_x = xyz[0];
-                        std::get<BEMatrix34>(value.value).pos_y = xyz[1];
-                        std::get<BEMatrix34>(value.value).pos_z = xyz[2];
+                    if (value.expanded) {
+                        auto mtx = std::get<BEMatrix34>(value.value).getLE();
+                        ImGui::Indent(); bool row0Changed = ImGui::DragFloat4("Row 0", mtx[0].data(), 10.0f, 0, 0, nullptr, ImGuiSliderFlags_NoRoundToFormat); ImGui::Unindent();
+                        ImGui::Indent(); bool row1Changed = ImGui::DragFloat4("Row 1", mtx[1].data(), 10.0f, 0, 0, nullptr, ImGuiSliderFlags_NoRoundToFormat); ImGui::Unindent();
+                        ImGui::Indent(); bool row2Changed = ImGui::DragFloat4("Row 2", mtx[2].data(), 10.0f, 0, 0, nullptr, ImGuiSliderFlags_NoRoundToFormat); ImGui::Unindent();
+                        if (row0Changed || row1Changed || row2Changed) {
+                            std::get<BEMatrix34>(value.value).setLE(mtx);
+                        }
+                    }
+                    else {
+                        float xyz[3] = { std::get<BEMatrix34>(value.value).pos_x.getLE(), std::get<BEMatrix34>(value.value).pos_y.getLE(), std::get<BEMatrix34>(value.value).pos_z.getLE() };
+                        if (ImGui::DragFloat3(value.value_name.c_str(), xyz)) {
+                            std::get<BEMatrix34>(value.value).pos_x = xyz[0];
+                            std::get<BEMatrix34>(value.value).pos_y = xyz[1];
+                            std::get<BEMatrix34>(value.value).pos_z = xyz[2];
+                        }
+                    }
+
+                    // allow matrix to be expandable to show more
+                    ImGui::SameLine();
+                    if (ImGui::Button("...")) {
+                        value.expanded = !value.expanded;
                     }
                 }
                 else if constexpr (std::is_same_v<T, std::string>) {
@@ -343,6 +362,8 @@ void RND_Vulkan::ImGuiOverlay::BeginFrame() {
             }, value.value);
 
             ImGui::EndDisabled();
+
+            ImGui::PopID();
         }
 
         ImGui::PopID();
@@ -565,7 +586,7 @@ void RND_Vulkan::ImGuiOverlay::AddOrUpdateEntity(uint32_t actorId, const std::st
     });
 
     if (valueIt == entityIt->second.values.end()) {
-        entityIt->second.values.emplace_back(valueName, false, address, std::move(value));
+        entityIt->second.values.emplace_back(valueName, false, false, address, std::move(value));
     }
     else if (!valueIt->frozen) {
         valueIt->value = std::move(value);

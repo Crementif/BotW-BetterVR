@@ -129,12 +129,12 @@ void CemuHooks::updateFrames() {
             overlay->AddOrUpdateEntity(actorId, actorName, "mtx", actorPtr + offsetof(ActorWiiU, mtx), mtx);
             overlay->AddOrUpdateEntity(actorId, actorName, "homeMtx", actorPtr + offsetof(ActorWiiU, homeMtx), homeMtx);
 
-            uint32_t physicsMtxPtr = 0;
-            if (readMemoryBE(actorPtr + offsetof(ActorWiiU, physicsMtxPtr), &physicsMtxPtr); physicsMtxPtr != 0) {
-                BEMatrix34 physicsMtx = {};
-                readMemory(physicsMtxPtr, &physicsMtx);
-                overlay->AddOrUpdateEntity(actorId, actorName, "physicsMtx", actorPtr + offsetof(ActorWiiU, physicsMtxPtr), physicsMtx);
-            }
+            // uint32_t physicsMtxPtr = 0;
+            // if (readMemoryBE(actorPtr + offsetof(ActorWiiU, physicsMtxPtr), &physicsMtxPtr); physicsMtxPtr != 0) {
+            //     BEMatrix34 physicsMtx = {};
+            //     readMemory(physicsMtxPtr, &physicsMtx);
+            //     overlay->AddOrUpdateEntity(actorId, actorName, "physicsMtx", actorPtr + offsetof(ActorWiiU, physicsMtxPtr), physicsMtx);
+            // }
             overlay->AddOrUpdateEntity(actorId, actorName, "velocity", actorPtr + offsetof(ActorWiiU, velocity), velocity);
             overlay->AddOrUpdateEntity(actorId, actorName, "angularVelocity", actorPtr + offsetof(ActorWiiU, angularVelocity), angularVelocity);
             overlay->AddOrUpdateEntity(actorId, actorName, "scale", actorPtr + offsetof(ActorWiiU, scale), getMemory<BEVec3>(actorPtr + offsetof(ActorWiiU, scale)));
@@ -204,20 +204,47 @@ void CemuHooks::hook_changeWeaponMtx(PPCInterpreter_t* hCPU) {
         BEMatrix34 mtx = {};
         readMemory(hCPU->gpr[5], &mtx);
 
-        Log::print("Changing weapon matrix for {} with the bone {}: {}", actorName, boneName, mtx);
+        BEMatrix34 extraMtx = {};
+        readMemory(hCPU->gpr[6], &extraMtx);
 
-        // move mtx slightly upwards
-        mtx.y_x = mtx.y_x.getLE() + 0.1f;
-        mtx.z_x = mtx.z_x.getLE() + 0.1f;
-        mtx.pos_y = mtx.pos_y.getLE() + 0.1f;
-        mtx.x_z = mtx.x_z.getLE() + 0.1f;
-
-        writeMemory(hCPU->gpr[5], &mtx);
+        Log::print("Changing weapon matrix for {} with the bone {}:", actorName, boneName);
+        Log::print("  -> destMtx: {}", mtx);
+        Log::print("  -> extraMtx: {}", extraMtx);
 
         auto& m_overlay = VRManager::instance().VK->m_imguiOverlay;
         if (m_overlay) {
             m_overlay->AddOrUpdateEntity(1337, "PlayerHeldWeapons", isLeftHandWeapon ? "left_mtx" : "right_mtx", hCPU->gpr[5], mtx);
-            m_overlay->SetPriority(1337, 0.0f);
+            m_overlay->AddOrUpdateEntity(1337, "PlayerHeldWeapons", isLeftHandWeapon ? "left_extra_mtx" : "right_extra_mtx", hCPU->gpr[6], extraMtx);
+            m_overlay->SetPriority(1337, -1.0f);
+
+            // freeze the value so it doesn't get overwritten
+            Entity& entity = m_overlay->m_entities[1337];
+            for (auto& value : entity.values) {
+                if (value.value_name == (isLeftHandWeapon ? "left_mtx" : "right_mtx") && value.frozen) {
+                    mtx = std::get<BEMatrix34>(value.value);
+                    writeMemory(hCPU->gpr[5], &mtx);
+                }
+                else if (value.value_name == (isLeftHandWeapon ? "left_extra_mtx" : "right_extra_mtx") && value.frozen) {
+                    extraMtx = std::get<BEMatrix34>(value.value);
+                    writeMemory(hCPU->gpr[6], &extraMtx);
+                }
+                else {
+                    // move mtx slightly upwards
+                    mtx.y_x = mtx.y_x.getLE() + 5.1f;
+                    mtx.z_x = mtx.z_x.getLE() + 5.1f;
+                    mtx.pos_y = mtx.pos_y.getLE() + 5.1f;
+                    mtx.x_z = mtx.x_z.getLE() + 5.1f;
+
+                    // [x_x=-0.005497217, y_x=0, z_x=0.9999848, pos_x=-840.4056] [x_y=0, x_y=1, z_y=0, pos_y=199.16814] [x_z=-0.9999848, y_z=0, z_z=-0.005497217, pos_z=1797.2269]
+                    // move extraMtx slightly upwards
+                    extraMtx.pos_x = extraMtx.y_x.getLE() + 5.1f;
+                    extraMtx.pos_y = extraMtx.pos_y.getLE() + 5.1f;
+                    extraMtx.pos_z = extraMtx.pos_z.getLE() + 5.1f;
+
+                    writeMemory(hCPU->gpr[5], &mtx);
+                    writeMemory(hCPU->gpr[6], &extraMtx);
+                }
+            }
         }
     }
 }

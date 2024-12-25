@@ -5,7 +5,8 @@ using ValueVariant = std::variant<BEType<uint32_t>, BEType<int32_t>, BEType<floa
 
 struct EntityValue {
     std::string value_name;
-    bool frozen;
+    bool frozen = false;
+    bool expanded = false;
     uint32_t value_address;
     ValueVariant value;
 };
