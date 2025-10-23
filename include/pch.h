@@ -59,7 +59,10 @@ using Microsoft::WRL::ComPtr;
 #include <glm/gtc/matrix_access.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtc/type_ptr.hpp>
-#include <glm/gtc/quaternion.hpp>
+
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtx/string_cast.hpp>
+#undef GLM_ENABLE_EXPERIMENTAL
 
 inline glm::fvec2 ToGLM(const XrVector2f& vec) {
     return glm::make_vec2(&vec.x);
@@ -290,27 +293,30 @@ struct BEMatrix34 : BETypeCompatible {
         return { row0, row1, row2 };
     }
 
-    glm::mat3x4 getLEMatrix() const {
-        return {
-            x_x.getLE(), y_x.getLE(), z_x.getLE(), pos_x.getLE(),
-            x_y.getLE(), y_y.getLE(), z_y.getLE(), pos_y.getLE(),
-            x_z.getLE(), y_z.getLE(), z_z.getLE(), pos_z.getLE()
-        };
+    glm::mat4x3 getLEMatrix() const {
+        return glm::mat4x3(
+            glm::vec3(x_x.getLE(), x_y.getLE(), x_z.getLE()),      // X basis column
+            glm::vec3(y_x.getLE(), y_y.getLE(), y_z.getLE()),      // Y basis column
+            glm::vec3(z_x.getLE(), z_y.getLE(), z_z.getLE()),      // Z basis column
+            glm::vec3(pos_x.getLE(), pos_y.getLE(), pos_z.getLE()) // translation column
+        );
     }
 
-    void setLEMatrix(const glm::mat3x4& mtx) {
-        x_x = mtx[0][0];
-        y_x = mtx[0][1];
-        z_x = mtx[0][2];
-        pos_x = mtx[0][3];
-        x_y = mtx[1][0];
-        y_y = mtx[1][1];
-        z_y = mtx[1][2];
-        pos_y = mtx[1][3];
-        x_z = mtx[2][0];
-        y_z = mtx[2][1];
-        z_z = mtx[2][2];
-        pos_z = mtx[2][3];
+    void setLEMatrix(const glm::mat4x3& m) {
+        // m[col][row]
+        x_x = m[0][0];
+        x_y = m[0][1];
+        x_z = m[0][2];
+        y_x = m[1][0];
+        y_y = m[1][1];
+        y_z = m[1][2];
+        z_x = m[2][0];
+        z_y = m[2][1];
+        z_z = m[2][2];
+
+        pos_x = m[3][0];
+        pos_y = m[3][1];
+        pos_z = m[3][2];
     }
 
     BEVec3 getPos() const {
@@ -325,9 +331,9 @@ struct BEMatrix34 : BETypeCompatible {
 
     glm::fquat getRotLE() const {
         return glm::quat_cast(glm::fmat3(
-            x_x.getLE(), y_x.getLE(), z_x.getLE(),
-            x_y.getLE(), y_y.getLE(), z_y.getLE(),
-            x_z.getLE(), y_z.getLE(), z_z.getLE()
+            x_x.getLE(), x_y.getLE(), x_z.getLE(),
+            y_x.getLE(), y_y.getLE(), y_z.getLE(),
+            z_x.getLE(), z_y.getLE(), z_z.getLE()
         ));
     }
 
@@ -343,6 +349,34 @@ struct BEMatrix34 : BETypeCompatible {
         x_z = rotMat[2][0];
         y_z = rotMat[2][1];
         z_z = rotMat[2][2];
+    }
+
+    glm::mat4 getNewMatrix() {
+        glm::mat4 translationMatrix = glm::translate(glm::identity<glm::mat4>(), glm::fvec3(pos_x.getLE(), pos_y.getLE(), pos_z.getLE()));
+        glm::mat4 rotationMatrix = glm::mat4(
+            x_x.getLE(), y_x.getLE(), z_x.getLE(), 0.0f,
+            x_y.getLE(), y_y.getLE(), z_y.getLE(), 0.0f,
+            x_z.getLE(), y_z.getLE(), z_z.getLE(), 0.0f,
+            0.0f,       0.0f,       0.0f,       1.0f
+        );
+        return translationMatrix * rotationMatrix;
+    }
+
+    void setNewMatrix(const glm::fmat4& mtx) {
+        glm::fmat3 rotationPart = glm::fmat3(mtx);
+        glm::fvec3 translationPart = glm::fvec3(mtx[3]);
+        x_x = rotationPart[0][0];
+        y_x = rotationPart[0][1];
+        z_x = rotationPart[0][2];
+        x_y = rotationPart[1][0];
+        y_y = rotationPart[1][1];
+        z_y = rotationPart[1][2];
+        x_z = rotationPart[2][0];
+        y_z = rotationPart[2][1];
+        z_z = rotationPart[2][2];
+        pos_x = translationPart.x;
+        pos_y = translationPart.y;
+        pos_z = translationPart.z;
     }
 };
 

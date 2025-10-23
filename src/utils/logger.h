@@ -56,69 +56,65 @@ struct std::formatter<DXGI_FORMAT> : std::formatter<string> {
 
 template <>
 struct std::formatter<glm::fmat3> : std::formatter<string> {
-    auto format(const glm::fmat3 mtx, std::format_context& ctx) const {
-        return std::format_to(ctx.out(), "row0: [{:.1f}, {:.1f}, {:.1f}] row1: [{:.1f}, {:.1f}, {:.1f}] row2: [{:.1f}, {:.1f}, {:.1f}]",
-            mtx[0][0], mtx[0][1], mtx[0][2],
-            mtx[1][0], mtx[1][1], mtx[1][2],
-            mtx[2][0], mtx[2][1], mtx[2][2]
-        );
+    auto format(const glm::fmat3& mtx, std::format_context& ctx) const {
+        return std::format_to(ctx.out(), "{}", glm::to_string(mtx));
     }
 };
 
 template <>
 struct std::formatter<glm::fmat4> : std::formatter<string> {
-    auto format(const glm::fmat4 mtx, std::format_context& ctx) const {
-        return std::format_to(ctx.out(), "row0: [{:.3f}, {:.3f}, {:.3f}, {:.3f}] row1: [{:.3f}, {:.3f}, {:.3f}, {:.3f}] row2: [{:.3f}, {:.3f}, {:.3f}, {:.3f}] row3: [{:.3f}, {:.3f}, {:.3f}, {:.3f}]",
-            mtx[0][0], mtx[0][1], mtx[0][2], mtx[0][3],
-            mtx[1][0], mtx[1][1], mtx[1][2], mtx[1][3],
-            mtx[2][0], mtx[2][1], mtx[2][2], mtx[2][3],
-            mtx[3][0], mtx[3][1], mtx[3][2], mtx[3][3]
-        );
+    auto format(const glm::fmat4& mtx, std::format_context& ctx) const {
+        return std::format_to(ctx.out(), "{}", glm::to_string(mtx));
     }
 };
 
 template <>
-struct std::formatter<glm::mat3x4> : std::formatter<string> {
-    auto format(const glm::mat3x4 mtx, std::format_context& ctx) const {
-        return std::format_to(ctx.out(), "row0: [{:.3f}, {:.3f}, {:.3f}, {:.3f}] row1: [{:.3f}, {:.3f}, {:.3f}, {:.3f}] row2: [{:.3f}, {:.3f}, {:.3f}, {:.3f}]",
-            mtx[0][0], mtx[0][1], mtx[0][2], mtx[0][3],
-            mtx[1][0], mtx[1][1], mtx[1][2], mtx[1][3],
-            mtx[2][0], mtx[2][1], mtx[2][2], mtx[2][3]
-        );
+struct std::formatter<glm::fmat3x4> : std::formatter<string> {
+    auto format(const glm::fmat3x4& mtx, std::format_context& ctx) const {
+        return std::format_to(ctx.out(), "{}", glm::to_string(mtx));
     }
 };
+
+template <>
+struct std::formatter<glm::mat4x3> : std::formatter<string> {
+    auto format(const glm::mat4x3& mtx, std::format_context& ctx) const {
+        return std::format_to(ctx.out(), "{}", glm::to_string(mtx));
+    }
+};
+
+
 
 template <>
 struct std::formatter<glm::fvec2> : std::formatter<string> {
-    auto format(const glm::fvec2 mtx, std::format_context& ctx) const {
-        return std::format_to(ctx.out(), "[x={:.1f}, y={:.1f}]", mtx.x, mtx.y);
+    auto format(const glm::fvec2& vec, std::format_context& ctx) const {
+        return std::format_to(ctx.out(), "{}", glm::to_string(vec));
     }
 };
 
 template <>
 struct std::formatter<glm::fvec3> : std::formatter<string> {
-    auto format(const glm::fvec3 mtx, std::format_context& ctx) const {
-        return std::format_to(ctx.out(), "[x={:.1f}, y={:.1f}, z={:.1f}]", mtx.x, mtx.y, mtx.z);
+    auto format(const glm::fvec3& vec, std::format_context& ctx) const {
+        return std::format_to(ctx.out(), "{}", glm::to_string(vec));
     }
 };
 
 template <>
 struct std::formatter<glm::fquat> : std::formatter<string> {
-    auto format(const glm::fquat quat, std::format_context& ctx) const {
+    auto format(const glm::fquat& quat, std::format_context& ctx) const {
         return std::format_to(ctx.out(), "[w={:.1f}, x={:.1f}, y={:.1f}, z={:.1f}] (euler: x={:.1f}, y={:.1f}, z={:.1f})", quat.w, quat.x, quat.y, quat.z, glm::degrees(glm::eulerAngles(quat)).x, glm::degrees(glm::eulerAngles(quat)).y, glm::degrees(glm::eulerAngles(quat)).z);
     }
 };
 
 template <>
 struct std::formatter<BEVec3> : std::formatter<string> {
-    auto format(const BEVec3 vec, std::format_context& ctx) const {
-        return std::format_to(ctx.out(), "[x={:.2f}, y={:.2f}, z={:.2f}]", vec.x.getLE(), vec.y.getLE(), vec.z.getLE());
+    auto format(const BEVec3& vec, std::format_context& ctx) const {
+        return std::format_to(ctx.out(), "{}", glm::to_string(vec.getLE()));
     }
 };
 
 template <>
 struct std::formatter<BEMatrix34> : std::formatter<string> {
-    auto format(const BEMatrix34 mtx, std::format_context& ctx) const {
+    auto format(const BEMatrix34& mtx, std::format_context& ctx) const {
         return std::format_to(ctx.out(), "[x_x={:.1f}, y_x={:.1f}, z_x={:.1f}, pos_x={:.1f}] [x_y={:.1f}, x_y={:.1f}, z_y={:.1f}, pos_y={:.1f}] [x_z={:.1f}, y_z={:.1f}, z_z={:.1f}, pos_z={:.1f}]",
             mtx.x_x.getLE(), mtx.y_x.getLE(), mtx.z_x.getLE(), mtx.pos_x.getLE(),
             mtx.x_y.getLE(), mtx.y_y.getLE(), mtx.z_y.getLE(), mtx.pos_y.getLE(),
@@ -129,19 +125,14 @@ struct std::formatter<BEMatrix34> : std::formatter<string> {
 
 template <>
 struct std::formatter<BEMatrix44> : std::formatter<string> {
-    auto format(const BEMatrix44 mtx, std::format_context& ctx) const {
-        return std::format_to(ctx.out(), "[a00={:.1f}, a01={:.1f}, a02={:.1f}, a03={:.1f}] [a10={:.1f}, a11={:.1f}, a12={:.1f}, a13={:.1f}] [a20={:.1f}, a21={:.1f}, a22={:.1f}, a23={:.1f}] [a30={:.1f}, a31={:.1f}, a32={:.1f}, a33={:.1f}]",
-            mtx.a00.getLE(), mtx.a01.getLE(), mtx.a02.getLE(), mtx.a03.getLE(),
-            mtx.a10.getLE(), mtx.a11.getLE(), mtx.a12.getLE(), mtx.a13.getLE(),
-            mtx.a20.getLE(), mtx.a21.getLE(), mtx.a22.getLE(), mtx.a23.getLE(),
-            mtx.a30.getLE(), mtx.a31.getLE(), mtx.a32.getLE(), mtx.a33.getLE()
-        );
+    auto format(const BEMatrix44& mtx, std::format_context& ctx) const {
+        return std::format_to(ctx.out(), "{}", glm::to_string(mtx.getLE()));
     }
 };
 
 template <>
 struct std::formatter<BESeadProjection> : std::formatter<string> {
-    auto format(const BESeadProjection proj, std::format_context& ctx) const {
+    auto format(const BESeadProjection& proj, std::format_context& ctx) const {
         return std::format_to(ctx.out(),
             "vtable = {:08X}, dirty = {}, deviceDirty = {}, matrix = {}, deviceMatrix = {} devicePosture = {}, deviceZOffset = {}, deviceZScale = {}",
             proj.__vftable.getLE(), proj.dirty.getLE(), proj.deviceDirty.getLE(), proj.matrix, proj.deviceMatrix, proj.devicePosture.getLE(), proj.deviceZOffset.getLE(), proj.deviceZScale.getLE()
@@ -151,7 +142,7 @@ struct std::formatter<BESeadProjection> : std::formatter<string> {
 
 template <>
 struct std::formatter<BESeadPerspectiveProjection> : std::formatter<string> {
-    auto format(const BESeadPerspectiveProjection proj, std::format_context& ctx) const {
+    auto format(const BESeadPerspectiveProjection& proj, std::format_context& ctx) const {
         return std::format_to(ctx.out(),
             "near = {}, far = {}, angle = {}, fovySin = {}, fovyCos = {}, fovyTan = {}, aspect = {}, offsetX = {}, offsetY = {}\r\ndirty = {}, deviceDirty = {}, matrix = {}, deviceMatrix = {} devicePosture = {}, deviceZOffset = {}, deviceZScale = {}",
             proj.zNear.getLE(), proj.zFar.getLE(), proj.fovYRadiansOrAngle.getLE(), proj.fovySin.getLE(), proj.fovyCos.getLE(), proj.fovyTan.getLE(), proj.aspect.getLE(), proj.offset.x.getLE(), proj.offset.y.getLE(),
@@ -162,19 +153,15 @@ struct std::formatter<BESeadPerspectiveProjection> : std::formatter<string> {
 
 template <>
 struct std::formatter<BESeadCamera> : std::formatter<string> {
-    auto format(const BESeadCamera cam, std::format_context& ctx) const {
+    auto format(const BESeadCamera& cam, std::format_context& ctx) const {
         return std::format_to(ctx.out(), "mtx = {}, vtbl = {:08X}", cam.mtx, cam.__vftable.getLE());
     }
 };
 
 template <>
 struct std::formatter<BESeadLookAtCamera> : std::formatter<string> {
-    auto format(const BESeadLookAtCamera cam, std::format_context& ctx) const {
-        if (!(abs(cam.up.x.getLE()) == 0.0f && cam.up.y.getLE() >= 0.9999994 && cam.up.y.getLE() <= 1.0000005f && abs(cam.up.z.getLE()) == 0.0f)) {
-            return std::format_to(ctx.out(), "mtx = {}, pos = {}, at = {}, up = {})", cam.mtx, cam.pos, cam.at, cam.up);
-        }
-
-        return std::format_to(ctx.out(), "mtx = {}, pos = {}, at = {})", cam.mtx, cam.pos, cam.at);
+    auto format(const BESeadLookAtCamera& cam, std::format_context& ctx) const {
+        return std::format_to(ctx.out(), "mtx = {}, pos = {}, at = {}, up = {}", cam.mtx, cam.pos, cam.at, cam.up);
     }
 };
 
