@@ -17,7 +17,9 @@ Windows Mixed Reality etc.). You can also use apps like Trinus VR to use this wi
 * A copy of BotW for the Wii U
 
 * A properly set up [Cemu](http://cemu.info/) emulator that's already able to run at 60FPS or higher.
-  See [this guide](https://cemu.cfw.guide/) for more info.
+  See [this guide](https://cemu.cfw.guide/) for more info.  
+
+* A recent Cemu version (at least Cemu 2.3 or newer, though only the latest version is tested to work).
 
 
 ### Mod Installation
@@ -30,19 +32,22 @@ Windows Mixed Reality etc.). You can also use apps like Trinus VR to use this wi
 
 2. Extract the downloaded `.zip` file where your `Cemu.exe` is stored.
    There should now be a .dll, .json and .bat file in the same folder as your `Cemu.exe`.
+   Make sure you start Cemu.exe once so that it can create the folder structure, if you've never done that before.
 
-3. Double-click on `Launch_BetterVR.bat` to start Cemu.
+3. The `BreathOfTheWild_BetterVR` folder has to be put in either inside the `graphicPacks` folder next to Cemu.exe if there **IS** an existing `settings.xml` file (portable mode) or the `%appdata%\Cemu\graphicPacks` folder if there's **NO** `settings.xml` next to the Cemu.exe (non-portable mode) or 
 
-4. Go to `Options`-> `Graphic packs`-> `The Legend of Zelda: Breath of the Wild` and enable the graphic pack named `BetterVR`.
+4. Double-click on `Launch_BetterVR.bat` to start Cemu.
+
+5. Go to `Options`-> `Graphic packs`-> `The Legend of Zelda: Breath of the Wild` and enable the graphic pack named `BetterVR`.
    This is where you can change any VR settings like the first/third-person mode etc.
    You'll also want to enable FPS++, or else the game will crash!
 
-5. (Recommended) For an enjoyable experience you should change some other graphic packs in this same window too:
+6. (Recommended) For an enjoyable experience you should change some other graphic packs in this same window too:
    - `Graphics` graphic pack: Use any (non-ultrawide!) resolution of 2160p (4k) or higher for clarity. Also change antialiasing to Nvidia FXAA.
    - `FPS++` graphic pack: Change the FPS limit to at least 120FPS or higher.
    - `Enhancements`: graphic pack: Change anisotropic filtering to 16x and use your preferred preset.
 
-6. Close the settings and start the game like normal from Cemu's game list. You can now put on your VR headset and if installed correctly it should now work!
+7. Close the settings and start the game like normal from Cemu's game list. You can now put on your VR headset and if installed correctly it should now work!
 
 Each time you want to play the game in VR from now on you can just use the `Launch_BetterVR.bat` file to start it in VR mode again.
 
