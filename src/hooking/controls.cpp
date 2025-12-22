@@ -96,6 +96,10 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
 
     OpenXR::InputState inputs = VRManager::instance().XR->m_input.load();
 
+    // fetch game state
+    auto gameState = VRManager::instance().XR->m_gameState.load();
+    gameState.in_game = inputs.inGame.in_game;
+
     // buttons
     static uint32_t oldCombinedHold = 0;
     uint32_t newXRBtnHold = 0;
@@ -134,11 +138,29 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
     }
 
     // fetching stick inputs
-    XrActionStateVector2f& leftStickSource = inputs.inGame.in_game ? inputs.inGame.move : inputs.inMenu.navigate;
+    XrActionStateVector2f& leftStickSource = gameState.in_game ? inputs.inGame.move : inputs.inMenu.navigate;
 
-    if (inputs.inGame.in_game) {
-        newXRBtnHold |= mapXRButtonToVpad(inputs.inGame.map, VPAD_BUTTON_MINUS);
-        newXRBtnHold |= mapXRButtonToVpad(inputs.inGame.inventory, VPAD_BUTTON_PLUS);
+    // check if we need to prevent inputs from happening
+    if (gameState.in_game != gameState.was_in_game) gameState.prevent_menu_input = true;
+    //if (!gameState.dpad_menu_open != gameState.was_dpad_menu_open) gameState.prevent_dpad_menu_input = true;
+
+    if (gameState.in_game) 
+    {
+        if (!gameState.prevent_menu_input) {
+            if (inputs.inGame.mapAndInventoryState.lastEvent == ButtonState::Event::LongPress) {
+                newXRBtnHold |= VPAD_BUTTON_MINUS;
+                gameState.map_open = true;
+            }
+            if (inputs.inGame.mapAndInventoryState.lastEvent == ButtonState::Event::ShortPress) {
+                newXRBtnHold |= VPAD_BUTTON_PLUS;
+                gameState.map_open = false;
+            }
+        }
+        else if (inputs.inGame.mapAndInventoryState.lastEvent == ButtonState::Event::None)
+        {
+            gameState.prevent_menu_input = false;
+            inputs.inGame.mapAndInventoryState.resetButtonState();
+        }
 
         newXRBtnHold |= mapXRButtonToVpad(inputs.inGame.jump, VPAD_BUTTON_X);
         newXRBtnHold |= mapXRButtonToVpad(inputs.inGame.run, VPAD_BUTTON_B);
@@ -146,30 +168,18 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
         newXRBtnHold |= mapXRButtonToVpad(inputs.inGame.cancel, VPAD_BUTTON_B);
 
         newXRBtnHold |= mapXRButtonToVpad(inputs.inGame.useRune, VPAD_BUTTON_L);
-        //newXRBtnHold |= mapXRButtonToVpad(inputs.inGame.throwWeapon, VPAD_BUTTON_R);
-        
         
         if (!leftHandCloseEnoughFromHead && !leftHandBehindHead) {
-            // When closing the dpad menu, this code triggers a grab since it also uses the grips. Will need a fix
-            // Not a big issue unless openning the menu near a grabbable item/weapon.
-            if (inputs.inGame.grabState[0].lastEvent == GrabButtonState::Event::ShortPress)
+            // Grab
+            if (inputs.inGame.grabState[0].lastEvent == ButtonState::Event::ShortPress)
                 newXRBtnHold |= VPAD_BUTTON_A;
 
+            //Dpad menu
             if (inputs.inGame.grabState[0].wasDownLastFrame) {
-                if (leftStickSource.currentState.y >= 0.5f) {
-                    newXRBtnHold |= VPAD_BUTTON_UP;
-                }
-                else if (leftStickSource.currentState.y <= -0.5f) {
-                    newXRBtnHold |= VPAD_BUTTON_DOWN;
-                }
-
-                if (leftStickSource.currentState.x <= -0.5f) {
-                    newXRBtnHold |= VPAD_BUTTON_LEFT;
-                }
-
-                else if (leftStickSource.currentState.x >= 0.5f) {
-                    newXRBtnHold |= VPAD_BUTTON_RIGHT;
-                }
+                if (leftStickSource.currentState.y >= 0.5f) newXRBtnHold |= VPAD_BUTTON_UP;
+                else if (leftStickSource.currentState.y <= -0.5f) newXRBtnHold |= VPAD_BUTTON_DOWN;
+                if (leftStickSource.currentState.x <= -0.5f) newXRBtnHold |= VPAD_BUTTON_LEFT;
+                else if (leftStickSource.currentState.x >= 0.5f) newXRBtnHold |= VPAD_BUTTON_RIGHT;
             }
         }
         else if (leftHandCloseEnoughFromHead && leftHandBehindHead && inputs.inGame.grabState[0].wasDownLastFrame)
@@ -177,7 +187,7 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
 
         if (!rightHandCloseEnoughFromHead && !rightHandBehindHead)
         {
-            if (inputs.inGame.grabState[1].lastEvent == GrabButtonState::Event::ShortPress)
+            if (inputs.inGame.grabState[1].lastEvent == ButtonState::Event::ShortPress)
                 newXRBtnHold |= VPAD_BUTTON_A;
         }
         else if (rightHandCloseEnoughFromHead && rightHandBehindHead && inputs.inGame.grabState[1].wasDownLastFrame)
@@ -188,8 +198,20 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
         newXRBtnHold |= mapXRButtonToVpad(inputs.inGame.rightTrigger, VPAD_BUTTON_ZR);
     }
     else {
-        newXRBtnHold |= mapXRButtonToVpad(inputs.inMenu.map, VPAD_BUTTON_MINUS);
-        newXRBtnHold |= mapXRButtonToVpad(inputs.inMenu.inventory, VPAD_BUTTON_PLUS);
+        if (!gameState.prevent_menu_input)
+        {
+            //Log::print<INFO>("map open : {}", inputs.inMenu.map_open);
+            if (gameState.map_open)
+                newXRBtnHold |= mapXRButtonToVpad(inputs.inMenu.mapAndInventory, VPAD_BUTTON_MINUS);
+            else
+            {
+                newXRBtnHold |= mapXRButtonToVpad(inputs.inMenu.mapAndInventory, VPAD_BUTTON_PLUS);
+            }
+        }
+        else if (!inputs.inMenu.mapAndInventory.currentState)
+            gameState.prevent_menu_input = false;
+
+       /* newXRBtnHold |= mapXRButtonToVpad(inputs.inMenu.mapAndInventory, VPAD_BUTTON_MINUS);*/
 
         newXRBtnHold |= mapXRButtonToVpad(inputs.inMenu.select, VPAD_BUTTON_A);
         newXRBtnHold |= mapXRButtonToVpad(inputs.inMenu.back, VPAD_BUTTON_B);
@@ -227,9 +249,7 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
     constexpr float HOLD_THRESHOLD = 0.1f;
 
     // movement/navigation stick
-    auto input = VRManager::instance().XR->m_input.load();
-
-    if (input.inGame.in_game) {
+    if (inputs.inGame.in_game) {
         auto isolateYaw = [](const glm::fquat& q) -> glm::fquat {
             glm::vec3 euler = glm::eulerAngles(q);
             euler.x = 0.0f;
@@ -237,10 +257,10 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
             return glm::angleAxis(euler.y, glm::vec3(0, 1, 0));
         };
 
-        glm::fquat controllerRotation = ToGLM(input.inGame.poseLocation[OpenXR::EyeSide::LEFT].pose.orientation);
+        glm::fquat controllerRotation = ToGLM(inputs.inGame.poseLocation[OpenXR::EyeSide::LEFT].pose.orientation);
         glm::fquat controllerYawRotation = isolateYaw(controllerRotation);
 
-        glm::fquat moveRotation = input.inGame.pose[OpenXR::EyeSide::LEFT].isActive ? glm::inverse(VRManager::instance().XR->m_inputCameraRotation.load() * controllerYawRotation) : glm::identity<glm::fquat>();
+        glm::fquat moveRotation = inputs.inGame.pose[OpenXR::EyeSide::LEFT].isActive ? glm::inverse(VRManager::instance().XR->m_inputCameraRotation.load() * controllerYawRotation) : glm::identity<glm::fquat>();
 
         glm::vec3 localMoveVec(leftStickSource.currentState.x, 0.0f, leftStickSource.currentState.y);
 
@@ -321,6 +341,11 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
 
     // set r3 to 1 for hooked VPADRead function to return success
     hCPU->gpr[3] = 1;
+
+    // set previous game states
+    gameState.was_in_game = gameState.in_game;
+    VRManager::instance().XR->m_gameState.store(gameState);
+    VRManager::instance().XR->m_input.store(inputs);
 }
 
 

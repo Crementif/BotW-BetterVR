@@ -30,8 +30,8 @@ public:
             std::optional<EyeSide> lastPickupSide = std::nullopt;
 
             // shared
-            XrActionStateBoolean map;
-            XrActionStateBoolean inventory;
+            XrActionStateBoolean mapAndInventory;
+            //XrActionStateBoolean inventory;
 
             XrActionStateBoolean leftTrigger;
             XrActionStateBoolean rightTrigger;
@@ -48,7 +48,7 @@ public:
             XrActionStateBoolean interact;
             std::array<XrActionStateBoolean, 2> grab;
 
-            struct GrabButtonState {
+            struct ButtonState {
                 enum class Event {
                     None,
                     ShortPress,
@@ -65,9 +65,14 @@ public:
                 Event lastEvent = Event::None;
 
                 void resetFrameFlags() { lastEvent = Event::None; }
+                void resetButtonState() {
+                    wasDownLastFrame = false;
+                    longFired = false;
+                    waitingForSecond = false;
+                }
             };
-            std::array<GrabButtonState, 2> grabState; // LEFT/RIGHT
-
+            std::array<ButtonState, 2> grabState; // LEFT/RIGHT
+            ButtonState mapAndInventoryState;
             std::array<XrActionStatePose, 2> pose;
             std::array<XrSpaceLocation, 2> poseLocation;
             std::array<XrSpaceVelocity, 2> poseVelocity;
@@ -76,12 +81,12 @@ public:
         } inGame;
         struct InMenu {
             bool in_game = false;
-            XrTime m_inputTime;
+            XrTime inputTime;
             std::optional<EyeSide> lastPickupSide = std::nullopt;
 
             // shared
-            XrActionStateBoolean map;
-            XrActionStateBoolean inventory;
+            XrActionStateBoolean mapAndInventory;
+            //XrActionStateBoolean inventory;
 
             XrActionStateBoolean leftTrigger;
             XrActionStateBoolean rightTrigger;
@@ -102,11 +107,24 @@ public:
     std::atomic<InputState> m_input = InputState{};
     std::atomic<glm::fquat> m_inputCameraRotation = glm::identity<glm::fquat>();
 
+    struct GameState {
+        bool in_game = false;
+        bool was_in_game = false;
+        bool map_open = false;
+        bool dpad_menu_open = false;
+        bool was_dpad_menu_open = false;
+        bool prevent_menu_input = false;
+        //bool prevent_dpad_menu_input = false;
+    } gameState ;
+
+    std::atomic<GameState> m_gameState{};
+
     void CreateSession(const XrGraphicsBindingD3D12KHR& d3d12Binding);
     void CreateActions();
     std::array<XrViewConfigurationView, 2> GetViewConfigurations();
     std::optional<XrSpaceLocation> UpdateSpaces(XrTime predictedDisplayTime);
     std::optional<InputState> UpdateActions(XrTime predictedFrameTime, glm::fquat controllerRotation, bool inMenu);
+   
     void ProcessEvents();
 
     XrSession GetSession() const { return m_session; }
@@ -147,8 +165,8 @@ private:
     XrAction m_inGame_leftTriggerAction = XR_NULL_HANDLE;
     XrAction m_inGame_rightTriggerAction = XR_NULL_HANDLE;
 
-    XrAction m_inGame_mapAction = XR_NULL_HANDLE;
-    XrAction m_inGame_inventoryAction = XR_NULL_HANDLE;
+    XrAction m_inGame_mapAndInventoryAction = XR_NULL_HANDLE;
+    /*XrAction m_inGame_inventoryAction = XR_NULL_HANDLE;*/
     XrAction m_rumbleAction = XR_NULL_HANDLE;
 
     // menu actions
@@ -165,8 +183,8 @@ private:
     XrAction m_inMenu_leftTriggerAction= XR_NULL_HANDLE;
     XrAction m_inMenu_rightTriggerAction = XR_NULL_HANDLE;
 
-    XrAction m_inMenu_mapAction = XR_NULL_HANDLE;
-    XrAction m_inMenu_inventoryAction = XR_NULL_HANDLE;
+    XrAction m_inMenu_mapAndInventoryAction = XR_NULL_HANDLE;
+    /*XrAction m_inMenu_inventoryAction = XR_NULL_HANDLE;*/
 
     std::unique_ptr<RND_Renderer> m_renderer;
     std::unique_ptr<RumbleManager> m_rumbleManager;
@@ -181,6 +199,4 @@ private:
     PFN_xrCreateDebugUtilsMessengerEXT func_xrCreateDebugUtilsMessengerEXT = nullptr;
     PFN_xrDestroyDebugUtilsMessengerEXT func_xrDestroyDebugUtilsMessengerEXT = nullptr;
 };
-
-using EyeSide = OpenXR::EyeSide;
-using GrabButtonState = OpenXR::InputState::InGame::GrabButtonState; 
+using ButtonState = OpenXR::InputState::InGame::ButtonState; 

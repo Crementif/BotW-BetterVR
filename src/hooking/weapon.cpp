@@ -16,74 +16,6 @@ std::array s_cameraPositions = {
     glm::fvec3(0.0f)
 };
 
-static bool isDroppable(std::string actorName) {
-    static const std::string_view nonDroppableItems[] = {
-        "GameRomHorseReins_01",
-        "GameRomHorseReins_02",
-        "GameRomHorseReins_03",
-        "GameRomHorseReins_04",
-        "GameRomHorseReins_05",
-        "GameRomHorseReins_10",
-        "GameRomHorseSaddle_01",
-        "GameRomHorseSaddle_02",
-        "GameRomHorseSaddle_03",
-        "GameRomHorseSaddle_04",
-        "GameRomHorseSaddle_05",
-        "GameRomHorseSaddle_10",
-        "Get_TwnObj_DLC_MemorialPicture_A_01",
-        "Item_Conductor",
-        "Item_CookSet",
-        "KeySmall",
-        "Obj_Armor_115_Head",
-        "Obj_DLC_HeroSeal_Gerudo",
-        "Obj_DLC_HeroSeal_Goron",
-        "Obj_DLC_HeroSeal_Rito",
-        "Obj_DLC_HeroSeal_Zora",
-        "Obj_DLC_HeroSoul_Gerudo",
-        "Obj_DLC_HeroSoul_Goron",
-        "Obj_DLC_HeroSoul_Rito",
-        "Obj_DLC_HeroSoul_Zora",
-        "Obj_DRStone_A_01",
-        "Obj_DRStone_Get",
-        "Obj_DungeonClearSeal",
-        "Obj_HeartUtuwa_A_01",
-        "Obj_HeroSoul_Gerudo",
-        "Obj_HeroSoul_Goron",
-        "Obj_HeroSoul_Rito",
-        "Obj_HeroSoul_Zora",
-        "Obj_KorokNuts",
-        "Obj_Maracas",
-        "Obj_ProofBook",
-        "Obj_ProofGiantKiller",
-        "Obj_ProofGolemKiller",
-        "Obj_ProofKorok",
-        "Obj_ProofSandwormKiller",
-        "Obj_StaminaUtuwa_A_01",
-        "Obj_WarpDLC",
-        "PlayerStole2",
-        "PlayerStole2_Vagrant",
-        "Weapon_Bow_071",
-        "Weapon_Sword_056",
-        "Weapon_Sword_070",
-        "Weapon_Sword_080",
-        "Weapon_Sword_081",
-        "Weapon_Sword_502"
-    };
-
-    for (const auto& item : nonDroppableItems) {
-        if (actorName == item) {
-            return false;
-        }
-    }
-
-    // prevent dropping arrows
-    if (actorName.contains("Arrow")) {
-        return false;
-    }
-
-    return true;
-}
-
 void CemuHooks::hook_ChangeWeaponMtx(PPCInterpreter_t* hCPU) {
     hCPU->instructionPointer = hCPU->sprNew.LR;
 
@@ -168,21 +100,21 @@ void CemuHooks::hook_ChangeWeaponMtx(PPCInterpreter_t* hCPU) {
         auto input = VRManager::instance().XR->m_input.load();
         auto& grabState = input.inGame.grabState[side];
 
-        if (input.inGame.in_game && grabState.lastEvent == GrabButtonState::Event::DoublePress && isDroppable(targetActor.name.getLE())) {
-            Log::print<INFO>("Dropping weapon {} with type of {} due to double press on grab button", targetActor.name.getLE().c_str(), (uint32_t)targetActor.type.getLE());
+        if (input.inGame.in_game && grabState.lastEvent == ButtonState::Event::DoublePress) {
+            Log::print<CONTROLS>("Dropping weapon {} due to double press on grab button", targetActor.name.getLE().c_str());
             hCPU->gpr[11] = 1;
             hCPU->gpr[9] = 1;
             hCPU->gpr[13] = isLeftHandWeapon ? 1 : 0; // set the hand index to 0 for left hand, 1 for right hand
             return;
         }
         // Support for long press (placeholder)
-        if (input.inGame.in_game && grabState.lastEvent == GrabButtonState::Event::LongPress) {
+        if (input.inGame.in_game && grabState.lastEvent == ButtonState::Event::LongPress) {
             Log::print<CONTROLS>("Long press detected for {} (side {})", targetActor.name.getLE().c_str(), (int)side);
             // TODO: Implement long press action (e.g., temporarily bind item)
             //grabState.longPress = false;
         }
         // Support for short press (placeholder)
-        if (input.inGame.in_game && grabState.lastEvent == GrabButtonState::Event::ShortPress) {
+        if (input.inGame.in_game && grabState.lastEvent == ButtonState::Event::ShortPress) {
             Log::print<CONTROLS>("Short press detected for {} (side {})", targetActor.name.getLE().c_str(), (int)side);
             // TODO: Implement short press action (e.g., cycle weapon)
         }
