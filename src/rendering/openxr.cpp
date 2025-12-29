@@ -321,7 +321,7 @@ void OpenXR::CreateActions() {
         suggestedBindingsInfo.interactionProfile = GetXRPath("/interaction_profiles/oculus/touch_controller");
         suggestedBindingsInfo.countSuggestedBindings = (uint32_t)suggestedBindings.size();
         suggestedBindingsInfo.suggestedBindings = suggestedBindings.data();
-        checkXRResult(xrSuggestInteractionProfileBindings(m_instance, &suggestedBindingsInfo), "Failed to suggest touch controller profile bindings!");
+        checkXRResult(xrSuggestInteractionProfileBindings(m_instance, &suggestedBindingsInfo), "Failed to suggest Oculus Touch Controller Profile bindings!");
     }
 
     {
@@ -332,40 +332,46 @@ void OpenXR::CreateActions() {
             XrActionSuggestedBinding{ .action = m_gripPoseAction, .binding = GetXRPath("/user/hand/right/input/grip/pose") },
             XrActionSuggestedBinding{ .action = m_aimPoseAction, .binding = GetXRPath("/user/hand/left/input/aim/pose") },
             XrActionSuggestedBinding{ .action = m_aimPoseAction, .binding = GetXRPath("/user/hand/right/input/aim/pose") },
-            XrActionSuggestedBinding{ .action = m_inGame_mapAndInventoryAction, .binding = GetXRPath("/user/hand/right/input/menu/click") },
-            //XrActionSuggestedBinding{ .action = m_inGame_inventoryAction, .binding = GetXRPath("/user/hand/right/input/menu/click") },
+            XrActionSuggestedBinding{ .action = m_inGame_mapAndInventoryAction, .binding = GetXRPath("/user/hand/right/input/thumbstick/click") },
 
-            // XrActionSuggestedBinding{ .action = m_interactAction, .binding = GetXRPath("/user/hand/left/input/trigger/value") },
-            // XrActionSuggestedBinding{ .action = m_interactAction, .binding = GetXRPath("/user/hand/right/input/trigger/value") },
-            // XrActionSuggestedBinding{ .action = m_grabAction, .binding = GetXRPath("/user/hand/left/input/squeeze/click") },
-            // XrActionSuggestedBinding{ .action = m_grabAction, .binding = GetXRPath("/user/hand/right/input/squeeze/click") },
-            //
-            // XrActionSuggestedBinding{ .action = m_jumpAction, .binding = GetXRPath("/user/hand/right/input/trackpad/click") },
-            // XrActionSuggestedBinding{ .action = m_cancelAction, .binding = GetXRPath("/user/hand/right/input/thumbstick/click") },
-            // XrActionSuggestedBinding{ .action = m_mapAction, .binding = GetXRPath("/user/hand/left/input/menu/click") },
-            // XrActionSuggestedBinding{ .action = m_menuAction, .binding = GetXRPath("/user/hand/right/input/menu/click") },
-            //
-            // XrActionSuggestedBinding{ .action = m_moveAction, .binding = GetXRPath("/user/hand/left/input/thumbstick") },
-            // XrActionSuggestedBinding{ .action = m_cameraAction, .binding = GetXRPath("/user/hand/right/input/thumbstick") },
-            // XrActionSuggestedBinding{ .action = m_gripPoseAction, .binding = GetXRPath("/user/hand/left/input/grip/pose") },
-            // XrActionSuggestedBinding{ .action = m_gripPoseAction, .binding = GetXRPath("/user/hand/right/input/grip/pose") },
+            XrActionSuggestedBinding{ .action = m_moveAction, .binding = GetXRPath("/user/hand/left/input/thumbstick") },
+            XrActionSuggestedBinding{ .action = m_cameraAction, .binding = GetXRPath("/user/hand/right/input/thumbstick") },
+
+            XrActionSuggestedBinding{ .action = m_grabAction, .binding = GetXRPath("/user/hand/left/input/squeeze/value") },
+            XrActionSuggestedBinding{ .action = m_grabAction, .binding = GetXRPath("/user/hand/right/input/squeeze/value") },
+            XrActionSuggestedBinding{ .action = m_interactAction, .binding = GetXRPath("/user/hand/right/input/a/click") },
+            XrActionSuggestedBinding{ .action = m_cancelAction, .binding = GetXRPath("/user/hand/right/input/a/click") },
+
+            XrActionSuggestedBinding{ .action = m_jumpAction, .binding = GetXRPath("/user/hand/right/input/b/click") },
+            XrActionSuggestedBinding{ .action = m_crouchAction, .binding = GetXRPath("/user/hand/left/input/thumbstick/click") },
+            XrActionSuggestedBinding{ .action = m_runAction, .binding = GetXRPath("/user/hand/right/input/a/click") },
+            XrActionSuggestedBinding{ .action = m_attackAction, .binding = GetXRPath("/user/hand/left/input/a/click") },
+            XrActionSuggestedBinding{ .action = m_useRuneAction, .binding = GetXRPath("/user/hand/left/input/b/click") },
+
+            XrActionSuggestedBinding{ .action = m_inGame_leftTriggerAction, .binding = GetXRPath("/user/hand/left/input/trigger/value") },
+            XrActionSuggestedBinding{ .action = m_inGame_rightTriggerAction, .binding = GetXRPath("/user/hand/right/input/trigger/value") },
+
+            XrActionSuggestedBinding{ .action = m_rumbleAction, .binding = GetXRPath("/user/hand/left/output/haptic") },
+            XrActionSuggestedBinding{ .action = m_rumbleAction, .binding = GetXRPath("/user/hand/right/output/haptic") },
 
             // === menu suggestions ===
-            XrActionSuggestedBinding{ .action = m_scrollAction, .binding = GetXRPath("/user/hand/left/input/thumbstick") },
-            XrActionSuggestedBinding{ .action = m_navigateAction, .binding = GetXRPath("/user/hand/right/input/thumbstick") },
-            XrActionSuggestedBinding{ .action = m_inMenu_mapAndInventoryAction, .binding = GetXRPath("/user/hand/right/input/menu/click") },
-            XrActionSuggestedBinding{ .action = m_selectAction, .binding = GetXRPath("/user/hand/right/input/trigger/value") },
-            XrActionSuggestedBinding{ .action = m_backAction, .binding = GetXRPath("/user/hand/right/input/trackpad/click") },
-            XrActionSuggestedBinding{ .action = m_sortAction, .binding = GetXRPath("/user/hand/left/input/trigger/value") },
-            XrActionSuggestedBinding{ .action = m_holdAction, .binding = GetXRPath("/user/hand/left/input/trackpad/click") },
-            XrActionSuggestedBinding{ .action = m_leftGripAction, .binding = GetXRPath("/user/hand/left/input/squeeze/click") },
-            XrActionSuggestedBinding{ .action = m_rightGripAction, .binding = GetXRPath("/user/hand/right/input/squeeze/click") },
+            XrActionSuggestedBinding{ .action = m_scrollAction, .binding = GetXRPath("/user/hand/right/input/thumbstick") },
+            XrActionSuggestedBinding{ .action = m_navigateAction, .binding = GetXRPath("/user/hand/left/input/thumbstick") },
+            XrActionSuggestedBinding{ .action = m_inMenu_mapAndInventoryAction, .binding = GetXRPath("/user/hand/right/input/thumbstick/click") },
+            XrActionSuggestedBinding{ .action = m_selectAction, .binding = GetXRPath("/user/hand/right/input/a/click") },
+            XrActionSuggestedBinding{ .action = m_backAction, .binding = GetXRPath("/user/hand/right/input/b/click") },
+            XrActionSuggestedBinding{ .action = m_sortAction, .binding = GetXRPath("/user/hand/left/input/b/click") },
+            XrActionSuggestedBinding{ .action = m_holdAction, .binding = GetXRPath("/user/hand/left/input/a/click") },
+            XrActionSuggestedBinding{ .action = m_leftGripAction, .binding = GetXRPath("/user/hand/left/input/squeeze/value") },
+            XrActionSuggestedBinding{ .action = m_rightGripAction, .binding = GetXRPath("/user/hand/right/input/squeeze/value") },
+            XrActionSuggestedBinding{ .action = m_inMenu_leftTriggerAction, .binding = GetXRPath("/user/hand/left/input/trigger/value") },
+            XrActionSuggestedBinding{ .action = m_inMenu_rightTriggerAction, .binding = GetXRPath("/user/hand/right/input/trigger/value") },
         };
         XrInteractionProfileSuggestedBinding suggestedBindingsInfo = { XR_TYPE_INTERACTION_PROFILE_SUGGESTED_BINDING };
-        suggestedBindingsInfo.interactionProfile = GetXRPath("/interaction_profiles/microsoft/motion_controller");
+        suggestedBindingsInfo.interactionProfile = GetXRPath("/interaction_profiles/valve/index_controller");
         suggestedBindingsInfo.countSuggestedBindings = (uint32_t)suggestedBindings.size();
         suggestedBindingsInfo.suggestedBindings = suggestedBindings.data();
-        checkXRResult(xrSuggestInteractionProfileBindings(m_instance, &suggestedBindingsInfo), "Failed to suggest microsoft motion controller profile bindings!");
+        checkXRResult(xrSuggestInteractionProfileBindings(m_instance, &suggestedBindingsInfo), "Failed to suggest Valve Index Controller Profile bindings!");
     }
 
     XrSessionActionSetsAttachInfo attachInfo = { XR_TYPE_SESSION_ACTION_SETS_ATTACH_INFO };
@@ -417,7 +423,7 @@ void CheckButtonState(XrActionStateBoolean& action, ButtonState& buttonState) {
     // pressed state
     if (down) {
         //will need to check if that cause issues elsewhere. Allows to keep LongPress event while button is pressed.
-        if (/*!buttonState.longFired &&*/(now - buttonState.pressStartTime) >= longPressThreshold) {
+        if (/*!buttonState.longFired &&*/ (now - buttonState.pressStartTime) >= longPressThreshold) {
             //buttonState.longFired = true;
             buttonState.lastEvent = ButtonState::Event::LongPress;
         }
@@ -526,7 +532,6 @@ std::optional<OpenXR::InputState> OpenXR::UpdateActions(XrTime predictedFrameTim
         getRightTriggerInfo.subactionPath = XR_NULL_PATH;
         newState.inMenu.rightTrigger = { XR_TYPE_ACTION_STATE_BOOLEAN };
         checkXRResult(xrGetActionStateBoolean(m_session, &getRightTriggerInfo, &newState.inMenu.rightTrigger), "Failed to get right trigger action value!");
-
     }
     else {
         for (EyeSide side : { EyeSide::LEFT, EyeSide::RIGHT }) {
@@ -591,7 +596,7 @@ std::optional<OpenXR::InputState> OpenXR::UpdateActions(XrTime predictedFrameTim
         auto& mapAndInventoryAction = newState.inGame.mapAndInventory;
         auto& mapAndInventoryButtonState = newState.inGame.mapAndInventoryState;
         CheckButtonState(mapAndInventoryAction, mapAndInventoryButtonState);
-        
+
         //XrActionStateGetInfo getInventory = { XR_TYPE_ACTION_STATE_GET_INFO };
         //getInventory.action = m_inGame_inventoryAction;
         //newState.inGame.inventory = { XR_TYPE_ACTION_STATE_BOOLEAN };
@@ -625,7 +630,7 @@ std::optional<OpenXR::InputState> OpenXR::UpdateActions(XrTime predictedFrameTim
         getJumpInfo.subactionPath = XR_NULL_PATH;
         newState.inGame.jump = { XR_TYPE_ACTION_STATE_BOOLEAN };
         checkXRResult(xrGetActionStateBoolean(m_session, &getJumpInfo, &newState.inGame.jump), "Failed to get jump action value!");
-    
+
         XrActionStateGetInfo getCrouchInfo = { XR_TYPE_ACTION_STATE_GET_INFO };
         getCrouchInfo.action = m_crouchAction;
         getCrouchInfo.subactionPath = XR_NULL_PATH;
@@ -641,19 +646,19 @@ std::optional<OpenXR::InputState> OpenXR::UpdateActions(XrTime predictedFrameTim
         auto& runAction = newState.inGame.run;
         auto& runButtonState = newState.inGame.runState;
         CheckButtonState(runAction, runButtonState);
-        
+
         XrActionStateGetInfo getAttackInfo = { XR_TYPE_ACTION_STATE_GET_INFO };
         getAttackInfo.action = m_attackAction;
         getAttackInfo.subactionPath = XR_NULL_PATH;
         newState.inGame.attack = { XR_TYPE_ACTION_STATE_BOOLEAN };
         checkXRResult(xrGetActionStateBoolean(m_session, &getAttackInfo, &newState.inGame.attack), "Failed to get attack action value!");
-    
+
         XrActionStateGetInfo getUseRuneInfo = { XR_TYPE_ACTION_STATE_GET_INFO };
         getUseRuneInfo.action = m_useRuneAction;
         getUseRuneInfo.subactionPath = XR_NULL_PATH;
         newState.inGame.useRune = { XR_TYPE_ACTION_STATE_BOOLEAN };
         checkXRResult(xrGetActionStateBoolean(m_session, &getUseRuneInfo, &newState.inGame.useRune), "Failed to get useRune action value!");
-    
+
         XrActionStateGetInfo getThrowWeaponInfo = { XR_TYPE_ACTION_STATE_GET_INFO };
         getThrowWeaponInfo.action = m_throwWeaponAction;
         getThrowWeaponInfo.subactionPath = XR_NULL_PATH;
@@ -671,7 +676,7 @@ std::optional<OpenXR::InputState> OpenXR::UpdateActions(XrTime predictedFrameTim
         getRightTriggerInfo.subactionPath = XR_NULL_PATH;
         newState.inGame.rightTrigger = { XR_TYPE_ACTION_STATE_BOOLEAN };
         checkXRResult(xrGetActionStateBoolean(m_session, &getRightTriggerInfo, &newState.inGame.rightTrigger), "Failed to get right trigger action value!");
-}
+    }
     this->m_input.store(newState);
     return newState;
 }
