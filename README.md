@@ -143,7 +143,7 @@ There's enough that was skipped over or left out in this explanation.
 Crementif: Main Developer  
 Acudofy: Sword & stab analysis system  
 Holydh: Developed some of the new input systems  
-leoetlino: For the [BotW Decomp project](github.com/zeldaret/botw), which was very useful  
+leoetlino: For the [BotW Decomp project](https://github.com/zeldaret/botw), which was very useful  
 Exzap: Technical support and optimization help  
 Mako Marci: Edited the trailer  
 Tim, Mako Marci, Solarwolf07 & Elliott Tate: Helped with testing, recording, feedback and support  
