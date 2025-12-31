@@ -8,6 +8,9 @@ RND_Vulkan::RND_Vulkan(VkInstance vkInstance, VkPhysicalDevice vkPhysDevice, VkD
     m_physicalDeviceDispatch = vkroots::tables::LookupPhysicalDeviceDispatch(vkPhysDevice);
     m_deviceDispatch = vkroots::tables::LookupDeviceDispatch(vkDevice);
 
+    // AMD GPU FIX: Initialize sType before calling vkGetPhysicalDeviceMemoryProperties2
+    m_memoryProperties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_PROPERTIES_2;
+    m_memoryProperties.pNext = nullptr;
     m_physicalDeviceDispatch->GetPhysicalDeviceMemoryProperties2KHR(vkPhysDevice, &m_memoryProperties);
 
     VkPhysicalDeviceProperties props{};
@@ -30,9 +33,11 @@ RND_Vulkan::~RND_Vulkan() {
 }
 
 uint32_t RND_Vulkan::FindMemoryType(uint32_t memoryTypeBitsRequirement, VkMemoryPropertyFlags requirementsMask) {
-    for (uint32_t i = 0; i < VK_MAX_MEMORY_TYPES; i++) {
-        const uint32_t memoryTypeBits = (1 << i);
-        const bool isRequiredMemoryType = memoryTypeBitsRequirement & memoryTypeBits;
+    // AMD GPU FIX: Use actual memoryTypeCount instead of VK_MAX_MEMORY_TYPES to avoid reading uninitialized data
+    const uint32_t memoryTypeCount = m_memoryProperties.memoryProperties.memoryTypeCount;
+    for (uint32_t i = 0; i < memoryTypeCount; i++) {
+        const uint32_t memoryTypeBits = (1u << i);
+        const bool isRequiredMemoryType = (memoryTypeBitsRequirement & memoryTypeBits) != 0;
         const bool satisfiesFlags = (m_memoryProperties.memoryProperties.memoryTypes[i].propertyFlags & requirementsMask) == requirementsMask;
 
         if (isRequiredMemoryType && satisfiesFlags) {

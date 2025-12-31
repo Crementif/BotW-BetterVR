@@ -349,34 +349,37 @@ void RND_Renderer::ImGuiOverlay::BeginFrame(long frameIdx, bool renderBackground
     }
 }
 
-void RND_Renderer::ImGuiOverlay::Draw3DLayerAsBackground(VkCommandBuffer cb, VkImage srcImage, float aspectRatio, long frameIdx) {
+void RND_Renderer::ImGuiOverlay::Draw3DLayerAsBackground(VkCommandBuffer cb, VkImage srcImage, float aspectRatio, long frameIdx, VkImageLayout srcLayout) {
     // Log::print("Drawing 3D layer as background with aspect ratio {}, and isRendering3D {}", aspectRatio, VRManager::instance().XR->GetRenderer()->IsRendering3D());
     auto* renderer = VRManager::instance().XR->GetRenderer();
     auto& frame = renderer->GetFrame(frameIdx);
 
     frame.mainFramebuffer->vkPipelineBarrier(cb);
     frame.mainFramebuffer->vkTransitionLayout(cb, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-    frame.mainFramebuffer->vkCopyFromImage(cb, srcImage);
-    
+    // AMD GPU FIX: Pass the actual source layout for proper transitions
+    frame.mainFramebuffer->vkCopyFromImage(cb, srcImage, srcLayout);
+
     frame.mainFramebuffer->vkPipelineBarrier(cb);
     frame.mainFramebuffer->vkTransitionLayout(cb, VK_IMAGE_LAYOUT_GENERAL);
 
     frame.mainFramebufferAspectRatio = aspectRatio;
 }
 
-void RND_Renderer::ImGuiOverlay::DrawHUDLayerAsBackground(VkCommandBuffer cb, VkImage srcImage, long frameIdx) {
+void RND_Renderer::ImGuiOverlay::DrawHUDLayerAsBackground(VkCommandBuffer cb, VkImage srcImage, long frameIdx, VkImageLayout srcLayout) {
     auto* renderer = VRManager::instance().XR->GetRenderer();
     auto& frame = renderer->GetFrame(frameIdx);
 
     frame.hudFramebuffer->vkPipelineBarrier(cb);
     frame.hudFramebuffer->vkTransitionLayout(cb, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-    frame.hudFramebuffer->vkCopyFromImage(cb, srcImage);
+    // AMD GPU FIX: Pass the actual source layout for proper transitions
+    frame.hudFramebuffer->vkCopyFromImage(cb, srcImage, srcLayout);
     frame.hudFramebuffer->vkPipelineBarrier(cb);
     frame.hudFramebuffer->vkTransitionLayout(cb, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
     frame.hudWithoutAlphaFramebuffer->vkPipelineBarrier(cb);
     frame.hudWithoutAlphaFramebuffer->vkTransitionLayout(cb, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-    frame.hudWithoutAlphaFramebuffer->vkCopyFromImage(cb, srcImage);
+    // AMD GPU FIX: Pass the actual source layout for proper transitions
+    frame.hudWithoutAlphaFramebuffer->vkCopyFromImage(cb, srcImage, srcLayout);
     frame.hudWithoutAlphaFramebuffer->vkPipelineBarrier(cb);
     frame.hudWithoutAlphaFramebuffer->vkTransitionLayout(cb, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 }

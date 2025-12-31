@@ -107,8 +107,8 @@ public:
         explicit Layer3D(VkExtent2D extent);
         ~Layer3D();
 
-        SharedTexture* CopyColorToLayer(OpenXR::EyeSide side, VkCommandBuffer copyCmdBuffer, VkImage image, long frameIdx);
-        SharedTexture* CopyDepthToLayer(OpenXR::EyeSide side, VkCommandBuffer copyCmdBuffer, VkImage image, long frameIdx);
+        SharedTexture* CopyColorToLayer(OpenXR::EyeSide side, VkCommandBuffer copyCmdBuffer, VkImage image, long frameIdx, VkImageLayout srcImageLayout);
+        SharedTexture* CopyDepthToLayer(OpenXR::EyeSide side, VkCommandBuffer copyCmdBuffer, VkImage image, long frameIdx, VkImageLayout srcImageLayout);
         void PrepareRendering(OpenXR::EyeSide side);
         void StartRendering();
         void Render(OpenXR::EyeSide side, long frameIdx);
@@ -135,8 +135,13 @@ public:
         explicit Layer2D(VkExtent2D extent);
         ~Layer2D();
 
-        SharedTexture* CopyColorToLayer(VkCommandBuffer copyCmdBuffer, VkImage image, long frameIdx);
-        bool IsTextureReady(long frameIdx) const { return m_textures[frameIdx]->GetLastSignalledValue() == SEMAPHORE_TO_D3D12; };
+        SharedTexture* CopyColorToLayer(VkCommandBuffer copyCmdBuffer, VkImage image, long frameIdx, VkImageLayout srcImageLayout);
+        // AMD GPU FIX: With incrementing values, Vulkan signals odd values (1,3,5...), D3D12 signals even values (2,4,6...)
+        // Texture is ready for D3D12 when Vulkan has signaled (odd value > 0)
+        bool IsTextureReady(long frameIdx) const {
+            uint64_t lastSignal = m_textures[frameIdx]->GetLastSignalledValue();
+            return lastSignal > 0 && (lastSignal % 2 == 1);
+        };
         void StartRendering() const;
         void Render(long frameIdx);
         std::vector<XrCompositionLayerQuad> FinishRendering(XrTime predictedDisplayTime, long frameIdx);
@@ -162,8 +167,9 @@ public:
         bool ShouldBlockGameInput() { return ImGui::GetIO().WantCaptureKeyboard; }
 
         void BeginFrame(long frameIdx, bool renderBackground);
-        static void Draw3DLayerAsBackground(VkCommandBuffer cb, VkImage srcImage, float aspectRatio, long frameIdx);
-        static void DrawHUDLayerAsBackground(VkCommandBuffer cb, VkImage srcImage, long frameIdx);
+        // AMD GPU FIX: Added srcLayout parameter to specify the actual source image layout
+        static void Draw3DLayerAsBackground(VkCommandBuffer cb, VkImage srcImage, float aspectRatio, long frameIdx, VkImageLayout srcLayout);
+        static void DrawHUDLayerAsBackground(VkCommandBuffer cb, VkImage srcImage, long frameIdx, VkImageLayout srcLayout);
         void Update();
         void Render();
         void DrawAndCopyToImage(VkCommandBuffer cb, VkImage destImage, long frameIdx);

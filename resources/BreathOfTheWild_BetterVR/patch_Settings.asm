@@ -113,6 +113,8 @@ slwi r8, r5, 2
 lwzx r4, r8, r7
 
 loc_31D8CAC:
+cmpwi r4, 0
+beq noActiveEvent ; skip if no valid event pointer
 lwz r4, 8(r4)
 li r3, 1
 bla import.coreinit.hook_GetEventName

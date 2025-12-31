@@ -265,13 +265,13 @@ void RND_D3D12::PresentPipeline<depth>::BindSettings(float screenWidth, float sc
 
 template <bool depth>
 void RND_D3D12::PresentPipeline<depth>::RecreatePipeline() {
-    D3D12_INPUT_ELEMENT_DESC inputElementDescs[] = {
-        { "SV_InstanceID", 0, DXGI_FORMAT_R16_UINT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-        { "SV_VertexID", 0, DXGI_FORMAT_R16_UINT, 0, 4, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
-    };
+    // AMD GPU FIX: Don't declare SV_InstanceID/SV_VertexID in the input layout.
+    // These are system-generated values, not vertex buffer inputs.
+    // AMD strictly enforces this - it will try to read from an unbound vertex buffer.
+    // NVIDIA ignores the "SV_" prefix and provides system values directly.
 
     D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
-    psoDesc.InputLayout = { inputElementDescs, (UINT)std::size(inputElementDescs) };
+    psoDesc.InputLayout = { nullptr, 0 };  // Empty input layout - shader generates system values
     psoDesc.pRootSignature = m_signature.Get();
     psoDesc.VS = { m_vertexShader->GetBufferPointer(), m_vertexShader->GetBufferSize() };
     psoDesc.PS = { m_pixelShader->GetBufferPointer(), m_pixelShader->GetBufferSize() };

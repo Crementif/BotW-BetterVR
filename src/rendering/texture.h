@@ -13,12 +13,17 @@ public:
     void vkTransitionLayout(VkCommandBuffer cmdBuffer, VkImageLayout newLayout);
 
     void vkClear(VkCommandBuffer cmdBuffer, VkClearColorValue color);
+    void vkClearDepth(VkCommandBuffer cmdBuffer, float depth, uint32_t stencil = 0);
     void vkCopyToImage(VkCommandBuffer cmdBuffer, VkImage dstImage);
-    void vkCopyFromImage(VkCommandBuffer cmdBuffer, VkImage srcImage);
+    // AMD GPU FIX: srcLayout parameter to specify the actual source image layout
+    // If srcLayout is TRANSFER_SRC_OPTIMAL, assume caller has already transitioned and skip internal transitions
+    void vkCopyFromImage(VkCommandBuffer cmdBuffer, VkImage srcImage, VkImageLayout srcLayout = VK_IMAGE_LAYOUT_GENERAL);
     uint32_t GetWidth() const { return m_width; }
     uint32_t GetHeight() const { return m_height; }
+    VkFormat GetFormat() const { return m_vkFormat; }
+    VkImageAspectFlags GetAspectMask() const;
 
-private:
+protected:
     VkImage m_vkImage = VK_NULL_HANDLE;
     VkDeviceMemory m_vkMemory = VK_NULL_HANDLE;
     VkImageLayout m_vkCurrLayout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -68,11 +73,28 @@ public:
 
 protected:
     void SetLastSignalledValue(uint64_t value) {
-        Log::print<INTEROP>("Signal fence for texture {} with value {}", (void*)this, value);
+        // Track signal/wait pattern for debugging
+        static uint32_t s_signalCount = 0;
+        s_signalCount++;
+        if (s_signalCount % 500 == 0 || m_fenceLastSignaledValue == value) {
+            Log::print<INFO>("Semaphore signal #{}: texture={}, value {} -> {} (last waited={})",
+                s_signalCount, (void*)this, m_fenceLastSignaledValue, value, m_fenceLastAwaitedValue);
+        }
+        if (m_fenceLastSignaledValue == value && value != 0) {
+            Log::print<WARNING>("Double signal detected! texture={}, value={}", (void*)this, value);
+        }
         m_fenceLastSignaledValue = value;
     }
     void SetLastAwaitedValue(uint64_t value) {
-        Log::print<INTEROP>("Wait for fence for texture {} with value {}", (void*)this, value);
+        static uint32_t s_waitCount = 0;
+        s_waitCount++;
+        if (s_waitCount % 500 == 0 || m_fenceLastAwaitedValue == value) {
+            Log::print<INFO>("Semaphore wait #{}: texture={}, value {} -> {} (last signaled={})",
+                s_waitCount, (void*)this, m_fenceLastAwaitedValue, value, m_fenceLastSignaledValue);
+        }
+        if (m_fenceLastAwaitedValue == value && value != 0) {
+            Log::print<WARNING>("Double wait detected! texture={}, value={}", (void*)this, value);
+        }
         m_fenceLastAwaitedValue = value;
     }
 
@@ -92,8 +114,31 @@ public:
     SharedTexture(uint32_t width, uint32_t height, VkFormat vkFormat, DXGI_FORMAT d3d12Format);
     ~SharedTexture() override;
 
-    void CopyFromVkImage(VkCommandBuffer cmdBuffer, VkImage srcImage);
+    // srcImageLayout: the ACTUAL current layout of srcImage (e.g., from Cemu's CmdClearColorImage hook)
+    void CopyFromVkImage(VkCommandBuffer cmdBuffer, VkImage srcImage, VkImageLayout srcImageLayout = VK_IMAGE_LAYOUT_GENERAL);
     const VkSemaphore& GetSemaphore() const { return m_vkSemaphore; }
+
+    // AMD GPU FIX: Timeline semaphores require strictly increasing values.
+    // Instead of ping-ponging between 0 and 1, we use a monotonically increasing counter.
+    // The flow is:
+    //   1. Vulkan waits for value N (last D3D12 signal, or 0 initially)
+    //   2. Vulkan copies, then signals N+1
+    //   3. D3D12 waits for N+1
+    //   4. D3D12 uses texture, then signals N+2
+    //   5. Next frame: Vulkan waits for N+2, signals N+3, etc.
+
+    // Get the value Vulkan should wait for (the last value D3D12 signaled)
+    uint64_t GetVulkanWaitValue() const { return m_fenceCounter.load(); }
+
+    // Get the value Vulkan should signal (increments counter)
+    uint64_t GetVulkanSignalValue() { return ++m_fenceCounter; }
+
+    // Get the value D3D12 should wait for (the last value Vulkan signaled)
+    uint64_t GetD3D12WaitValue() const { return m_fenceCounter.load(); }
+
+    // Get the value D3D12 should signal (increments counter)
+    uint64_t GetD3D12SignalValue() { return ++m_fenceCounter; }
+
     const VkSemaphore& GetSemaphoreForSignal(uint64_t dbg_SignalTo = 0) {
         SetLastSignalledValue(dbg_SignalTo);
         return m_vkSemaphore;
@@ -106,4 +151,5 @@ public:
 private:
     VkSemaphore m_vkSemaphore = VK_NULL_HANDLE;
     std::atomic_bool m_activeOperation = false;
+    std::atomic<uint64_t> m_fenceCounter{0};  // Monotonically increasing fence value
 };

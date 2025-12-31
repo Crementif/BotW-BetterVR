@@ -7,6 +7,7 @@
 std::mutex lockImageResolutions;
 std::unordered_map<VkImage, std::pair<VkExtent2D, VkFormat>> imageResolutions;
 
+std::mutex s_activeCopyMutex;
 std::vector<std::pair<VkCommandBuffer, SharedTexture*>> s_activeCopyOperations;
 
 VkImage s_curr3DColorImage = VK_NULL_HANDLE;
@@ -27,19 +28,17 @@ VkResult VkDeviceOverrides::CreateImage(const vkroots::VkDeviceDispatch* pDispat
 }
 
 void VkDeviceOverrides::DestroyImage(const vkroots::VkDeviceDispatch* pDispatch, VkDevice device, VkImage image, const VkAllocationCallbacks* pAllocator) {
-    pDispatch->DestroyImage(device, image, pAllocator);
-
     lockImageResolutions.lock();
-    if (imageResolutions.erase(image)) {
-        // Log::print("Removed texture {}", (void*)image);
-        if (s_curr3DColorImage == image) {
-            s_curr3DColorImage = VK_NULL_HANDLE;
-        }
-        else if (s_curr3DDepthImage == image) {
-            s_curr3DDepthImage = VK_NULL_HANDLE;
-        }
+    imageResolutions.erase(image);
+    if (s_curr3DColorImage == image) {
+        s_curr3DColorImage = VK_NULL_HANDLE;
+    }
+    else if (s_curr3DDepthImage == image) {
+        s_curr3DDepthImage = VK_NULL_HANDLE;
     }
     lockImageResolutions.unlock();
+
+    pDispatch->DestroyImage(device, image, pAllocator);
 }
 
 void VkDeviceOverrides::CmdClearColorImage(const vkroots::VkDeviceDispatch* pDispatch, VkCommandBuffer commandBuffer, VkImage image, VkImageLayout imageLayout, const VkClearColorValue* pColor, uint32_t rangeCount, const VkImageSubresourceRange* pRanges) {
@@ -58,6 +57,42 @@ void VkDeviceOverrides::CmdClearColorImage(const vkroots::VkDeviceDispatch* pDis
     }
 
     if (side != (OpenXR::EyeSide)-1) {
+        // Track original layout so we can restore after copies
+        const VkImageLayout originalLayout = imageLayout;
+        bool transitionedToSrc = false;
+        auto ensureSrcLayout = [&]() {
+            if (!transitionedToSrc) {
+                VulkanUtils::TransitionLayout(commandBuffer, image, originalLayout, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+                transitionedToSrc = true;
+            }
+        };
+        auto restoreLayout = [&]() {
+            if (transitionedToSrc) {
+                VulkanUtils::TransitionLayout(commandBuffer, image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, originalLayout);
+                transitionedToSrc = false;
+            }
+        };
+        // AMD GPU FIX: Helper to transition to TRANSFER_DST_OPTIMAL for copy-to operations
+        bool transitionedToDst = false;
+        auto ensureDstLayout = [&]() {
+            if (transitionedToSrc) {
+                // Currently in TRANSFER_SRC, transition to TRANSFER_DST
+                VulkanUtils::TransitionLayout(commandBuffer, image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+                transitionedToSrc = false;
+                transitionedToDst = true;
+            } else if (!transitionedToDst) {
+                // Currently in original layout, transition to TRANSFER_DST
+                VulkanUtils::TransitionLayout(commandBuffer, image, originalLayout, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+                transitionedToDst = true;
+            }
+        };
+        auto restoreFromDst = [&]() {
+            if (transitionedToDst) {
+                VulkanUtils::TransitionLayout(commandBuffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, originalLayout);
+                transitionedToDst = false;
+            }
+        };
+
         // r value in magical clear value is the capture idx after rounding down
         const long captureIdx = std::lroundf(pColor->float32[0] * 32.0f);
         const long frameIdx = pColor->float32[3] < 0.5f ? 0 : 1;
@@ -121,46 +156,60 @@ void VkDeviceOverrides::CmdClearColorImage(const vkroots::VkDeviceDispatch* pDis
 
             if (image != s_curr3DColorImage) {
                 Log::print<RENDERING>("Color image is not the same as the current 3D color image! ({} != {})", (void*)image, (void*)s_curr3DColorImage);
+                // AMD GPU FIX: Use local VkClearColorValue instead of const_cast to avoid UB
+                VkClearColorValue clearColor;
                 if (VRManager::instance().XR->GetRenderer()->IsRendering3D(frameIdx)) {
-                    const_cast<VkClearColorValue*>(pColor)[0] = { 0.0f, 0.0f, 0.0f, 0.0f };
+                    clearColor = {{ 0.0f, 0.0f, 0.0f, 0.0f }};
                 }
                 else {
-                    const_cast<VkClearColorValue*>(pColor)[0] = { 0.0f, 0.0f, 0.0f, 1.0f };
+                    clearColor = {{ 0.0f, 0.0f, 0.0f, 1.0f }};
                 }
-                return pDispatch->CmdClearColorImage(commandBuffer, image, imageLayout, pColor, rangeCount, pRanges);
+                return pDispatch->CmdClearColorImage(commandBuffer, image, imageLayout, &clearColor, rangeCount, pRanges);
             }
 
             if (renderer->GetFrame(frameIdx).copiedColor[side]) {
                 // the color texture has already been copied to the layer
                 Log::print<RENDERING>("A 3D color texture is already been copied for the current frame!");
-                const_cast<VkClearColorValue*>(pColor)[0] = { 0.0f, 0.0f, 0.0f, 0.0f };
-                return pDispatch->CmdClearColorImage(commandBuffer, image, imageLayout, pColor, rangeCount, pRanges);
+                // AMD GPU FIX: Use local VkClearColorValue instead of const_cast to avoid UB
+                VkClearColorValue clearColor = {{ 0.0f, 0.0f, 0.0f, 0.0f }};
+                return pDispatch->CmdClearColorImage(commandBuffer, image, imageLayout, &clearColor, rangeCount, pRanges);
             }
 
             // note: This uses vkCmdCopyImage to copy the image to an OpenXR-specific texture. s_activeCopyOperations queues a semaphore for the D3D12 side to wait on.
-            SharedTexture* texture = layer3D->CopyColorToLayer(side, commandBuffer, image, frameIdx);
+            // AMD GPU FIX: ensureSrcLayout transitions to TRANSFER_SRC_OPTIMAL, then pass that layout so copy functions skip internal transitions
+            ensureSrcLayout();
+            SharedTexture* texture = layer3D->CopyColorToLayer(side, commandBuffer, image, frameIdx, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
             renderer->On3DColorCopied(side, frameIdx);
             // Log::print("[VULKAN] Waiting for {} side to be 0", side == OpenXR::EyeSide::LEFT ? "left" : "right");
-            s_activeCopyOperations.emplace_back(commandBuffer, texture);
+            // AMD GPU FIX: Protect s_activeCopyOperations with mutex
+            {
+                std::lock_guard<std::mutex> lk(s_activeCopyMutex);
+                s_activeCopyOperations.emplace_back(commandBuffer, texture);
+            }
+            // AMD GPU FIX: Removed incorrect TransitionLayout(GENERAL, GENERAL) - CopyFromVkImage already handles layout transitions
+            // DebugPipelineBarrier provides memory synchronization without incorrect layout claims
             VulkanUtils::DebugPipelineBarrier(commandBuffer);
-            VulkanUtils::TransitionLayout(commandBuffer, image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL);
 
             // imgui needs only one eye to render Cemu's 2D output, so use right side since it looks better
             if (side == EyeSide::RIGHT) {
                 // note: Uses vkCmdCopyImage to copy the (right-eye-only) image to the imgui overlay's texture
+                // AMD GPU FIX: Image is already in TRANSFER_SRC_OPTIMAL from ensureSrcLayout
                 float aspectRatio = layer3D->GetAspectRatio(side);
-                imguiOverlay->Draw3DLayerAsBackground(commandBuffer, image, aspectRatio, frameIdx);
+                imguiOverlay->Draw3DLayerAsBackground(commandBuffer, image, aspectRatio, frameIdx, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 
                 VulkanUtils::DebugPipelineBarrier(commandBuffer);
-                VulkanUtils::TransitionLayout(commandBuffer, image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL);
             }
 
+            // AMD GPU FIX: Restore layout BEFORE CmdClearColorImage
+            // CmdClearColorImage requires GENERAL or TRANSFER_DST_OPTIMAL, not TRANSFER_SRC_OPTIMAL
+            restoreLayout();
+
             // clear the image to be transparent to allow for the HUD to be rendered on top of it which results in a transparent HUD layer
-            const_cast<VkClearColorValue*>(pColor)[0] = { 0.0f, 0.0f, 0.0f, 0.0f };
-            pDispatch->CmdClearColorImage(commandBuffer, image, imageLayout, pColor, rangeCount, pRanges);
+            // AMD GPU FIX: Use local VkClearColorValue instead of const_cast to avoid UB
+            VkClearColorValue clearColor = {{ 0.0f, 0.0f, 0.0f, 0.0f }};
+            pDispatch->CmdClearColorImage(commandBuffer, image, imageLayout, &clearColor, rangeCount, pRanges);
 
             VulkanUtils::DebugPipelineBarrier(commandBuffer);
-            VulkanUtils::TransitionLayout(commandBuffer, image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL);
             return;
         }
         else if (captureIdx == 2) {
@@ -172,15 +221,17 @@ void VkDeviceOverrides::CmdClearColorImage(const vkroots::VkDeviceDispatch* pDis
                 if (hudCopied) {
                     // the 2D texture has already been copied to the layer
                     Log::print<RENDERING>("A 2D texture has already been copied for the current frame!");
-                    const_cast<VkClearColorValue*>(pColor)[0] = { 0.0f, 0.0f, 0.0f, 0.0f };
-                    return pDispatch->CmdClearColorImage(commandBuffer, image, imageLayout, pColor, rangeCount, pRanges);
+                    // AMD GPU FIX: Use local VkClearColorValue instead of const_cast to avoid UB
+                    VkClearColorValue clearColor = {{ 0.0f, 0.0f, 0.0f, 0.0f }};
+                    return pDispatch->CmdClearColorImage(commandBuffer, image, imageLayout, &clearColor, rangeCount, pRanges);
                 }
                 else {
                     // provide the HUD texture to the imgui overlay we'll use to recomposite Cemu's original flatscreen rendering
                     if (imguiOverlay && !hudCopied) {
-                        imguiOverlay->DrawHUDLayerAsBackground(commandBuffer, image, frameIdx);
+                        // AMD GPU FIX: ensureSrcLayout transitions to TRANSFER_SRC_OPTIMAL
+                        ensureSrcLayout();
+                        imguiOverlay->DrawHUDLayerAsBackground(commandBuffer, image, frameIdx, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
                         VulkanUtils::DebugPipelineBarrier(commandBuffer);
-                        VulkanUtils::TransitionLayout(commandBuffer, image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL);
                     }
 
                     if (imguiOverlay && !hudCopied) {
@@ -188,18 +239,31 @@ void VkDeviceOverrides::CmdClearColorImage(const vkroots::VkDeviceDispatch* pDis
                         imguiOverlay->BeginFrame(frameIdx, false);
                         imguiOverlay->Update();
                         imguiOverlay->Render();
+                        // AMD GPU FIX: DrawAndCopyToImage copies TO the image, needs TRANSFER_DST_OPTIMAL
+                        ensureDstLayout();
                         imguiOverlay->DrawAndCopyToImage(commandBuffer, image, frameIdx);
                         VulkanUtils::DebugPipelineBarrier(commandBuffer);
-                        VulkanUtils::TransitionLayout(commandBuffer, image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL);
                     }
 
                     // copy the HUD texture to D3D12 to be presented
                     // only copy the first attempt at capturing when GX2ClearColor is called with this capture index since the game/Cemu clears the 2D layer twice
-                    SharedTexture* texture = layer2D->CopyColorToLayer(commandBuffer, image, frameIdx);
+                    // AMD GPU FIX: Need to transition from DST back to SRC for copy operation
+                    if (transitionedToDst) {
+                        VulkanUtils::TransitionLayout(commandBuffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+                        transitionedToDst = false;
+                        transitionedToSrc = true;
+                    } else {
+                        ensureSrcLayout();
+                    }
+                    SharedTexture* texture = layer2D->CopyColorToLayer(commandBuffer, image, frameIdx, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
                     VulkanUtils::DebugPipelineBarrier(commandBuffer);
-                    VulkanUtils::TransitionLayout(commandBuffer, image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL);
                     renderer->On2DCopied(frameIdx);
-                    s_activeCopyOperations.emplace_back(commandBuffer, texture);
+                    // AMD GPU FIX: Protect s_activeCopyOperations with mutex
+                    {
+                        std::lock_guard<std::mutex> lk(s_activeCopyMutex);
+                        s_activeCopyOperations.emplace_back(commandBuffer, texture);
+                    }
+                    restoreLayout();
                 }
             }
             if (side == OpenXR::EyeSide::RIGHT) {
@@ -209,17 +273,21 @@ void VkDeviceOverrides::CmdClearColorImage(const vkroots::VkDeviceDispatch* pDis
                     imguiOverlay->BeginFrame(frameIdx, true);
                     imguiOverlay->Update();
                     imguiOverlay->Render();
+                    // AMD GPU FIX: DrawAndCopyToImage copies TO the image, needs TRANSFER_DST_OPTIMAL
+                    ensureDstLayout();
                     imguiOverlay->DrawAndCopyToImage(commandBuffer, image, frameIdx);
                     VulkanUtils::DebugPipelineBarrier(commandBuffer);
-                    VulkanUtils::TransitionLayout(commandBuffer, image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL);
+                    restoreFromDst();
                     return;
                 }
 
                 if (hudCopied) {
-                    const_cast<VkClearColorValue*>(pColor)[0] = { 0.0f, 0.0f, 0.0f, 0.0f };
-                    return pDispatch->CmdClearColorImage(commandBuffer, image, imageLayout, pColor, rangeCount, pRanges);
+                    // AMD GPU FIX: Use local VkClearColorValue instead of const_cast to avoid UB
+                    VkClearColorValue clearColor = {{ 0.0f, 0.0f, 0.0f, 0.0f }};
+                    return pDispatch->CmdClearColorImage(commandBuffer, image, imageLayout, &clearColor, rangeCount, pRanges);
                 }
             }
+            restoreLayout();
         }
         return;
     }
@@ -284,9 +352,17 @@ void VkDeviceOverrides::CmdClearDepthStencilImage(const vkroots::VkDeviceDispatc
             //
             // checkAssert(layer3D.GetStatus() == Status3D::LEFT_BINDING_COLOR || layer3D.GetStatus() == Status3D::RIGHT_BINDING_COLOR, "3D layer is not in the correct state for capturing depth images!");
 
-            SharedTexture* texture = layer3D->CopyDepthToLayer(side, commandBuffer, image, frameCounter);
+            // AMD GPU FIX: Transition to TRANSFER_SRC_OPTIMAL before depth copy
+            VulkanUtils::TransitionLayout(commandBuffer, image, imageLayout, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT);
+            SharedTexture* texture = layer3D->CopyDepthToLayer(side, commandBuffer, image, frameCounter, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
             VRManager::instance().XR->GetRenderer()->On3DDepthCopied(side, frameCounter);
-            s_activeCopyOperations.emplace_back(commandBuffer, texture);
+            // AMD GPU FIX: Protect s_activeCopyOperations with mutex
+            {
+                std::lock_guard<std::mutex> lk(s_activeCopyMutex);
+                s_activeCopyOperations.emplace_back(commandBuffer, texture);
+            }
+            // Restore layout after depth copy
+            VulkanUtils::TransitionLayout(commandBuffer, image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, imageLayout, VK_IMAGE_ASPECT_DEPTH_BIT);
             return;
         }
     }
@@ -317,27 +393,46 @@ inline bool IsTimeline(const VkSemaphore semaphore) {
 
 VkResult VkDeviceOverrides::QueueSubmit(const vkroots::VkDeviceDispatch* pDispatch, VkQueue queue, uint32_t submitCount, const VkSubmitInfo* pSubmits, VkFence fence) {
     VkResult result = VK_SUCCESS;
-    if (s_activeCopyOperations.empty()) {
+
+    // AMD GPU FIX: Build shadow copies of submit info to avoid mutating caller's data (UB).
+    // Also protect s_activeCopyOperations with mutex for thread safety.
+    struct ModifiedSubmitInfo_t {
+        VkSubmitInfo submitInfoCopy;  // Shadow copy of VkSubmitInfo
+        std::vector<VkSemaphore> waitSemaphores;
+        std::vector<uint64_t> timelineWaitValues;
+        std::vector<VkPipelineStageFlags> waitDstStageMasks;
+        std::vector<VkSemaphore> signalSemaphores;
+        std::vector<uint64_t> timelineSignalValues;
+
+        VkTimelineSemaphoreSubmitInfo timelineSemaphoreSubmitInfo = { VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO };
+    };
+    std::vector<ModifiedSubmitInfo_t> modifiedSubmitInfos;
+    std::vector<VkSubmitInfo> shadowSubmits;
+    size_t activeCopyCount = 0;
+
+    {
+        std::lock_guard<std::mutex> lk(s_activeCopyMutex);
+        activeCopyCount = s_activeCopyOperations.size();
+    }
+
+    if (activeCopyCount == 0) {
         result = pDispatch->QueueSubmit(queue, submitCount, pSubmits, fence);
     }
     else {
-        Log::print<INTEROP>("QueueSubmit called with {} active copy operations", s_activeCopyOperations.size());
 
         // insert (possible) pipeline barriers for any active copy operations
-        struct ModifiedSubmitInfo_t {
-            std::vector<VkSemaphore> waitSemaphores;
-            std::vector<uint64_t> timelineWaitValues;
-            std::vector<VkPipelineStageFlags> waitDstStageMasks;
-            std::vector<VkSemaphore> signalSemaphores;
-            std::vector<uint64_t> timelineSignalValues;
+        modifiedSubmitInfos.resize(submitCount);
+        shadowSubmits.resize(submitCount);
 
-            VkTimelineSemaphoreSubmitInfo timelineSemaphoreSubmitInfo = { VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO };
-        };
+        // AMD GPU FIX: Hold mutex for the duration of s_activeCopyOperations access
+        std::lock_guard<std::mutex> lk(s_activeCopyMutex);
 
-        std::vector<ModifiedSubmitInfo_t> modifiedSubmitInfos(submitCount);
         for (uint32_t i = 0; i < submitCount; i++) {
             const VkSubmitInfo& submitInfo = pSubmits[i];
             ModifiedSubmitInfo_t& modifiedSubmitInfo = modifiedSubmitInfos[i];
+
+            // AMD GPU FIX: Create shadow copy of original VkSubmitInfo
+            modifiedSubmitInfo.submitInfoCopy = submitInfo;
 
             // copy old semaphores into new vectors
             modifiedSubmitInfo.waitSemaphores.assign(submitInfo.pWaitSemaphores, submitInfo.pWaitSemaphores + submitInfo.waitSemaphoreCount);
@@ -348,49 +443,42 @@ VkResult VkDeviceOverrides::QueueSubmit(const vkroots::VkDeviceDispatch* pDispat
             modifiedSubmitInfo.timelineSignalValues.resize(submitInfo.signalSemaphoreCount, 0);
 
             // find timeline semaphore submit info if already present
-            const VkTimelineSemaphoreSubmitInfo* timelineSemaphoreSubmitInfoPtr = &modifiedSubmitInfo.timelineSemaphoreSubmitInfo;
+            const VkTimelineSemaphoreSubmitInfo* existingTimelineInfo = nullptr;
 
             const VkBaseInStructure* pNextIt = static_cast<const VkBaseInStructure*>(submitInfo.pNext);
             while (pNextIt) {
                 if (pNextIt->sType == VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO) {
-                    timelineSemaphoreSubmitInfoPtr = reinterpret_cast<const VkTimelineSemaphoreSubmitInfo*>(pNextIt);
+                    existingTimelineInfo = reinterpret_cast<const VkTimelineSemaphoreSubmitInfo*>(pNextIt);
                     break;
                 }
                 pNextIt = pNextIt->pNext;
             }
-            if (pNextIt == nullptr)
-                const_cast<VkSubmitInfo&>(submitInfo).pNext = &modifiedSubmitInfo.timelineSemaphoreSubmitInfo;
 
             // copy any existing timeline values into new vectors
-            for (uint32_t j = 0; j < timelineSemaphoreSubmitInfoPtr->waitSemaphoreValueCount; j++) {
-                modifiedSubmitInfo.timelineWaitValues[j] = timelineSemaphoreSubmitInfoPtr->pWaitSemaphoreValues[j];
-            }
-            for (uint32_t j = 0; j < timelineSemaphoreSubmitInfoPtr->signalSemaphoreValueCount; j++) {
-                modifiedSubmitInfo.timelineSignalValues[j] = timelineSemaphoreSubmitInfoPtr->pSignalSemaphoreValues[j];
+            if (existingTimelineInfo) {
+                for (uint32_t j = 0; j < existingTimelineInfo->waitSemaphoreValueCount; j++) {
+                    modifiedSubmitInfo.timelineWaitValues[j] = existingTimelineInfo->pWaitSemaphoreValues[j];
+                }
+                for (uint32_t j = 0; j < existingTimelineInfo->signalSemaphoreValueCount; j++) {
+                    modifiedSubmitInfo.timelineSignalValues[j] = existingTimelineInfo->pSignalSemaphoreValues[j];
+                }
             }
 
-            // insert timeline semaphores for active copy operations
-            bool foundCommandBufferForActiveCopyOperations = false;
+            // Insert timeline semaphores for active copy operations
             for (uint32_t j = 0; j < submitInfo.commandBufferCount; j++) {
                 for (auto it = s_activeCopyOperations.begin(); it != s_activeCopyOperations.end();) {
                     if (submitInfo.pCommandBuffers[j] == it->first) {
-                        // wait for D3D12/XR to finish with the previous shared texture render
-                        modifiedSubmitInfo.waitSemaphores.emplace_back(it->second->GetSemaphoreForWait(SEMAPHORE_TO_VULKAN));
+                        // Wait for D3D12/XR to finish with the previous shared texture render
+                        uint64_t waitValue = it->second->GetVulkanWaitValue();
+                        modifiedSubmitInfo.waitSemaphores.emplace_back(it->second->GetSemaphoreForWait(waitValue));
                         modifiedSubmitInfo.waitDstStageMasks.emplace_back(VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
-                        modifiedSubmitInfo.timelineWaitValues.emplace_back(SEMAPHORE_TO_VULKAN);
+                        modifiedSubmitInfo.timelineWaitValues.emplace_back(waitValue);
 
-#ifdef _DEBUG
-                        WCHAR nameChars[128] = {};
-                        UINT size = sizeof(nameChars);
-                        it->second->d3d12GetTexture()->GetPrivateData(WKPDID_D3DDebugObjectNameW, &size, nameChars);
-                        std::string nameStr = wcharToUtf8(nameChars);
-#endif
-
-                        // signal to D3D12/XR rendering that the shared texture can be rendered to VR headset
-                        modifiedSubmitInfo.signalSemaphores.emplace_back(it->second->GetSemaphoreForSignal(SEMAPHORE_TO_D3D12));
-                        modifiedSubmitInfo.timelineSignalValues.emplace_back(SEMAPHORE_TO_D3D12);
+                        // Signal to D3D12/XR rendering that the shared texture can be rendered to VR headset
+                        uint64_t signalValue = it->second->GetVulkanSignalValue();
+                        modifiedSubmitInfo.signalSemaphores.emplace_back(it->second->GetSemaphoreForSignal(signalValue));
+                        modifiedSubmitInfo.timelineSignalValues.emplace_back(signalValue);
                         it = s_activeCopyOperations.erase(it);
-                        foundCommandBufferForActiveCopyOperations = true;
                     }
                     else {
                         ++it;
@@ -398,69 +486,31 @@ VkResult VkDeviceOverrides::QueueSubmit(const vkroots::VkDeviceDispatch* pDispat
                 }
             }
 
-            if (!foundCommandBufferForActiveCopyOperations) {
-                Log::print<RENDERING>("No command buffer found for active copy operations!");
-                Log::print<RENDERING>("Active copy operations:");
-                for (const auto& op : s_activeCopyOperations) {
-                    wchar_t name[128] = {};
-                    UINT size = sizeof(name);
-                    op.second->d3d12GetTexture()->GetPrivateData(WKPDID_D3DDebugObjectNameW, &size, name);
-                    std::string nameStr = wcharToUtf8(name);
-                    Log::print<RENDERING>(" - Command buffer: {}, Texture: {}", (void*)op.first, nameStr);
-                }
-                Log::print<RENDERING>("Submitted command buffers:");
-                for (uint32_t j = 0; j < submitInfo.commandBufferCount; j++) {
-                    Log::print<RENDERING>(" - Command buffer: {}", (void*)submitInfo.pCommandBuffers[j]);
-                }
-            }
+            // Update timeline semaphore submit info
+            modifiedSubmitInfo.timelineSemaphoreSubmitInfo.waitSemaphoreValueCount = (uint32_t)modifiedSubmitInfo.timelineWaitValues.size();
+            modifiedSubmitInfo.timelineSemaphoreSubmitInfo.pWaitSemaphoreValues = modifiedSubmitInfo.timelineWaitValues.data();
+            modifiedSubmitInfo.timelineSemaphoreSubmitInfo.signalSemaphoreValueCount = (uint32_t)modifiedSubmitInfo.timelineSignalValues.size();
+            modifiedSubmitInfo.timelineSemaphoreSubmitInfo.pSignalSemaphoreValues = modifiedSubmitInfo.timelineSignalValues.data();
 
-            // update the VkTimelineSemaphoreSubmitInfo struct
-            const_cast<VkTimelineSemaphoreSubmitInfo*>(timelineSemaphoreSubmitInfoPtr)->waitSemaphoreValueCount = (uint32_t)modifiedSubmitInfo.timelineWaitValues.size();
-            const_cast<VkTimelineSemaphoreSubmitInfo*>(timelineSemaphoreSubmitInfoPtr)->pWaitSemaphoreValues = modifiedSubmitInfo.timelineWaitValues.data();
-            const_cast<VkTimelineSemaphoreSubmitInfo*>(timelineSemaphoreSubmitInfoPtr)->signalSemaphoreValueCount = (uint32_t)modifiedSubmitInfo.timelineSignalValues.size();
-            const_cast<VkTimelineSemaphoreSubmitInfo*>(timelineSemaphoreSubmitInfoPtr)->pSignalSemaphoreValues = modifiedSubmitInfo.timelineSignalValues.data();
+            // AMD GPU FIX: Preserve existing pNext chain - prepend our timeline struct
+            modifiedSubmitInfo.timelineSemaphoreSubmitInfo.pNext = submitInfo.pNext;
 
-            // add wait and signal semaphores to the submit info
-            const_cast<VkSubmitInfo&>(submitInfo).waitSemaphoreCount = (uint32_t)modifiedSubmitInfo.waitSemaphores.size();
-            const_cast<VkSubmitInfo&>(submitInfo).pWaitSemaphores = modifiedSubmitInfo.waitSemaphores.data();
-            const_cast<VkSubmitInfo&>(submitInfo).pWaitDstStageMask = modifiedSubmitInfo.waitDstStageMasks.data();
-            const_cast<VkSubmitInfo&>(submitInfo).signalSemaphoreCount = (uint32_t)modifiedSubmitInfo.signalSemaphores.size();
-            const_cast<VkSubmitInfo&>(submitInfo).pSignalSemaphores = modifiedSubmitInfo.signalSemaphores.data();
+            // AMD GPU FIX: Update our shadow VkSubmitInfo copy, not the caller's
+            modifiedSubmitInfo.submitInfoCopy.pNext = &modifiedSubmitInfo.timelineSemaphoreSubmitInfo;
+            modifiedSubmitInfo.submitInfoCopy.waitSemaphoreCount = (uint32_t)modifiedSubmitInfo.waitSemaphores.size();
+            modifiedSubmitInfo.submitInfoCopy.pWaitSemaphores = modifiedSubmitInfo.waitSemaphores.data();
+            modifiedSubmitInfo.submitInfoCopy.pWaitDstStageMask = modifiedSubmitInfo.waitDstStageMasks.data();
+            modifiedSubmitInfo.submitInfoCopy.signalSemaphoreCount = (uint32_t)modifiedSubmitInfo.signalSemaphores.size();
+            modifiedSubmitInfo.submitInfoCopy.pSignalSemaphores = modifiedSubmitInfo.signalSemaphores.data();
+
+            shadowSubmits[i] = modifiedSubmitInfo.submitInfoCopy;
         }
-        result = pDispatch->QueueSubmit(queue, submitCount, pSubmits, fence);
+        result = pDispatch->QueueSubmit(queue, submitCount, shadowSubmits.data(), fence);
     }
 
-#if ENABLE_VK_ROBUSTNESS
-    if (result == VK_ERROR_DEVICE_LOST) {
-        auto vkGetDeviceFaultInfoEXT = (PFN_vkGetDeviceFaultInfoEXT)pDispatch->GetDeviceProcAddr(pDispatch->Device, "vkGetDeviceFaultInfoEXT");
-        if (vkGetDeviceFaultInfoEXT) {
-            VkDeviceFaultCountsEXT faultCounts = { VK_STRUCTURE_TYPE_DEVICE_FAULT_COUNTS_EXT };
-            VkDeviceFaultInfoEXT faultInfo = { VK_STRUCTURE_TYPE_DEVICE_FAULT_INFO_EXT };
-
-            if (vkGetDeviceFaultInfoEXT(pDispatch->Device, &faultCounts, nullptr) == VK_SUCCESS) {
-                Log::print<ERROR>("Device lost! Fault counts: Address info: {}, Vendor info: {}, Vendor binary: {}",
-                    faultCounts.addressInfoCount, faultCounts.vendorInfoCount, faultCounts.vendorBinarySize);
-
-                std::vector<VkDeviceFaultAddressInfoEXT> addressInfos(faultCounts.addressInfoCount);
-                std::vector<VkDeviceFaultVendorInfoEXT> vendorInfos(faultCounts.vendorInfoCount);
-                std::vector<uint8_t> vendorBinary(faultCounts.vendorBinarySize);
-
-                faultInfo.pAddressInfos = addressInfos.data();
-                faultInfo.pVendorInfos = vendorInfos.data();
-                faultInfo.pVendorBinaryData = vendorBinary.data();
-
-                if (vkGetDeviceFaultInfoEXT(pDispatch->Device, &faultCounts, &faultInfo) == VK_SUCCESS) {
-                    for (const auto& addrInfo : addressInfos) {
-                        Log::print<ERROR>("Fault Address: 0x{:X}, Precision: {}, Type: {}", addrInfo.reportedAddress, addrInfo.addressPrecision, (int)addrInfo.addressType);
-                    }
-                    for (const auto& vendorInfo : vendorInfos) {
-                        Log::print<ERROR>("Fault Vendor Info: Description: {}, Code: {}", vendorInfo.description, vendorInfo.vendorFaultCode);
-                    }
-                }
-            }
-        }
+    if (result != VK_SUCCESS) {
+        Log::print<ERROR>("QueueSubmit failed with error {}", result);
     }
-#endif
 
     return result;
 }

@@ -562,17 +562,23 @@ uint32_t CemuHooks::s_playerAddress = 0;
 void CemuHooks::hook_GetEventName(PPCInterpreter_t* hCPU) {
     hCPU->instructionPointer = hCPU->sprNew.LR;
 
-    //if (s_playerAddress != 0) {
-    //    PlayerMoveBitFlags moveBits = getMemory<BEType<PlayerMoveBitFlags>>(s_playerAddress + offsetof(Player, moveBitFlags)).getLE();
-    //    if ((uint32_t)moveBits & (uint32_t)PlayerMoveBitFlags::EVENT_UNK_134217728 == 0) {
-    //        Log::print<INFO>("Cutscene camera is active, skipping event processing.");
-    //        //return;
-    //    }
-    //}
-
     uint32_t isEventActive = hCPU->gpr[3];
+    uint32_t ppcAddress = hCPU->gpr[4];
+
     if (isEventActive) {
-        const char* eventNamePtr = (const char*)(hCPU->gpr[4] + s_memoryBaseAddress);
+        // Validate PPC address is in valid game memory range
+        if (ppcAddress < 0x10000000 || ppcAddress > 0x50000000) {
+            return;
+        }
+
+        const char* eventNamePtr = (const char*)(ppcAddress + s_memoryBaseAddress);
+
+        // Validate the string starts with a printable ASCII character
+        unsigned char firstChar = static_cast<unsigned char>(eventNamePtr[0]);
+        if (firstChar < 0x20 || firstChar > 0x7E) {
+            return;
+        }
+
         std::string eventName = std::string(eventNamePtr);
         if (s_currentEvent == eventName) {
             return;
