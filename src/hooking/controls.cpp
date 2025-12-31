@@ -166,7 +166,7 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
 
     const auto now = std::chrono::steady_clock::now();
     //Delay to wait before allowing specific inputs again
-    constexpr std::chrono::milliseconds delay{ 200 };
+    constexpr std::chrono::milliseconds delay{ 400 };
 
     // check if we need to prevent inputs from happening (fix menu reopening when exiting it and grab object when quitting dpad menu)
     if (gameState.in_game != gameState.was_in_game) {

@@ -222,7 +222,7 @@ void OpenXR::CreateActions() {
         createAction(m_gameplayActionSet, "move", "Move (Left Thumbstick)", XR_ACTION_TYPE_VECTOR2F_INPUT, m_moveAction);
         createAction(m_gameplayActionSet, "camera", "Camera (Right Thumbstick)", XR_ACTION_TYPE_VECTOR2F_INPUT, m_cameraAction);
 
-        createAction(m_gameplayActionSet, "grab", "Grab", XR_ACTION_TYPE_BOOLEAN_INPUT, m_grabAction);
+        createAction(m_gameplayActionSet, "grab", "Grab", XR_ACTION_TYPE_FLOAT_INPUT, m_grabAction);
         createAction(m_gameplayActionSet, "interact", "Interact/Action (A Button)", XR_ACTION_TYPE_BOOLEAN_INPUT, m_interactAction);
         createAction(m_gameplayActionSet, "jump", "Jump (X Button)", XR_ACTION_TYPE_BOOLEAN_INPUT, m_jumpAction);
         createAction(m_gameplayActionSet, "crouch", "Crouch (Left Thumbstick Button)", XR_ACTION_TYPE_BOOLEAN_INPUT, m_crouchAction);
@@ -407,18 +407,15 @@ void OpenXR::CreateActions() {
     m_rumbleManager.get()->initializeXrPaths(m_instance);
 }
 
-void CheckButtonState(XrActionStateBoolean& action, ButtonState& buttonState) {
+void CheckButtonState(bool buttonPressed, ButtonState& buttonState) {
     // Button state logic
     buttonState.resetFrameFlags();
-    if (action.isActive == XR_FALSE) {
-        return;
-    }
 
     // detect long, short and double presses
     constexpr std::chrono::milliseconds longPressThreshold{ 250 };
     constexpr std::chrono::milliseconds doublePressWindow{ 150 };
 
-    const bool down = (action.currentState == XR_TRUE);
+    const bool down = buttonPressed;
     const auto now = std::chrono::steady_clock::now();
 
     // rising edge
@@ -598,12 +595,15 @@ std::optional<OpenXR::InputState> OpenXR::UpdateActions(XrTime predictedFrameTim
             XrActionStateGetInfo getGrabInfo = { XR_TYPE_ACTION_STATE_GET_INFO };
             getGrabInfo.action = m_grabAction;
             getGrabInfo.subactionPath = m_handPaths[side];
-            newState.inGame.grab[side] = { XR_TYPE_ACTION_STATE_BOOLEAN };
-            checkXRResult(xrGetActionStateBoolean(m_session, &getGrabInfo, &newState.inGame.grab[side]), "Failed to get grab action value!");
+            newState.inGame.grab[side] = { XR_TYPE_ACTION_STATE_FLOAT };
+            checkXRResult(xrGetActionStateFloat(m_session, &getGrabInfo, &newState.inGame.grab[side]), "Failed to get grab action value!");
 
             auto& action = newState.inGame.grab[side];
             auto& buttonState = newState.inGame.grabState[side];
-            CheckButtonState(action, buttonState);
+            if (action.isActive == XR_TRUE) {
+                auto buttonPressed = action.currentState > 0.75f;
+                CheckButtonState(buttonPressed, buttonState);
+            }
         }
 
         XrActionStateGetInfo getMapAndInventoryInfo = { XR_TYPE_ACTION_STATE_GET_INFO };
@@ -614,7 +614,10 @@ std::optional<OpenXR::InputState> OpenXR::UpdateActions(XrTime predictedFrameTim
 
         auto& mapAndInventoryAction = newState.inGame.mapAndInventory;
         auto& mapAndInventoryButtonState = newState.inGame.mapAndInventoryState;
-        CheckButtonState(mapAndInventoryAction, mapAndInventoryButtonState);
+        if (mapAndInventoryAction.isActive == XR_TRUE) {
+            auto buttonPressed = mapAndInventoryAction.currentState == XR_TRUE;
+            CheckButtonState(buttonPressed, mapAndInventoryButtonState);
+        }
 
         //XrActionStateGetInfo getInventory = { XR_TYPE_ACTION_STATE_GET_INFO };
         //getInventory.action = m_inGame_inventoryAction;
@@ -663,7 +666,10 @@ std::optional<OpenXR::InputState> OpenXR::UpdateActions(XrTime predictedFrameTim
 
         auto& runAction = newState.inGame.run;
         auto& runButtonState = newState.inGame.runState;
-        CheckButtonState(runAction, runButtonState);
+        if (runAction.isActive == XR_TRUE) {
+            auto buttonPressed = runAction.currentState == XR_TRUE;
+            CheckButtonState(buttonPressed, runButtonState);
+        }
 
         XrActionStateGetInfo getAttackInfo = { XR_TYPE_ACTION_STATE_GET_INFO };
         getAttackInfo.action = m_attackAction;

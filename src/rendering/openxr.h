@@ -47,7 +47,7 @@ public:
             XrActionStateBoolean throwWeapon;
             XrActionStateBoolean cancel;
             XrActionStateBoolean interact;
-            std::array<XrActionStateBoolean, 2> grab;
+            std::array<XrActionStateFloat, 2> grab;
             std::array<bool, 2> drop_weapon; // LEFT/RIGHT
 
             struct ButtonState {
