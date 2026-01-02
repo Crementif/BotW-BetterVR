@@ -1,6 +1,61 @@
 #include "cemu_hooks.h"
 #include "../instance.h"
 
+// ============================================================================
+// OpenXR to Wii U GamePad Motion Bridge
+// Converts VR controller motion data to VPAD-compatible motion format
+// ============================================================================
+
+namespace MotionBridge {
+    constexpr float TWO_PI = 2.0f * 3.14159265358979f;
+    constexpr float GYRO_NOISE_THRESHOLD = 0.015f;
+
+    inline glm::fquat getPistolToTabletOffset() {
+        return glm::angleAxis(glm::radians(-90.0f), glm::fvec3(1.0f, 0.0f, 0.0f));
+    }
+
+    inline float radToRevolutions(float rad) { return rad / TWO_PI; }
+
+    inline float filterGyroNoise(float value) {
+        return (fabsf(value) < GYRO_NOISE_THRESHOLD) ? 0.0f : value;
+    }
+
+    inline glm::fvec3 calculateAccelerometer(const glm::fquat& orientation) {
+        return glm::inverse(orientation) * glm::fvec3(0.0f, -1.0f, 0.0f);
+    }
+
+    inline void buildAttitudeMatrix(const glm::fquat& orientation,
+                                     glm::fvec3& dirX, glm::fvec3& dirY, glm::fvec3& dirZ) {
+        glm::fmat3 rotMatrix = glm::mat3_cast(orientation);
+        dirX = glm::fvec3(rotMatrix[0][0], rotMatrix[0][1], rotMatrix[0][2]);
+        dirY = glm::fvec3(rotMatrix[1][0], rotMatrix[1][1], rotMatrix[1][2]);
+        dirZ = glm::fvec3(rotMatrix[2][0], rotMatrix[2][1], rotMatrix[2][2]);
+    }
+
+    inline glm::fvec2 calculateAccXY(const glm::fvec3& acc) {
+        float magnitude = glm::length(acc);
+        if (magnitude < 0.001f) return glm::fvec2(1.0f, 0.0f);
+        glm::fvec3 normAcc = acc / magnitude;
+        float accX = sqrtf(normAcc.x * normAcc.x + normAcc.y * normAcc.y);
+        float accY = -sinf(atan2f(-normAcc.z, sqrtf(normAcc.x * normAcc.x + normAcc.y * normAcc.y)));
+        return glm::fvec2(accX, accY);
+    }
+
+    struct MotionState {
+        glm::fvec3 prevAcc = glm::fvec3(0.0f, -1.0f, 0.0f);
+        glm::fvec3 gyroOrientation = glm::fvec3(0.0f);
+        glm::fquat calibrationOffset = glm::identity<glm::fquat>();
+    };
+
+    inline MotionState& getState() { static MotionState state; return state; }
+
+    inline void recenter(const glm::fquat& currentOrientation) {
+        auto& state = getState();
+        state.calibrationOffset = glm::inverse(currentOrientation);
+        state.gyroOrientation = glm::fvec3(0.0f);
+    }
+}
+
 enum VPADButtons : uint32_t {
     VPAD_BUTTON_A                 = 0x8000,
     VPAD_BUTTON_B                 = 0x4000,
@@ -104,38 +159,31 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
         return state.currentState ? mapping : 0;
     };
 
-    // read existing vpad as to not overwrite it
     uint32_t vpadStatusOffset = hCPU->gpr[4];
     VPADStatus vpadStatus = {};
 
     auto* renderer = VRManager::instance().XR->GetRenderer();
-    // todo: revert this to unblock gamepad input
     if (!(renderer && renderer->m_imguiOverlay && renderer->m_imguiOverlay->ShouldBlockGameInput())) {
         readMemory(vpadStatusOffset, &vpadStatus);
     }
 
     OpenXR::InputState inputs = VRManager::instance().XR->m_input.load();
     inputs.inGame.drop_weapon[0] = inputs.inGame.drop_weapon[1] = false;
-    // fetch game state
     auto gameState = VRManager::instance().XR->m_gameState.load();
     gameState.in_game = inputs.inGame.in_game;
 
-    // buttons
     static uint32_t oldCombinedHold = 0;
     uint32_t newXRBtnHold = 0;
 
-    // initializing gesture related variables
     bool leftHandBehindHead = false;
     bool rightHandBehindHead = false;
     bool leftHandCloseEnoughFromHead = false;
     bool rightHandCloseEnoughFromHead = false;
 
-    // fetching motion states for gesture based inputs
     const auto headset = VRManager::instance().XR->GetRenderer()->GetMiddlePose();
     if (headset.has_value()) {
         const auto headsetMtx = headset.value();
         const auto headsetPosition = glm::fvec3(headsetMtx[3]);
-        const glm::fquat headsetRotation = glm::quat_cast(headsetMtx);
         glm::fvec3 headsetForward = -glm::normalize(glm::fvec3(headsetMtx[2]));
         headsetForward.y = 0.0f;
         headsetForward = glm::normalize(headsetForward);
@@ -144,20 +192,15 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
         const glm::fvec3 headToleftHand = leftHandPosition - headsetPosition;
         const glm::fvec3 headToRightHand = rightHandPosition - headsetPosition;
 
-        // check if hands are behind head
-        float leftHandForwardDot = glm::dot(headsetForward, headToleftHand);
-        float rightHandForwardDot = glm::dot(headsetForward, headToRightHand);
-        leftHandBehindHead = leftHandForwardDot < 0.0f;
-        rightHandBehindHead = rightHandForwardDot < 0.0f;
+        leftHandBehindHead = glm::dot(headsetForward, headToleftHand) < 0.0f;
+        rightHandBehindHead = glm::dot(headsetForward, headToRightHand) < 0.0f;
 
-        // check the head hand distances
-        constexpr float shoulderRadius = 0.35f; // meters
+        constexpr float shoulderRadius = 0.35f;
         const float shoulderRadiusSq = shoulderRadius * shoulderRadius;
         leftHandCloseEnoughFromHead = glm::length2(headToleftHand) < shoulderRadiusSq;
         rightHandCloseEnoughFromHead = glm::length2(headToRightHand) < shoulderRadiusSq;
     }
 
-    // fetching stick inputs
     XrActionStateVector2f& leftStickSource = gameState.in_game ? inputs.inGame.move : inputs.inMenu.navigate;
     XrActionStateVector2f& rightStickSource = gameState.in_game ? inputs.inGame.camera : inputs.inMenu.scroll;
 
@@ -165,17 +208,14 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
     JoyDir rightJoystickDir = GetJoystickDirection(rightStickSource.currentState);
 
     const auto now = std::chrono::steady_clock::now();
-    //Delay to wait before allowing specific inputs again
     constexpr std::chrono::milliseconds delay{ 400 };
 
-    // check if we need to prevent inputs from happening (fix menu reopening when exiting it and grab object when quitting dpad menu)
     if (gameState.in_game != gameState.was_in_game) {
         gameState.prevent_menu_inputs = true;
         gameState.prevent_menu_time = now;
     }
 
-    if (gameState.in_game) 
-    {
+    if (gameState.in_game) {
         if (!gameState.prevent_menu_inputs) {
             if (inputs.inGame.mapAndInventoryState.lastEvent == ButtonState::Event::LongPress) {
                 newXRBtnHold |= VPAD_BUTTON_MINUS;
@@ -191,43 +231,22 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
 
         newXRBtnHold |= mapXRButtonToVpad(inputs.inGame.jump, VPAD_BUTTON_X);
         newXRBtnHold |= mapXRButtonToVpad(inputs.inGame.crouch, VPAD_BUTTON_STICK_L);
-        //newXRBtnHold |= mapXRButtonToVpad(inputs.inGame.run, VPAD_BUTTON_B);
         newXRBtnHold |= mapXRButtonToVpad(inputs.inGame.interact, VPAD_BUTTON_A);
         newXRBtnHold |= mapXRButtonToVpad(inputs.inGame.attack, VPAD_BUTTON_Y);
-        //newXRBtnHold |= mapXRButtonToVpad(inputs.inGame.cancel, VPAD_BUTTON_B);
         newXRBtnHold |= mapXRButtonToVpad(inputs.inGame.useRune, VPAD_BUTTON_L);
 
-        //run
         if (inputs.inGame.runState.lastEvent == ButtonState::Event::LongPress) {
             newXRBtnHold |= VPAD_BUTTON_B;
         }
 
         if (!leftHandBehindHead) {
-
             if (inputs.inGame.grabState[0].wasDownLastFrame) {
-                // Left Drop - Need dual wield implementation. Dropping left item currently makes the game freak out
-                // and the right weapon disappears. Equipping another sword make both the previous sword and actual appear in hand.
-                //if (leftJoystickDir == JoyDir::Down)
-                //{
-                //    inputs.inGame.drop_weapon[0] = true;
-                //    gameState.prevent_grab_inputs = true;
-                //    gameState.drop_weapon_time = now;
-                //}
-                //// Grab
-                //else if (!gameState.prevent_grab_inputs)
                 newXRBtnHold |= VPAD_BUTTON_A;
-                //else if (now >= gameState.drop_weapon_time + delay)
-                //{
-                //   gameState.prevent_grab_inputs = false;
-                //}
             }
 
-
-            //Dpad menu
             if (!gameState.prevent_menu_inputs) {
                 if (inputs.inGame.grabState[0].wasDownLastFrame) {
-                    switch (leftJoystickDir) 
-                    {
+                    switch (leftJoystickDir) {
                         case JoyDir::Up: newXRBtnHold |= VPAD_BUTTON_UP; break;
                         case JoyDir::Right: newXRBtnHold |= VPAD_BUTTON_RIGHT; break;
                         case JoyDir::Down: newXRBtnHold |= VPAD_BUTTON_DOWN; break;
@@ -236,47 +255,36 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
                     if (leftJoystickDir != JoyDir::None) {
                         gameState.prevent_grab_inputs = true;
                         gameState.prevent_grab_time = now;
-                        //prevent movement while dpad is used
                         leftStickSource.currentState = { 0.0f, 0.0f };
                     }
                 }
             }
-            else if (now >= gameState.prevent_menu_time + delay) 
+            else if (now >= gameState.prevent_menu_time + delay)
                 gameState.prevent_menu_inputs = false;
         }
 
-        if (leftHandCloseEnoughFromHead && leftHandBehindHead)
-        {
+        if (leftHandCloseEnoughFromHead && leftHandBehindHead) {
             VRManager::instance().XR->GetRumbleManager()->startSimpleRumble(true, 0.01f, 0.05f, 0.1f);
-            //Throw weapon left hand
             if (inputs.inGame.grabState[0].wasDownLastFrame)
                 newXRBtnHold |= VPAD_BUTTON_R;
         }
-            
-        if (!rightHandBehindHead)
-        {
-            if (inputs.inGame.grabState[1].wasDownLastFrame)
-            {
-                //Drop
-                if (rightJoystickDir == JoyDir::Down)
-                {
+
+        if (!rightHandBehindHead) {
+            if (inputs.inGame.grabState[1].wasDownLastFrame) {
+                if (rightJoystickDir == JoyDir::Down) {
                     inputs.inGame.drop_weapon[1] = true;
                     gameState.prevent_grab_inputs = true;
                     gameState.prevent_grab_time = now;
-                }  
-                // Grab
+                }
                 else if (!gameState.prevent_grab_inputs)
                     newXRBtnHold |= VPAD_BUTTON_A;
                 else if (now >= gameState.prevent_grab_time + delay)
-                {
                     gameState.prevent_grab_inputs = false;
-                }
             }
         }
-        
+
         if (rightHandCloseEnoughFromHead && rightHandBehindHead) {
             VRManager::instance().XR->GetRumbleManager()->startSimpleRumble(false, 0.01f, 0.05f, 0.1f);
-            //Throw weapon right hand
             if (inputs.inGame.grabState[1].wasDownLastFrame)
                 newXRBtnHold |= VPAD_BUTTON_R;
         }
@@ -285,14 +293,11 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
         newXRBtnHold |= mapXRButtonToVpad(inputs.inGame.rightTrigger, VPAD_BUTTON_ZR);
     }
     else {
-        if (!gameState.prevent_menu_inputs)
-        {
+        if (!gameState.prevent_menu_inputs) {
             if (gameState.map_open)
                 newXRBtnHold |= mapXRButtonToVpad(inputs.inMenu.mapAndInventory, VPAD_BUTTON_MINUS);
             else
-            {
                 newXRBtnHold |= mapXRButtonToVpad(inputs.inMenu.mapAndInventory, VPAD_BUTTON_PLUS);
-            }
         }
         else if (!inputs.inMenu.mapAndInventory.currentState)
             gameState.prevent_menu_inputs = false;
@@ -305,8 +310,7 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
         newXRBtnHold |= mapXRButtonToVpad(inputs.inMenu.rightTrigger, VPAD_BUTTON_R);
 
         if (inputs.inMenu.leftGrip.currentState) {
-            switch (leftJoystickDir)
-            {
+            switch (leftJoystickDir) {
                 case JoyDir::Up: newXRBtnHold |= VPAD_BUTTON_UP; break;
                 case JoyDir::Right: newXRBtnHold |= VPAD_BUTTON_RIGHT; break;
                 case JoyDir::Down: newXRBtnHold |= VPAD_BUTTON_DOWN; break;
@@ -315,13 +319,10 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
         }
     }
 
-    // todo: see if select or grab is better
-
     // sticks
     static uint32_t oldXRStickHold = 0;
     uint32_t newXRStickHold = 0;
 
-    // movement/navigation stick
     if (inputs.inGame.in_game) {
         auto isolateYaw = [](const glm::fquat& q) -> glm::fquat {
             glm::vec3 euler = glm::eulerAngles(q);
@@ -332,26 +333,22 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
 
         glm::fquat controllerRotation = ToGLM(inputs.inGame.poseLocation[OpenXR::EyeSide::LEFT].pose.orientation);
         glm::fquat controllerYawRotation = isolateYaw(controllerRotation);
-
         glm::fquat moveRotation = inputs.inGame.pose[OpenXR::EyeSide::LEFT].isActive ? glm::inverse(VRManager::instance().XR->m_inputCameraRotation.load() * controllerYawRotation) : glm::identity<glm::fquat>();
 
         glm::vec3 localMoveVec(leftStickSource.currentState.x, 0.0f, leftStickSource.currentState.y);
-
         glm::vec3 worldMoveVec = moveRotation * localMoveVec;
 
         float inputLen = glm::length(glm::vec2(leftStickSource.currentState.x, leftStickSource.currentState.y));
         if (inputLen > 1e-3f) {
             worldMoveVec = glm::normalize(worldMoveVec) * inputLen;
-        }
-        else {
+        } else {
             worldMoveVec = glm::vec3(0.0f);
         }
 
         worldMoveVec = {0, 0, 0};
 
         vpadStatus.leftStick = { worldMoveVec.x + leftStickSource.currentState.x + vpadStatus.leftStick.x.getLE(), worldMoveVec.z + leftStickSource.currentState.y + vpadStatus.leftStick.y.getLE() };
-    }
-    else {
+    } else {
         vpadStatus.leftStick = { leftStickSource.currentState.x + vpadStatus.leftStick.x.getLE(), leftStickSource.currentState.y + vpadStatus.leftStick.y.getLE() };
     }
 
@@ -379,71 +376,135 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
 
     oldXRStickHold = newXRStickHold;
 
-    // calculate new hold, trigger and release
     uint32_t combinedHold = (vpadStatus.hold.getLE() | (newXRBtnHold | newXRStickHold));
     vpadStatus.hold = combinedHold;
     vpadStatus.trig = (combinedHold & ~oldCombinedHold);
     vpadStatus.release = (~combinedHold & oldCombinedHold);
     oldCombinedHold = combinedHold;
 
-    // misc
     vpadStatus.vpadErr = 0;
     vpadStatus.batteryLevel = 0xC0;
-
-    // touch
     vpadStatus.tpData.touch = 0;
     vpadStatus.tpData.validity = 3;
 
-    // motion
-    vpadStatus.dir.x = glm::fvec3{1, 0, 0};
-    vpadStatus.dir.y = glm::fvec3{0, 1, 0};
-    vpadStatus.dir.z = glm::fvec3{0, 0, 1};
-    vpadStatus.accXY = {1.0f, 0.0f};
+    // ========================================================================
+    // Motion Controls - OpenXR to VPAD Motion Bridge
+    // ========================================================================
+    {
+        auto& motionState = MotionBridge::getState();
+        const auto& rightPose = inputs.inGame.poseLocation[OpenXR::EyeSide::RIGHT];
+        const auto& rightVelocity = inputs.inGame.poseVelocity[OpenXR::EyeSide::RIGHT];
 
-    // write the input back to VPADStatus
+        // Recenter motion: Hold both grips + both triggers for 1 second
+        static bool recenterTriggered = false;
+        static std::chrono::steady_clock::time_point recenterStartTime;
+        bool bothGripsHeld = inputs.inGame.grabState[0].wasDownLastFrame &&
+                            inputs.inGame.grabState[1].wasDownLastFrame;
+        bool bothTriggersHeld = inputs.inGame.leftTrigger.currentState &&
+                               inputs.inGame.rightTrigger.currentState;
+
+        if (bothGripsHeld && bothTriggersHeld) {
+            if (!recenterTriggered) {
+                auto elapsed = std::chrono::steady_clock::now() - recenterStartTime;
+                if (elapsed >= std::chrono::milliseconds(1000)) {
+                    glm::fquat rawOrientation = ToGLM(rightPose.pose.orientation);
+                    glm::fquat tabletOffset = MotionBridge::getPistolToTabletOffset();
+                    MotionBridge::recenter(rawOrientation * tabletOffset);
+                    recenterTriggered = true;
+                    VRManager::instance().XR->GetRumbleManager()->startSimpleRumble(false, 0.5f, 0.3f, 0.2f);
+                    VRManager::instance().XR->GetRumbleManager()->startSimpleRumble(true, 0.5f, 0.3f, 0.2f);
+                }
+            }
+        } else {
+            recenterStartTime = std::chrono::steady_clock::now();
+            recenterTriggered = false;
+        }
+
+        if (rightPose.locationFlags & XR_SPACE_LOCATION_ORIENTATION_VALID_BIT) {
+            glm::fquat rawOrientation = ToGLM(rightPose.pose.orientation);
+            glm::fquat tabletOffset = MotionBridge::getPistolToTabletOffset();
+            glm::fquat adjustedOrientation = rawOrientation * tabletOffset;
+            glm::fquat finalOrientation = motionState.calibrationOffset * adjustedOrientation;
+
+            glm::fvec3 acc = MotionBridge::calculateAccelerometer(finalOrientation);
+            vpadStatus.acc = BEVec3(-acc.x, -acc.y, acc.z);
+            vpadStatus.accMagnitude = glm::length(acc);
+
+            glm::fvec3 accDelta = acc - motionState.prevAcc;
+            vpadStatus.accAcceleration = glm::length(accDelta);
+            motionState.prevAcc = acc;
+
+            glm::fvec2 accXY = MotionBridge::calculateAccXY(acc);
+            vpadStatus.accXY = BEVec2(accXY.x, accXY.y);
+
+            glm::fvec3 dirX, dirY, dirZ;
+            MotionBridge::buildAttitudeMatrix(finalOrientation, dirX, dirY, dirZ);
+            vpadStatus.dir.x = dirX;
+            vpadStatus.dir.y = dirY;
+            vpadStatus.dir.z = dirZ;
+
+            if (rightVelocity.velocityFlags & XR_SPACE_VELOCITY_ANGULAR_VALID_BIT) {
+                glm::fvec3 angularVel = ToGLM(rightVelocity.angularVelocity);
+                angularVel.x = MotionBridge::filterGyroNoise(angularVel.x);
+                angularVel.y = MotionBridge::filterGyroNoise(angularVel.y);
+                angularVel.z = MotionBridge::filterGyroNoise(angularVel.z);
+
+                vpadStatus.gyroChange = BEVec3(
+                    MotionBridge::radToRevolutions(-angularVel.x),
+                    MotionBridge::radToRevolutions(-angularVel.y),
+                    MotionBridge::radToRevolutions(angularVel.z)
+                );
+
+                motionState.gyroOrientation += glm::fvec3(
+                    MotionBridge::radToRevolutions(-angularVel.x),
+                    MotionBridge::radToRevolutions(-angularVel.y),
+                    MotionBridge::radToRevolutions(angularVel.z)
+                );
+
+                auto wrapRevolution = [](float v) {
+                    v = fmodf(v + 0.5f, 1.0f);
+                    if (v < 0.0f) v += 1.0f;
+                    return v - 0.5f;
+                };
+                motionState.gyroOrientation.x = wrapRevolution(motionState.gyroOrientation.x);
+                motionState.gyroOrientation.y = wrapRevolution(motionState.gyroOrientation.y);
+                motionState.gyroOrientation.z = wrapRevolution(motionState.gyroOrientation.z);
+
+                vpadStatus.gyroOrientation = BEVec3(
+                    motionState.gyroOrientation.x,
+                    motionState.gyroOrientation.y,
+                    motionState.gyroOrientation.z
+                );
+            } else {
+                vpadStatus.gyroChange = BEVec3(0.0f, 0.0f, 0.0f);
+                vpadStatus.gyroOrientation = BEVec3(
+                    motionState.gyroOrientation.x,
+                    motionState.gyroOrientation.y,
+                    motionState.gyroOrientation.z
+                );
+            }
+        } else {
+            vpadStatus.acc = BEVec3(0.0f, -1.0f, 0.0f);
+            vpadStatus.accMagnitude = 1.0f;
+            vpadStatus.accAcceleration = 0.0f;
+            vpadStatus.accXY = BEVec2(1.0f, 0.0f);
+            vpadStatus.gyroChange = BEVec3(0.0f, 0.0f, 0.0f);
+            vpadStatus.gyroOrientation = BEVec3(0.0f, 0.0f, 0.0f);
+            vpadStatus.dir.x = glm::fvec3{1, 0, 0};
+            vpadStatus.dir.y = glm::fvec3{0, 1, 0};
+            vpadStatus.dir.z = glm::fvec3{0, 0, 1};
+        }
+    }
+
     writeMemory(vpadStatusOffset, &vpadStatus);
-
-    // set r3 to 1 for hooked VPADRead function to return success
     hCPU->gpr[3] = 1;
 
-    // set previous game states
     gameState.was_in_game = gameState.in_game;
     VRManager::instance().XR->m_gameState.store(gameState);
     VRManager::instance().XR->m_input.store(inputs);
 }
 
-
-// some ideas:
-// - quickly pressing the grip button without a weapon while there's a nearby weapon and there's enough slots = pick up weapon
-// - holding the grip button without a weapon while there's a nearby weapon = temporarily hold weapon
-// - holding the grip button a weapon equipped = opens weapon dpad menu
-// - quickly press the grip button while holding a weapon = drops current weapon
-
 void CemuHooks::hook_CreateNewActor(PPCInterpreter_t* hCPU) {
     hCPU->instructionPointer = hCPU->sprNew.LR;
-
-    // if (VRManager::instance().XR->GetRenderer() == nullptr || VRManager::instance().XR->GetRenderer()->m_layer3D.GetStatus() == RND_Renderer::Layer3D::Status3D::UNINITIALIZED) {
-    //     hCPU->gpr[3] = 0;
-    //     return;
-    // }
     hCPU->gpr[3] = 0;
-
-    // OpenXR::InputState inputs = VRManager::instance().XR->m_input.load();
-    // if (!inputs.inGame.in_game) {
-    //     hCPU->gpr[3] = 0;
-    //     return;
-    // }
-    //
-    // // test if controller is connected
-    // if (inputs.inGame.grab[OpenXR::EyeSide::LEFT].currentState == XR_TRUE && inputs.inGame.grab[OpenXR::EyeSide::LEFT].changedSinceLastSync == XR_TRUE) {
-    //     Log::print("Trying to spawn new thing!");
-    //     hCPU->gpr[3] = 1;
-    // }
-    // else if (inputs.inGame.grab[OpenXR::EyeSide::RIGHT].currentState == XR_TRUE && inputs.inGame.grab[OpenXR::EyeSide::RIGHT].changedSinceLastSync == XR_TRUE) {
-    //     Log::print("Trying to spawn new thing!");
-    //     hCPU->gpr[3] = 1;
-    // }
-    // else {
-    //     hCPU->gpr[3] = 0;
-    // }
 }
