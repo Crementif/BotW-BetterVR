@@ -121,6 +121,12 @@ static bool isDroppable(std::string actorName) {
     return true;
 }
 
+constexpr uint32_t FLAG_THROWABLE = 0x00004000;
+bool ObjectCanBeThrown(uint32_t flags)
+{
+    return (flags & FLAG_THROWABLE);
+}
+
 void CemuHooks::hook_ChangeWeaponMtx(PPCInterpreter_t* hCPU) {
     hCPU->instructionPointer = hCPU->sprNew.LR;
 
@@ -202,14 +208,19 @@ void CemuHooks::hook_ChangeWeaponMtx(PPCInterpreter_t* hCPU) {
         Weapon targetActor = {};
         readMemory(targetActorPtr, &targetActor);
 
-        //Update for inputs handling
+        //Fetch data for inputs handling
         auto gameState = VRManager::instance().XR->m_gameState.load();
         gameState.is_weapon_or_object_held = true;
-        if (isRightHandWeapon)
-            gameState.right_weapon_type = targetActor.type.getLE();
-        else
+        gameState.is_throwable_object_held = ObjectCanBeThrown(targetActor.flags2.getLE());  
+        if (isRightHandWeapon) {
+            gameState.right_weapon_type = targetActor.type.getLE();          
+        }
+        else {
             gameState.left_weapon_type = targetActor.type.getLE();
+        }
         VRManager::instance().XR->m_gameState.store(gameState);
+
+        
 
         // check if weapon is held and if the grip button is held, drop it
         auto input = VRManager::instance().XR->m_input.load();

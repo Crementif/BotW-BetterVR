@@ -388,11 +388,12 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
         // Trigger attack if weapon equip or throw objects if not
         if (inputs.inGame.rightTrigger.currentState) {
             if (gameState.is_weapon_or_object_held) {
-                if (gameState.left_weapon_type == WeaponType::Bow)
+                //object throw 
+                if (gameState.is_throwable_object_held)
+                    newXRBtnHold |= VPAD_BUTTON_R;
+                //weapon attacks
+                else if (gameState.left_weapon_type == WeaponType::Bow)
                     newXRBtnHold |= VPAD_BUTTON_ZR;
-                //object throw
-                //else if (gameState.right_weapon_type == WeaponType::UnknownWeapon)
-                //    newXRBtnHold |= VPAD_BUTTON_R;
                 else
                     newXRBtnHold |= VPAD_BUTTON_Y;
             }
@@ -401,8 +402,6 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
                 newXRBtnHold |= VPAD_BUTTON_ZR;
             else if (gameState.last_weapon_held_hand == 1)
                 newXRBtnHold |= VPAD_BUTTON_Y;
-            /* else I need to check if an object is being held to throw it
-                newXRBtnHold |= VPAD_BUTTON_R;*/
         }
 
     }
@@ -529,6 +528,7 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
     // set previous game states
     gameState.was_in_game = gameState.in_game;
     gameState.is_weapon_or_object_held = false; // updated in hook_ChangeWeaponMtx
+    gameState.is_throwable_object_held = false; // updated in hook_ChangeWeaponMtx
     gameState.right_weapon_type = WeaponType::SmallSword; // updated in hook_ChangeWeaponMtx
     gameState.left_weapon_type = WeaponType::SmallSword; // updated in hook_ChangeWeaponMtx
 
