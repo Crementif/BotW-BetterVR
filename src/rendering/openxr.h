@@ -122,7 +122,7 @@ public:
         WeaponType right_weapon_type = WeaponType::SmallSword;
         WeaponType left_weapon_type = WeaponType::SmallSword;
         bool last_weapon_held_hand = 0; // 0 = left, 1 = right
-        bool is_weapon_held = false;
+        bool is_weapon_or_object_held = false;
     } gameState ;
 
     std::atomic<GameState> m_gameState{};

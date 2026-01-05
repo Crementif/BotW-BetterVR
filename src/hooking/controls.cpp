@@ -180,10 +180,10 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
     if (gameState.prevent_grab_inputs && now >= gameState.prevent_grab_time + delay)
         gameState.prevent_grab_inputs = false;
 
-    Log::print<INFO>("last_weapon_held_hand : {}", gameState.last_weapon_held_hand);
-    //Log::print<INFO>("Is weapon held : {}", gameState.is_weapon_held);
+    //Log::print<INFO>("last_weapon_held_hand : {}", gameState.last_weapon_held_hand);
+    //Log::print<INFO>("Is weapon held : {}", gameState.is_weapon_or_object_held);
     //Log::print<INFO>("Weapon Type : {}", (int)gameState.left_weapon_type);
-    //Log::print<INFO>("Weapon Type : {}", (int)gameState.right_weapon_type);
+    Log::print<INFO>("Weapon Type : {}", (int)gameState.right_weapon_type);
 
     if (gameState.in_game) 
     {
@@ -264,7 +264,7 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
         {
             VRManager::instance().XR->GetRumbleManager()->startSimpleRumble(true, 0.01f, 0.05f, 0.1f);
             if (!gameState.prevent_grab_inputs && (inputs.inGame.grabState[0].wasDownLastFrame || inputs.inGame.grabState[1].wasDownLastFrame)) {
-                if (gameState.is_weapon_held) {
+                if (gameState.is_weapon_or_object_held) {
                     //Equip bow if sword is held
                     if (gameState.left_weapon_type != WeaponType::Bow)
                     {
@@ -307,7 +307,7 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
             VRManager::instance().XR->GetRumbleManager()->startSimpleRumble(false, 0.01f, 0.05f, 0.1f);
 
             if (!gameState.prevent_grab_inputs && (inputs.inGame.grabState[0].wasDownLastFrame || inputs.inGame.grabState[1].wasDownLastFrame)) {
-                if (gameState.is_weapon_held) {
+                if (gameState.is_weapon_or_object_held) {
                     //Equip sword if bow is held
                     if (gameState.left_weapon_type == WeaponType::Bow)
                     {
@@ -337,9 +337,12 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
 
         // Trigger attack if weapon equip or throw objects if not
         if (inputs.inGame.rightTrigger.currentState) {
-            if (gameState.is_weapon_held) {
+            if (gameState.is_weapon_or_object_held) {
                 if (gameState.left_weapon_type == WeaponType::Bow)
                     newXRBtnHold |= VPAD_BUTTON_ZR;
+                //object throw
+                //else if (gameState.right_weapon_type == WeaponType::UnknownWeapon)
+                //    newXRBtnHold |= VPAD_BUTTON_R;
                 else
                     newXRBtnHold |= VPAD_BUTTON_Y;
             }
@@ -475,7 +478,7 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
 
     // set previous game states
     gameState.was_in_game = gameState.in_game;
-    gameState.is_weapon_held = false; // updated in hook_ChangeWeaponMtx
+    gameState.is_weapon_or_object_held = false; // updated in hook_ChangeWeaponMtx
     gameState.right_weapon_type = WeaponType::SmallSword; // updated in hook_ChangeWeaponMtx
     gameState.left_weapon_type = WeaponType::SmallSword; // updated in hook_ChangeWeaponMtx
 

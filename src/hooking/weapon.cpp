@@ -168,6 +168,7 @@ void CemuHooks::hook_ChangeWeaponMtx(PPCInterpreter_t* hCPU) {
     bool isHeldByPlayer = actorName.getLE() == "GameROMPlayer";
     bool isLeftHandWeapon = strcmp(boneName, "Weapon_L") == 0;
     bool isRightHandWeapon = strcmp(boneName, "Weapon_R") == 0;
+
     if (!actorName.getLE().empty() && boneName[0] != '\0' && isHeldByPlayer && (isLeftHandWeapon || isRightHandWeapon)) {
         OpenXR::EyeSide side = isLeftHandWeapon ? OpenXR::EyeSide::LEFT : OpenXR::EyeSide::RIGHT;
 
@@ -203,7 +204,7 @@ void CemuHooks::hook_ChangeWeaponMtx(PPCInterpreter_t* hCPU) {
 
         //Update for inputs handling
         auto gameState = VRManager::instance().XR->m_gameState.load();
-        gameState.is_weapon_held = true;
+        gameState.is_weapon_or_object_held = true;
         if (isRightHandWeapon)
             gameState.right_weapon_type = targetActor.type.getLE();
         else
