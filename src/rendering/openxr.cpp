@@ -416,15 +416,13 @@ void CheckButtonState(bool buttonPressed, ButtonState& buttonState) {
     // Rising edge - button just pressed
     if (down && !buttonState.wasDownLastFrame) {
         buttonState.pressStartTime = now;
-        buttonState.longFired = false;
     }
     
     // Pressed state - check for long press threshold
-    if (down && !buttonState.longFired) {
+    if (down) {
         auto pressDuration = now - buttonState.pressStartTime;
         
         if (pressDuration >= longPressThreshold) {
-            buttonState.longFired = true;
             buttonState.lastEvent = ButtonState::Event::LongPress;
         }
     }

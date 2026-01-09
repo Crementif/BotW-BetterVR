@@ -229,6 +229,9 @@ void CemuHooks::hook_ChangeWeaponMtx(PPCInterpreter_t* hCPU) {
                 equipType = EquipType::None;
                 break;
         }
+
+       
+
         if (targetActor.name.getLE() == "Item_Conductor")
             equipType = EquipType::Rune;
 

@@ -126,6 +126,8 @@ public:
         EquipType last_item_held = EquipType::None;
         bool has_something_in_hand = false; // true if either a weapon or a throwable object is held
         bool is_throwable_object_held = false; // true if a throwable object is held
+
+        float left_hand_velocity = 0.0f;
     } gameState ;
     std::atomic<GameState> m_gameState{};
 
