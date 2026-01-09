@@ -87,7 +87,7 @@ enum JoyDir {
 constexpr float AXIS_THRESHOLD = 0.5f;
 constexpr float HOLD_THRESHOLD = 0.1f;
 
-JoyDir GetJoystickDirection(const XrVector2f& stick)
+JoyDir getJoystickDirection(const XrVector2f& stick)
 {
     if (stick.y >= AXIS_THRESHOLD)       return JoyDir::Up;
     if (stick.y <= -AXIS_THRESHOLD)      return JoyDir::Down;
@@ -95,6 +95,338 @@ JoyDir GetJoystickDirection(const XrVector2f& stick)
     if (stick.x >= AXIS_THRESHOLD)       return JoyDir::Right;
 
     return JoyDir::None;
+}
+
+
+struct HandGestureState {
+    bool isBehindHead;
+    bool isBehindHeadWithWaistOffset;
+    bool isCloseToHead;
+    bool isCloseToWaist;
+    bool isOnLeftSide;  // true = left side of body, false = right side
+};
+
+// Gesture detection functions
+HandGestureState calculateHandGesture(
+    const glm::fvec3& handPos,
+    const glm::fmat4& headsetMatrix,
+    const glm::fvec3& headsetPos
+) {
+    HandGestureState gesture = {};
+    
+    // Calculate directional vectors
+    glm::fvec3 headsetForward = -glm::normalize(glm::fvec3(headsetMatrix[2]));
+    headsetForward.y = 0.0f;
+    headsetForward = glm::normalize(headsetForward);
+    
+    glm::fvec3 headsetRight = glm::normalize(glm::fvec3(headsetMatrix[0]));
+    glm::fvec3 headToHand = handPos - headsetPos;
+    
+    // Check if hand is behind head (for shoulder slots)
+    float forwardDot = glm::dot(headsetForward, headToHand);
+    gesture.isBehindHead = (forwardDot < 0.0f);
+    
+    // Check if hand is behind head (for waist slot) - uses flattened vectors
+    glm::vec3 flatForward = glm::normalize(glm::vec3(headsetForward.x, 0.0f, headsetForward.z));
+    glm::vec3 flatHandOffset = glm::vec3(headToHand.x, 0.0f, headToHand.z);
+    
+    constexpr float WAIST_BEHIND_OFFSET = 0.15f;
+    float flatForwardDot = glm::dot(flatForward, flatHandOffset) + WAIST_BEHIND_OFFSET;
+    gesture.isBehindHeadWithWaistOffset = (flatForwardDot < 0.0f);
+    
+    // Check which side of body the hand is on
+    float rightDot = glm::dot(headsetRight, headToHand);
+    gesture.isOnLeftSide = (rightDot < 0.0f);
+    
+    // Check distance from head (for shoulder slots)
+    constexpr float SHOULDER_RADIUS = 0.35f;
+    constexpr float SHOULDER_RADIUS_SQ = SHOULDER_RADIUS * SHOULDER_RADIUS;
+    gesture.isCloseToHead = (glm::length2(headToHand) < SHOULDER_RADIUS_SQ);
+    
+    // Check distance from waist (rough estimate)
+    glm::fvec3 waistPos = headsetPos - glm::fvec3(0.0f, 0.5f, 0.0f);
+    gesture.isCloseToWaist = (handPos.y < waistPos.y);
+    
+    return gesture;
+}
+
+bool isHandOverLeftShoulderSlot(const HandGestureState& gesture) {
+    return gesture.isBehindHead && gesture.isCloseToHead && gesture.isOnLeftSide;
+}
+
+bool isHandOverRightShoulderSlot(const HandGestureState& gesture) {
+    return gesture.isBehindHead && gesture.isCloseToHead && !gesture.isOnLeftSide;
+}
+
+bool isHandOverWaistSlot(const HandGestureState& gesture) {
+    return gesture.isBehindHeadWithWaistOffset && gesture.isCloseToWaist && gesture.isOnLeftSide;
+}
+
+
+// Input handling functions
+void handleLeftHandInGameInput(
+    uint32_t& buttonHold,
+    OpenXR::InputState& inputs,
+    OpenXR::GameState& gameState,
+    const HandGestureState& leftGesture,
+    JoyDir leftStickDir,
+    XrActionStateVector2f& leftStickSource,
+    const std::chrono::steady_clock::time_point& now
+) {
+    constexpr std::chrono::milliseconds INPUT_DELAY(400);
+    
+    RumbleParameters overSlotRumble = { true, 0, 0.5f, true, 1.0, 0.25f, 0.25f };
+    RumbleParameters grabSlotRumble = { true, 0, 0.5f, false, 0.25, 0.3f, 0.3f };
+    
+    auto* rumbleMgr = VRManager::instance().XR->GetRumbleManager();
+    bool isGrabPressed = inputs.inGame.grabState[0].wasDownLastFrame;
+    
+    // Handle shoulder slot interactions
+    if (isHandOverLeftShoulderSlot(leftGesture) || isHandOverRightShoulderSlot(leftGesture)) {
+        // Provide haptic feedback when hand is over equipped slot
+        if (isHandOverRightShoulderSlot(leftGesture) && gameState.right_equip_type == EquipType::Melee) {
+            rumbleMgr->enqueueInputsRumbleCommand(overSlotRumble);
+        }
+        else if (isHandOverLeftShoulderSlot(leftGesture) && gameState.left_equip_type == EquipType::Bow) {
+            rumbleMgr->enqueueInputsRumbleCommand(overSlotRumble);
+        }
+        
+        // Handle equip/unequip
+        if (!gameState.prevent_grab_inputs && isGrabPressed) {
+            rumbleMgr->enqueueInputsRumbleCommand(grabSlotRumble);
+            
+            if (isHandOverLeftShoulderSlot(leftGesture)) {
+                // Left shoulder = Bow
+                if (gameState.left_equip_type != EquipType::Bow) {
+                    buttonHold |= VPAD_BUTTON_ZR;
+                    gameState.last_item_held = EquipType::Bow;
+                } else {
+                    buttonHold |= VPAD_BUTTON_B;  // Unequip
+                }
+            }
+            else {
+                // Right shoulder = Melee weapon
+                if (gameState.right_equip_type != EquipType::Melee) {
+                    buttonHold |= VPAD_BUTTON_Y;
+                    gameState.last_item_held = EquipType::Melee;
+                } else {
+                    buttonHold |= VPAD_BUTTON_B;  // Unequip
+                }
+            }
+            
+            gameState.prevent_grab_inputs = true;
+            gameState.prevent_grab_time = now;
+        }
+        return;  // Don't process normal input when over slots
+    }
+    
+    // Handle waist slot interaction (Rune)
+    if (isHandOverWaistSlot(leftGesture)) {
+        if (gameState.left_equip_type == EquipType::Rune) {
+            rumbleMgr->enqueueInputsRumbleCommand(overSlotRumble);
+        }
+        
+        if (!gameState.prevent_grab_inputs && isGrabPressed) {
+            rumbleMgr->enqueueInputsRumbleCommand(grabSlotRumble);
+            
+            if (gameState.left_equip_type != EquipType::Rune) {
+                buttonHold |= VPAD_BUTTON_L;
+                gameState.last_item_held = EquipType::Rune;
+            } else {
+                buttonHold |= VPAD_BUTTON_B;  // Unequip
+            }
+            
+            gameState.prevent_grab_inputs = true;
+            gameState.prevent_grab_time = now;
+        }
+        return;
+    }
+    
+    // Normal hand input (not over slots)
+    rumbleMgr->stopInputsRumble(0);
+    
+    if (isGrabPressed) {
+        // Handle grab action
+        if (!gameState.prevent_grab_inputs) {
+            buttonHold |= VPAD_BUTTON_A;
+        }
+    }
+    
+    // Handle D-pad menu with left stick while grabbing
+    if (!gameState.prevent_menu_inputs && isGrabPressed) {
+        switch (leftStickDir) {
+            case JoyDir::Up:    buttonHold |= VPAD_BUTTON_UP; break;
+            case JoyDir::Right: buttonHold |= VPAD_BUTTON_RIGHT; break;
+            case JoyDir::Down:  buttonHold |= VPAD_BUTTON_DOWN; break;
+            case JoyDir::Left:  buttonHold |= VPAD_BUTTON_LEFT; break;
+            case JoyDir::None:  break;
+        }
+        
+        if (leftStickDir != JoyDir::None) {
+            gameState.prevent_grab_inputs = true;
+            gameState.prevent_grab_time = now;
+            leftStickSource.currentState = { 0.0f, 0.0f };  // Prevent movement
+        }
+    }
+}
+
+void handleRightHandInGameInput(
+    uint32_t& buttonHold,
+    OpenXR::InputState& inputs,
+    OpenXR::GameState& gameState,
+    const HandGestureState& rightGesture,
+    JoyDir rightStickDir,
+    const std::chrono::steady_clock::time_point& now
+) {
+    constexpr std::chrono::milliseconds INPUT_DELAY(400);
+    
+    RumbleParameters overSlotRumble = { true, 1, 0.5f, true, 1.0, 0.25f, 0.25f };
+    RumbleParameters grabSlotRumble = { true, 1, 0.5f, false, 0.25, 0.3f, 0.3f };
+    
+    auto* rumbleMgr = VRManager::instance().XR->GetRumbleManager();
+    bool isGrabPressed = inputs.inGame.grabState[1].wasDownLastFrame;
+    bool isTriggerPressed = inputs.inGame.rightTrigger.currentState;
+    
+    // Handle shoulder slot interactions
+    if (isHandOverLeftShoulderSlot(rightGesture) || isHandOverRightShoulderSlot(rightGesture)) {
+        // Haptic feedback when over equipped slot
+        if (isHandOverRightShoulderSlot(rightGesture) && gameState.right_equip_type == EquipType::Melee) {
+            rumbleMgr->enqueueInputsRumbleCommand(overSlotRumble);
+        }
+        else if (isHandOverLeftShoulderSlot(rightGesture) && gameState.left_equip_type == EquipType::Bow) {
+            rumbleMgr->enqueueInputsRumbleCommand(overSlotRumble);
+        }
+        
+        // Handle equip/unequip
+        if (!gameState.prevent_grab_inputs && isGrabPressed) {
+            rumbleMgr->enqueueInputsRumbleCommand(grabSlotRumble);
+            
+            if (isHandOverRightShoulderSlot(rightGesture)) {
+                // Right shoulder = Melee weapon
+                if (gameState.right_equip_type != EquipType::Melee) {
+                    buttonHold |= VPAD_BUTTON_Y;
+                    gameState.last_item_held = EquipType::Melee;
+                } else {
+                    buttonHold |= VPAD_BUTTON_B;
+                }
+            }
+            else {
+                // Left shoulder = Bow
+                if (gameState.left_equip_type != EquipType::Bow) {
+                    buttonHold |= VPAD_BUTTON_ZR;
+                    gameState.last_item_held = EquipType::Bow;
+                } else {
+                    buttonHold |= VPAD_BUTTON_B;
+                }
+            }
+            
+            gameState.prevent_grab_inputs = true;
+            gameState.prevent_grab_time = now;
+        }
+        
+        // Handle weapon throw when over shoulder slot
+        if (isTriggerPressed) {
+            rumbleMgr->enqueueInputsRumbleCommand(grabSlotRumble);
+            buttonHold |= VPAD_BUTTON_R;
+        }
+        
+        return;  // Don't process normal input when over slots
+    }
+    
+    // Normal hand input (not over slots)
+    rumbleMgr->stopInputsRumble(1);
+    
+    if (isGrabPressed) {
+        // Handle drop action
+        if (rightStickDir == JoyDir::Down) {
+            inputs.inGame.drop_weapon[1] = true;
+            gameState.prevent_grab_inputs = true;
+            gameState.prevent_grab_time = now;
+        }
+        // Handle grab action
+        else if (!gameState.prevent_grab_inputs) {
+            buttonHold |= VPAD_BUTTON_A;
+        }
+    }
+}
+
+void handleRightTriggerAttack(
+    uint32_t& buttonHold,
+    OpenXR::InputState& inputs,
+    OpenXR::GameState& gameState
+) {
+    if (!inputs.inGame.rightTrigger.currentState) {
+        return;
+    }
+    
+    RumbleParameters attackRumble = { true, 1, 0.5f, false, 0.25, 0.3f, 0.3f };
+    auto* rumbleMgr = VRManager::instance().XR->GetRumbleManager();
+    
+    rumbleMgr->enqueueInputsRumbleCommand(attackRumble);
+    
+    if (gameState.has_something_in_hand) {
+        if (gameState.is_throwable_object_held) {
+            buttonHold |= VPAD_BUTTON_R;  // Throw object
+        }
+        else if (gameState.left_equip_type == EquipType::Bow) {
+            buttonHold |= VPAD_BUTTON_ZR;  // Shoot bow
+        }
+        else if (gameState.left_equip_type == EquipType::Rune) {
+            buttonHold |= VPAD_BUTTON_A;  // Use rune
+        }
+        else {
+            buttonHold |= VPAD_BUTTON_Y;  // Melee attack
+        }
+    }
+    else {
+        // Re-equip last held weapon when empty-handed
+        if (gameState.last_item_held == EquipType::Melee) {
+            buttonHold |= VPAD_BUTTON_Y;
+        }
+        else if (gameState.last_item_held == EquipType::Bow) {
+            buttonHold |= VPAD_BUTTON_ZR;
+        }
+        else if (gameState.last_item_held == EquipType::Rune) {
+            buttonHold |= VPAD_BUTTON_L;
+        }
+    }
+}
+
+void handleMenuInput(
+    uint32_t& buttonHold,
+    OpenXR::InputState& inputs,
+    OpenXR::GameState& gameState,
+    JoyDir leftStickDir
+) {
+    auto mapButton = [](XrActionStateBoolean& state, VPADButtons btn) -> uint32_t {
+        return state.currentState ? btn : 0;
+    };
+    
+    if (!gameState.prevent_menu_inputs) {
+        if (gameState.map_open) {
+            buttonHold |= mapButton(inputs.inMenu.mapAndInventory, VPAD_BUTTON_MINUS);
+        } else {
+            buttonHold |= mapButton(inputs.inMenu.mapAndInventory, VPAD_BUTTON_PLUS);
+        }
+    }
+    
+    buttonHold |= mapButton(inputs.inMenu.select, VPAD_BUTTON_A);
+    buttonHold |= mapButton(inputs.inMenu.back, VPAD_BUTTON_B);
+    buttonHold |= mapButton(inputs.inMenu.sort, VPAD_BUTTON_Y);
+    buttonHold |= mapButton(inputs.inMenu.hold, VPAD_BUTTON_X);
+    buttonHold |= mapButton(inputs.inMenu.leftTrigger, VPAD_BUTTON_L);
+    buttonHold |= mapButton(inputs.inMenu.rightTrigger, VPAD_BUTTON_R);
+    
+    // D-pad navigation with left grip
+    if (inputs.inMenu.leftGrip.currentState) {
+        switch (leftStickDir) {
+            case JoyDir::Up:    buttonHold |= VPAD_BUTTON_UP; break;
+            case JoyDir::Right: buttonHold |= VPAD_BUTTON_RIGHT; break;
+            case JoyDir::Down:  buttonHold |= VPAD_BUTTON_DOWN; break;
+            case JoyDir::Left:  buttonHold |= VPAD_BUTTON_LEFT; break;
+            case JoyDir::None:  break;
+        }
+    }
 }
 
 void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
@@ -114,8 +446,10 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
         readMemory(vpadStatusOffset, &vpadStatus);
     }
 
+    // fetch input state
     OpenXR::InputState inputs = VRManager::instance().XR->m_input.load();
     inputs.inGame.drop_weapon[0] = inputs.inGame.drop_weapon[1] = false;
+
     // fetch game state
     auto gameState = VRManager::instance().XR->m_gameState.load();
     gameState.in_game = inputs.inGame.in_game;
@@ -124,102 +458,16 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
     static uint32_t oldCombinedHold = 0;
     uint32_t newXRBtnHold = 0;
 
-    // initializing rumble parameters
-    RumbleParameters leftHandOverSlotsRumbleParams {
-        true, 0, 0.5f, true, 1.0, 0.25f, 0.25f
-    };
-    RumbleParameters rightHandOverSlotsRumbleParams {
-        true, 1, 0.5f, true, 1.0, 0.25f, 0.25f
-    };
-
-    RumbleParameters leftGrabSlotsRumbleParams{
-        true, 0, 0.5f, false, 0.25, 0.3f, 0.3f
-    };
-    RumbleParameters rightGrabSlotsRumbleParams{
-        true, 1, 0.5f, false, 0.25, 0.3f, 0.3f
-    };
-
-
-    // initializing gesture related variables
-    bool leftHandBehindHead = false;
-    bool rightHandBehindHead = false;
-    bool leftHandBehindHeadWithWaistOffset = false;
-    bool rightHandBehindHeadWithWaistOffset = false;
-    bool leftHandCloseEnoughFromHead = false;
-    bool rightHandCloseEnoughFromHead = false;
-    bool leftHandBodySide = false; // 0 = left, 1 = right -- hand reaching for left or right slots
-    bool rightHandBodySide = false;
-    bool leftHandCloseEnoughFromWaist = false;
-    bool rightHandCloseEnoughFromWaist = false;
-
-    // fetching motion states for gesture based inputs
-    const auto headset = VRManager::instance().XR->GetRenderer()->GetMiddlePose();
-    if (headset.has_value()) {
-        const auto headsetMtx = headset.value();
-        const auto headsetPosition = glm::fvec3(headsetMtx[3]);
-        const glm::fquat headsetRotation = glm::quat_cast(headsetMtx);
-        glm::fvec3 headsetForward = -glm::normalize(glm::fvec3(headsetMtx[2]));
-        headsetForward.y = 0.0f;
-        headsetForward = glm::normalize(headsetForward);
-        const auto leftHandPosition = ToGLM(inputs.inGame.poseLocation[0].pose.position);
-        const auto rightHandPosition = ToGLM(inputs.inGame.poseLocation[1].pose.position);
-        const glm::fvec3 headToleftHand = leftHandPosition - headsetPosition;
-        const glm::fvec3 headToRightHand = rightHandPosition - headsetPosition;
-
-        // check if hands are behind head for shoulders reach (ignoring the Y axis)
-        float leftHandForwardDot = glm::dot(headsetForward, headToleftHand);
-        float rightHandForwardDot = glm::dot(headsetForward, headToRightHand);
-        leftHandBehindHead = leftHandForwardDot < 0.0f;
-        rightHandBehindHead = rightHandForwardDot < 0.0f;
-
-        // check if hands are behind head for waist reach. We flatten the forward vector so the roll and pitch aren't took into account
-        glm::vec3 flatForward = { headsetForward.x, 0.0f, headsetForward.z };
-        flatForward = glm::normalize(flatForward);
-        glm::vec3 flatLeftHand = { headToleftHand.x, 0.0f, headToleftHand.z };
-        glm::vec3 flatRightHand = { headToRightHand.x, 0.0f, headToRightHand.z };
-
-        float BEHIND_OFFSET = 0.15f;
-        leftHandForwardDot = glm::dot(flatForward, flatLeftHand) + BEHIND_OFFSET;
-        rightHandForwardDot = glm::dot(flatForward, flatRightHand) + BEHIND_OFFSET;
-        leftHandBehindHeadWithWaistOffset = leftHandForwardDot < 0.0f;
-        rightHandBehindHeadWithWaistOffset = rightHandForwardDot > 0.0f;
-
-        // check if hands are on correct side
-        glm::fvec3 headsetRight = glm::normalize(glm::fvec3(headsetMtx[0]));
-        float leftHandRightDot = glm::dot(headsetRight, headToleftHand);
-        float rightHandRightDot = glm::dot(headsetRight, headToRightHand);
-        leftHandBodySide = leftHandRightDot < 0.0f;
-        rightHandBodySide = rightHandRightDot > 0.0f;
-
-        // check the head hand distances
-        constexpr float shoulderRadius = 0.35f; // meters
-        const float shoulderRadiusSq = shoulderRadius * shoulderRadius;
-        leftHandCloseEnoughFromHead = glm::length2(headToleftHand) < shoulderRadiusSq;
-        rightHandCloseEnoughFromHead = glm::length2(headToRightHand) < shoulderRadiusSq;
-
-        // check if hands are close enough from waist
-        glm::fvec3 offset = { 0.0f, 0.5f, 0.0f};
-        glm::fvec3 waistPosition = headsetPosition - offset; // rough estimate of waist position
-        //constexpr float waistRadius = 0.75f; // meters
-        //Log::print<INFO>("height difference = {}", leftHandPosition.y - waistPosition.y);
-        leftHandCloseEnoughFromWaist = leftHandPosition.y < waistPosition.y;
-        //const float waistRadiusSq = waistRadius * waistRadius;
-        //float lenght = glm::length2(leftHandPosition - waistPosition);
-        //Log::print<INFO>("distance sq = {}", lenght);
-        //leftHandCloseEnoughFromWaist = glm::length2(leftHandPosition - waistPosition) < waistRadiusSq;
-        //rightHandCloseEnoughFromWaist = glm::length2(rightHandPosition - waistPosition) < waistRadiusSq;
-    }
-
     // fetching stick inputs
     XrActionStateVector2f& leftStickSource = gameState.in_game ? inputs.inGame.move : inputs.inMenu.navigate;
     XrActionStateVector2f& rightStickSource = gameState.in_game ? inputs.inGame.camera : inputs.inMenu.scroll;
 
-    JoyDir leftJoystickDir = GetJoystickDirection(leftStickSource.currentState);
-    JoyDir rightJoystickDir = GetJoystickDirection(rightStickSource.currentState);
+    JoyDir leftJoystickDir = getJoystickDirection(leftStickSource.currentState);
+    JoyDir rightJoystickDir = getJoystickDirection(rightStickSource.currentState);
 
-    const auto now = std::chrono::steady_clock::now();
     //Delay to wait before allowing specific inputs again
     constexpr std::chrono::milliseconds delay{ 400 };
+    const auto now = std::chrono::steady_clock::now();
 
     // check if we need to prevent inputs from happening (fix menu reopening when exiting it and grab object when quitting dpad menu)
     if (gameState.in_game != gameState.was_in_game) {
@@ -238,8 +486,25 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
     //Log::print<INFO>("Weapon Type : {}", (int)gameState.left_weapon_type);
     //Log::print<INFO>("Weapon Type : {}", (int)gameState.right_weapon_type);
 
-    if (gameState.in_game)
-    {
+    // Calculate hand gestures
+    HandGestureState leftGesture = {};
+    HandGestureState rightGesture = {};
+
+    auto headsetPose = VRManager::instance().XR->GetRenderer()->GetMiddlePose();
+    if (headsetPose.has_value()) {
+        const auto headsetMtx = headsetPose.value();
+        const glm::fvec3 headsetPos(headsetMtx[3]);
+        
+        const auto leftHandPos = ToGLM(inputs.inGame.poseLocation[0].pose.position);
+        const auto rightHandPos = ToGLM(inputs.inGame.poseLocation[1].pose.position);
+        
+        leftGesture = calculateHandGesture(leftHandPos, headsetMtx, headsetPos);
+        rightGesture = calculateHandGesture(rightHandPos, headsetMtx, headsetPos);
+    }
+    
+    // Process input
+    if (gameState.in_game) {
+        // Handle menu toggle
         if (!gameState.prevent_menu_inputs) {
             if (inputs.inGame.mapAndInventoryState.lastEvent == ButtonState::Event::LongPress) {
                 newXRBtnHold |= VPAD_BUTTON_MINUS;
@@ -250,267 +515,48 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
                 gameState.map_open = false;
             }
         }
-
-        //Scope
+        
+        // Handle crouch and scope
         if (inputs.inGame.crouchAndScopeState.lastEvent == ButtonState::Event::LongPress) {
-            newXRBtnHold |= VPAD_BUTTON_STICK_R;
+            newXRBtnHold |= VPAD_BUTTON_STICK_R;  // Scope
         }
-        //Crouch
         if (inputs.inGame.crouchAndScopeState.lastEvent == ButtonState::Event::ShortPress) {
-            newXRBtnHold |= VPAD_BUTTON_STICK_L;
+            newXRBtnHold |= VPAD_BUTTON_STICK_L;  // Crouch
         }
-
+        
+        // Basic actions
         newXRBtnHold |= mapXRButtonToVpad(inputs.inGame.jump, VPAD_BUTTON_X);
-        //newXRBtnHold |= mapXRButtonToVpad(inputs.inGame.run, VPAD_BUTTON_B);
         newXRBtnHold |= mapXRButtonToVpad(inputs.inGame.interact, VPAD_BUTTON_A);
-        //newXRBtnHold |= mapXRButtonToVpad(inputs.inGame.attack, VPAD_BUTTON_Y);
-        //newXRBtnHold |= mapXRButtonToVpad(inputs.inGame.cancel, VPAD_BUTTON_B);
-        //newXRBtnHold |= mapXRButtonToVpad(inputs.inGame.useRune, VPAD_BUTTON_L);
-
-        //run
+        
         if (inputs.inGame.runState.lastEvent == ButtonState::Event::LongPress) {
+            newXRBtnHold |= VPAD_BUTTON_B;  // Run
+        }
+        
+        // Hand-specific input
+        handleLeftHandInGameInput(newXRBtnHold, inputs, gameState, leftGesture, 
+                                   leftJoystickDir, leftStickSource, now);
+        handleRightHandInGameInput(newXRBtnHold, inputs, gameState, rightGesture, 
+                                    rightJoystickDir, now);
+        
+        // Combat actions
+        handleRightTriggerAttack(newXRBtnHold, inputs, gameState);
+        
+        // Rune cancel with left trigger
+        if (inputs.inGame.leftTrigger.currentState && 
+            gameState.left_equip_type == EquipType::Rune) {
+            RumbleParameters rumble = { true, 1, 0.5f, false, 0.25, 0.3f, 0.3f };
+            VRManager::instance().XR->GetRumbleManager()->enqueueInputsRumbleCommand(rumble);
             newXRBtnHold |= VPAD_BUTTON_B;
         }
-
-        
-
-        if (!leftHandBehindHead) {
-            VRManager::instance().XR->GetRumbleManager()->stopInputsRumble(0);
-            if (inputs.inGame.grabState[0].wasDownLastFrame) {
-                // Left Drop - Need dual wield implementation. Dropping left item currently makes the game freak out
-                // and the right weapon disappears. Equipping another sword make both the previous sword and actual appear in hand.
-                //if (leftJoystickDir == JoyDir::Down)
-                //{
-                //    inputs.inGame.drop_weapon[0] = true;
-                //    gameState.prevent_grab_inputs = true;
-                //    gameState.drop_weapon_time = now;
-                //}
-                //// Grab
-                //else if (!gameState.prevent_grab_inputs)
-                newXRBtnHold |= VPAD_BUTTON_A;
-                //else if (now >= gameState.drop_weapon_time + delay)
-                //{
-                //   gameState.prevent_grab_inputs = false;
-                //}
-            }
-
-
-            //Dpad menu
-            if (!gameState.prevent_menu_inputs) {
-                if (inputs.inGame.grabState[0].wasDownLastFrame) {
-                    switch (leftJoystickDir) 
-                    {
-                        case JoyDir::Up: newXRBtnHold |= VPAD_BUTTON_UP; break;
-                        case JoyDir::Right: newXRBtnHold |= VPAD_BUTTON_RIGHT; break;
-                        case JoyDir::Down: newXRBtnHold |= VPAD_BUTTON_DOWN; break;
-                        case JoyDir::Left: newXRBtnHold |= VPAD_BUTTON_LEFT; break;
-                    }
-                    if (leftJoystickDir != JoyDir::None) {
-                        gameState.prevent_grab_inputs = true;
-                        gameState.prevent_grab_time = now;
-                        //prevent movement while dpad is used
-                        leftStickSource.currentState = { 0.0f, 0.0f };
-                    }
-                }
-            }
-        }
-        else {
-            if (leftHandCloseEnoughFromHead) {
-                //Rumbles when hand over slot when equipped
-                if (!leftHandBodySide && gameState.right_equip_type == EquipType::Melee)
-                    VRManager::instance().XR->GetRumbleManager()->enqueueInputsRumbleCommand(leftHandOverSlotsRumbleParams);
-                else if (leftHandBodySide && gameState.left_equip_type == EquipType::Bow)
-                    VRManager::instance().XR->GetRumbleManager()->enqueueInputsRumbleCommand(leftHandOverSlotsRumbleParams);
-
-                if (!gameState.prevent_grab_inputs && (inputs.inGame.grabState[0].wasDownLastFrame)) {
-                    //Rumbles when equipping/unequipping
-                    VRManager::instance().XR->GetRumbleManager()->enqueueInputsRumbleCommand(leftGrabSlotsRumbleParams);
-                    // Allows to grab from any side for left hand
-                    if (leftHandBodySide) {
-                        //Equip bow
-                        if (gameState.left_equip_type != EquipType::Bow) {
-                            newXRBtnHold |= VPAD_BUTTON_ZR;
-                            gameState.last_item_held = EquipType::Bow;
-                        }
-                        //Unequip bow
-                        else
-                            newXRBtnHold |= VPAD_BUTTON_B;
-                        
-                        gameState.prevent_grab_inputs = true;
-                        gameState.prevent_grab_time = now;
-                    }
-                    else {
-                        //Equip sword
-                        if (gameState.right_equip_type != EquipType::Melee) {
-                            newXRBtnHold |= VPAD_BUTTON_Y;
-                            gameState.last_item_held = EquipType::Melee;
-                        }
-                        //Unequip sword
-                        else
-                            newXRBtnHold |= VPAD_BUTTON_B;
-                      
-                        gameState.prevent_grab_inputs = true;
-                        gameState.prevent_grab_time = now;
-                    }
-                }
-            }
-        }
-
-        if (leftHandBehindHeadWithWaistOffset && leftHandCloseEnoughFromWaist) {
-            //Rumbles when hand over slot when equipped
-            if (leftHandBodySide && gameState.left_equip_type == EquipType::Rune)
-                VRManager::instance().XR->GetRumbleManager()->enqueueInputsRumbleCommand(leftHandOverSlotsRumbleParams);
-            if (!gameState.prevent_grab_inputs && (inputs.inGame.grabState[0].wasDownLastFrame)) {
-                VRManager::instance().XR->GetRumbleManager()->enqueueInputsRumbleCommand(leftGrabSlotsRumbleParams);
-                // Allows to grab from any side for left hand
-                if (leftHandBodySide) {
-                    // Equip rune
-                    if (gameState.left_equip_type != EquipType::Rune) {
-                        newXRBtnHold |= VPAD_BUTTON_L;
-                        gameState.last_item_held = EquipType::Rune;
-                    }
-                    //Unequip rune
-                    else
-                        newXRBtnHold |= VPAD_BUTTON_B;
-
-                    gameState.prevent_grab_inputs = true;
-                    gameState.prevent_grab_time = now;
-                }
-            }
-            // Rune = VPAD_BUTTON_L
-        }
-
-                    
-        if (!rightHandBehindHead)
-        {
-            VRManager::instance().XR->GetRumbleManager()->stopInputsRumble(1);
-            if (inputs.inGame.grabState[1].wasDownLastFrame)
-            {
-                //Drop
-                if (rightJoystickDir == JoyDir::Down)
-                {
-                    inputs.inGame.drop_weapon[1] = true;
-                    gameState.prevent_grab_inputs = true;
-                    gameState.prevent_grab_time = now;
-                }  
-                // Grab
-                else if (!gameState.prevent_grab_inputs)
-                    newXRBtnHold |= VPAD_BUTTON_A;
-            }
-        }
-        
-        if (rightHandCloseEnoughFromHead && rightHandBehindHead) {
-            //Rumbles when hand over slot when equipped
-            if (rightHandBodySide && gameState.right_equip_type == EquipType::Melee)
-                VRManager::instance().XR->GetRumbleManager()->enqueueInputsRumbleCommand(rightHandOverSlotsRumbleParams);
-            else if (!rightHandBodySide && gameState.left_equip_type == EquipType::Bow)
-                VRManager::instance().XR->GetRumbleManager()->enqueueInputsRumbleCommand(rightHandOverSlotsRumbleParams);
-
-            if (!gameState.prevent_grab_inputs && (inputs.inGame.grabState[1].wasDownLastFrame)) {
-                VRManager::instance().XR->GetRumbleManager()->enqueueInputsRumbleCommand(rightGrabSlotsRumbleParams);
-                // Allows to grab from any side for right hand
-                if (rightHandBodySide) {
-                    //Equip sword
-                    if (gameState.right_equip_type != EquipType::Melee) {
-                        newXRBtnHold |= VPAD_BUTTON_Y;
-                        gameState.last_item_held = EquipType::Melee;
-                    }
-                    //Unequip sword
-                    else
-                        newXRBtnHold |= VPAD_BUTTON_B;
-
-                    gameState.prevent_grab_inputs = true;
-                    gameState.prevent_grab_time = now;
-                }
-                else {
-                    //Equip bow
-                    if (gameState.left_equip_type != EquipType::Bow) {
-                        newXRBtnHold |= VPAD_BUTTON_ZR;
-                        gameState.last_item_held = EquipType::Bow;
-                    }
-                    //Unequip bow
-                    else
-                        newXRBtnHold |= VPAD_BUTTON_B;
-
-                    gameState.prevent_grab_inputs = true;
-                    gameState.prevent_grab_time = now;
-                }
-            }
-
-            //Throw weapon right hand
-            if (inputs.inGame.rightTrigger.currentState)
-            {
-                VRManager::instance().XR->GetRumbleManager()->enqueueInputsRumbleCommand(rightGrabSlotsRumbleParams);
-                newXRBtnHold |= VPAD_BUTTON_R;
-            }
-        }
-
-        //newXRBtnHold |= mapXRButtonToVpad(inputs.inGame.leftTrigger, VPAD_BUTTON_ZL);
-
-        // Trigger attack if weapon equip or throw objects if not
-        if (inputs.inGame.rightTrigger.currentState) {
-            VRManager::instance().XR->GetRumbleManager()->enqueueInputsRumbleCommand(rightGrabSlotsRumbleParams);
-            if (gameState.has_something_in_hand) {
-                //object throw 
-                if (gameState.is_throwable_object_held)
-                    newXRBtnHold |= VPAD_BUTTON_R;
-                //weapon attacks
-                else if (gameState.left_equip_type == EquipType::Bow)
-                    newXRBtnHold |= VPAD_BUTTON_ZR;
-                //rune use
-                else if (gameState.left_equip_type == EquipType::Rune)
-                    newXRBtnHold |= VPAD_BUTTON_A;
-                else
-                    newXRBtnHold |= VPAD_BUTTON_Y;
-            }
-            //reequip the last held weapon when no weapon is held
-            else if (gameState.last_item_held == EquipType::Melee)
-                newXRBtnHold |= VPAD_BUTTON_Y;
-            else if (gameState.last_item_held == EquipType::Bow)
-                newXRBtnHold |= VPAD_BUTTON_ZR;
-            else if (gameState.last_item_held == EquipType::Rune)
-                newXRBtnHold |= VPAD_BUTTON_L;
-        }
-
-        if (inputs.inGame.leftTrigger.currentState) {
-            if (gameState.left_equip_type == EquipType::Rune) {
-                VRManager::instance().XR->GetRumbleManager()->enqueueInputsRumbleCommand(rightGrabSlotsRumbleParams);
-                newXRBtnHold |= VPAD_BUTTON_B;
-            }
-        }
-
     }
     else {
-        if (!gameState.prevent_menu_inputs)
-        {
-            if (gameState.map_open)
-                newXRBtnHold |= mapXRButtonToVpad(inputs.inMenu.mapAndInventory, VPAD_BUTTON_MINUS);
-            else
-            {
-                newXRBtnHold |= mapXRButtonToVpad(inputs.inMenu.mapAndInventory, VPAD_BUTTON_PLUS);
-            }
-        }
-
-        newXRBtnHold |= mapXRButtonToVpad(inputs.inMenu.select, VPAD_BUTTON_A);
-        newXRBtnHold |= mapXRButtonToVpad(inputs.inMenu.back, VPAD_BUTTON_B);
-        newXRBtnHold |= mapXRButtonToVpad(inputs.inMenu.sort, VPAD_BUTTON_Y);
-        newXRBtnHold |= mapXRButtonToVpad(inputs.inMenu.hold, VPAD_BUTTON_X);
-        newXRBtnHold |= mapXRButtonToVpad(inputs.inMenu.leftTrigger, VPAD_BUTTON_L);
-        newXRBtnHold |= mapXRButtonToVpad(inputs.inMenu.rightTrigger, VPAD_BUTTON_R);
-
-        if (inputs.inMenu.leftGrip.currentState) {
-            switch (leftJoystickDir)
-            {
-                case JoyDir::Up: newXRBtnHold |= VPAD_BUTTON_UP; break;
-                case JoyDir::Right: newXRBtnHold |= VPAD_BUTTON_RIGHT; break;
-                case JoyDir::Down: newXRBtnHold |= VPAD_BUTTON_DOWN; break;
-                case JoyDir::Left: newXRBtnHold |= VPAD_BUTTON_LEFT; break;
-            }
-        }
+        handleMenuInput(newXRBtnHold, inputs, gameState, leftJoystickDir);
     }
-
-    // consume rumble commands :
+    
+    // Update rumble/haptics
     VRManager::instance().XR->GetRumbleManager()->updateHaptics();
+
+
 
     // sticks
     static uint32_t oldXRStickHold = 0;
