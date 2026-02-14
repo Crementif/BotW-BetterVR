@@ -471,7 +471,7 @@ void CemuHooks::hook_EquipWeapon(PPCInterpreter_t* hCPU) {
     auto input = VRManager::instance().XR->m_input.load();
     // Check both hands for a short press to pick up weapon
     for (int side = 0; side < 2; ++side) {
-        auto& grabState = input.inGame.grabState[side];
+        auto& grabState = input.shared.grabState[side];
         // todo: Make sword smaller while its equipped. I think this might be a member value, but otherwise we can just scale the weapon matrix.
 
         //if (input.inGame.in_game && grabState.shortPress) {
