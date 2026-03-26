@@ -15,10 +15,12 @@ moduleMatches = 0x6267BFD0
 ; disable AutoExposure
 ; 0x039D99A4 = li r3, 0
 
-; disable gyro controls
-0x02E1905C = li r3, 0 ; always return 0 to signal disabled
+; native controls toggle
+; $nativeCtrlEnabled = 0 -> Use VR Controls
+; $nativeCtrlEnabled = 1 -> Use Standard Controls
+0x02E1905C = li r3, $nativeCtrlEnabled
 0x02E19060 = blr
-0x02E19064 = li r5, 0 ; always set 0
+0x02E19064 = li r5, $nativeCtrlEnabled
 
 ; disable inversed button controls
 0x02E199AC = li r3, 0 ; return 0 to signal disabled

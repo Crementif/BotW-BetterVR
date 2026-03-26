@@ -43,7 +43,19 @@ public:
         void BindAttachment(uint32_t attachmentIdx, ID3D12Resource* srcTexture, DXGI_FORMAT overwriteFormat = DXGI_FORMAT_UNKNOWN);
         void BindTarget(uint32_t targetIdx, ID3D12Resource* dstTexture, DXGI_FORMAT overwriteFormat = DXGI_FORMAT_UNKNOWN);
         void BindDepthTarget(ID3D12Resource* dstTexture, DXGI_FORMAT overwriteFormat);
-        void BindSettings(float screenWidth, float screenHeight);
+        void BindSettings(
+            float screenWidth,
+            float screenHeight,
+            float reticleEyeSign = 0.0f,
+            float reticlePixelOffsetPx = 20.0f,
+            float reticleRadiusPx = 8.0f,
+            float reticleThicknessPx = 2.0f,
+            float reticleOpacity = 0.0f,
+            float reticleEnabled = 0.0f,
+            float reticleColorR = 1.0f,
+            float reticleColorG = 1.0f,
+            float reticleColorB = 1.0f
+        );
         void Render(ID3D12GraphicsCommandList* commandList, ID3D12Resource* swapchain);
 
     private:
@@ -67,6 +79,17 @@ public:
         ComPtr<ID3D12DescriptorHeap> m_targetHeap;
         ComPtr<ID3D12DescriptorHeap> m_depthHeap;
         std::array<DXGI_FORMAT, 2> m_targetFormats = { DXGI_FORMAT_UNKNOWN, DXGI_FORMAT_D32_FLOAT };
+
+        // Reticle parameters pushed from renderer-side settings.
+        float m_reticleEyeSign = 0.0f;
+        float m_reticlePixelOffsetPx = 20.0f;
+        float m_reticleRadiusPx = 8.0f;
+        float m_reticleThicknessPx = 2.0f;
+        float m_reticleOpacity = 0.0f;
+        float m_reticleEnabled = 0.0f;
+        float m_reticleColorR = 1.0f;
+        float m_reticleColorG = 1.0f;
+        float m_reticleColorB = 1.0f;
     };
 
     template <bool blockTillExecuted>

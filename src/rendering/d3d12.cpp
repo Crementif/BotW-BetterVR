@@ -235,14 +235,36 @@ void RND_D3D12::PresentPipeline<depth>::BindDepthTarget(ID3D12Resource* dstTextu
 }
 
 template <bool depth>
-void RND_D3D12::PresentPipeline<depth>::BindSettings(float screenWidth, float screenHeight) {
+void RND_D3D12::PresentPipeline<depth>::BindSettings(
+    float screenWidth,
+    float screenHeight,
+    float reticleEyeSign,
+    float reticlePixelOffsetPx,
+    float reticleRadiusPx,
+    float reticleThicknessPx,
+    float reticleOpacity,
+    float reticleEnabled,
+    float reticleColorR,
+    float reticleColorG,
+    float reticleColorB
+) {
+    m_reticleEyeSign = reticleEyeSign;
+    m_reticlePixelOffsetPx = reticlePixelOffsetPx;
+    m_reticleRadiusPx = reticleRadiusPx;
+    m_reticleThicknessPx = reticleThicknessPx;
+    m_reticleOpacity = reticleOpacity;
+    m_reticleEnabled = reticleEnabled;
+    m_reticleColorR = reticleColorR;
+    m_reticleColorG = reticleColorG;
+    m_reticleColorB = reticleColorB;
+
     ComPtr<ID3D12Resource> newSettingsStaging;
     ComPtr<ID3D12CommandAllocator> newSettingsAllocator;
     {
         ID3D12Device* device = VRManager::instance().D3D12->GetDevice();
         ID3D12CommandQueue* queue = VRManager::instance().D3D12->GetCommandQueue();
         device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&newSettingsAllocator));
-        RND_D3D12::CommandContext<true> uploadBufferContext(device, queue, newSettingsAllocator.Get(), [this, device, &newSettingsStaging, screenWidth, screenHeight](RND_D3D12::CommandContext<true>* context) {
+        RND_D3D12::CommandContext<true> uploadBufferContext(device, queue, newSettingsAllocator.Get(), [this, device, &newSettingsStaging, screenWidth, screenHeight, reticleEyeSign, reticlePixelOffsetPx, reticleRadiusPx, reticleThicknessPx, reticleOpacity, reticleEnabled, reticleColorR, reticleColorG, reticleColorB](RND_D3D12::CommandContext<true>* context) {
             m_settingsBuffer = D3D12Utils::CreateConstantBuffer(device, D3D12_HEAP_TYPE_DEFAULT, sizeof(presentSettings));
 
             newSettingsStaging = D3D12Utils::CreateConstantBuffer(device, D3D12_HEAP_TYPE_UPLOAD, sizeof(presentSettings));
@@ -372,6 +394,52 @@ void RND_D3D12::PresentPipeline<depth>::Render(ID3D12GraphicsCommandList* cmdLis
     cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     cmdList->IASetIndexBuffer(&m_screenIndicesView);
     cmdList->DrawIndexedInstanced((UINT)std::size(screenIndices), 1, 0, 0, 0);
+
+    // Safer stereo reticle path: draw with color clears in screen-space for depth pipeline only.
+    if constexpr (depth) {
+        if (m_reticleEnabled > 0.5f) {
+            const int width = (int)swapchain->GetDesc().Width;
+            const int height = (int)swapchain->GetDesc().Height;
+
+            const float eyeSign = m_reticleEyeSign;
+            const float pxOffset = std::copysign(std::max(0.0f, m_reticlePixelOffsetPx), -eyeSign);
+
+            const int cx = (int)std::lround(width * 0.5f + pxOffset);
+            const int cy = height / 2;
+            const int radius = (int)std::lround(std::max(1.0f, m_reticleRadiusPx));
+            const int thickness = (int)std::lround(std::max(1.0f, m_reticleThicknessPx));
+            const int halfThickness = std::max(1, thickness / 2);
+            const int crossHalf = std::max(1, radius / 2);
+
+            auto clampi = [](int v, int lo, int hi) { return std::max(lo, std::min(v, hi)); };
+            auto makeRect = [&](int l, int t, int r, int b) {
+                D3D12_RECT rc{};
+                rc.left = clampi(l, 0, width);
+                rc.top = clampi(t, 0, height);
+                rc.right = clampi(r, 0, width);
+                rc.bottom = clampi(b, 0, height);
+                return rc;
+            };
+
+            std::array<D3D12_RECT, 2> rects = {
+                makeRect(cx - crossHalf, cy - halfThickness, cx + crossHalf, cy + halfThickness),
+                makeRect(cx - halfThickness, cy - crossHalf, cx + halfThickness, cy + crossHalf),
+            };
+
+            float a = std::clamp(m_reticleOpacity, 0.0f, 1.0f);
+            float colorR = std::clamp(m_reticleColorR, 0.0f, 1.0f);
+            float colorG = std::clamp(m_reticleColorG, 0.0f, 1.0f);
+            float colorB = std::clamp(m_reticleColorB, 0.0f, 1.0f);
+            const float clearColor[4] = {
+                colorR * a,
+                colorG * a,
+                colorB * a,
+                1.0f
+            };
+
+            cmdList->ClearRenderTargetView(m_targetHandles[0], clearColor, (UINT)rects.size(), rects.data());
+        }
+    }
 }
 
 template class RND_D3D12::PresentPipeline<false>;

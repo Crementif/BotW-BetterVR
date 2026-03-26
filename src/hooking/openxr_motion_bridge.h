@@ -180,6 +180,15 @@ public:
             vpadStatus.dir.y = corrected * glm::vec3(0, 1, 0);
             vpadStatus.dir.z = corrected * glm::vec3(0, 0, 1);
         }
+        else if (GetSettings().GetCameraMode() == CameraMode::ORIGINAL) {
+            if (GetSettings().gyroFlipYZOriginal.Get()) {
+                const glm::fvec3 prevGyroChange = vpadStatus.gyroChange.getLE();
+                const glm::fvec3 prevGyroOrientation = vpadStatus.gyroOrientation.getLE();
+
+                vpadStatus.gyroChange = glm::fvec3{ prevGyroChange.x, prevGyroChange.z, prevGyroChange.y };
+                vpadStatus.gyroOrientation = glm::fvec3{ prevGyroOrientation.x, prevGyroOrientation.z, prevGyroOrientation.y };
+            }
+        }
         else {
             vpadStatus.dir.x = glm::fvec3{ 1, 0, 0 };
             vpadStatus.dir.y = glm::fvec3{ 0, 1, 0 };

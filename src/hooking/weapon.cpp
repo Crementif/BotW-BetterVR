@@ -168,7 +168,7 @@ void CemuHooks::hook_ChangeWeaponMtx(PPCInterpreter_t* hCPU) {
         }
     }
 
-    if (IsThirdPerson()) {
+    if (IsThirdPerson() && GetSettings().GetCameraMode() != CameraMode::ORIGINAL) {
         return;
     }
 
@@ -330,7 +330,7 @@ void CemuHooks::hook_DropEquipment(PPCInterpreter_t* hCPU) {
 
 void CemuHooks::hook_GetContactLayerOfAttack(PPCInterpreter_t* hCPU) {
     hCPU->instructionPointer = hCPU->sprNew.LR;
-    if (GetSettings().GetCameraMode() == CameraMode::THIRD_PERSON) {
+    if (GetSettings().GetCameraMode() == CameraMode::THIRD_PERSON || GetSettings().GetCameraMode() == CameraMode::ORIGINAL) {
         return;
     }
 
@@ -372,7 +372,7 @@ void CemuHooks::hook_EnableWeaponAttackSensor(PPCInterpreter_t* hCPU) {
     hCPU->instructionPointer = hCPU->sprNew.LR;
 
 
-    if (GetSettings().GetCameraMode() == CameraMode::THIRD_PERSON)
+    if (GetSettings().GetCameraMode() == CameraMode::THIRD_PERSON || GetSettings().GetCameraMode() == CameraMode::ORIGINAL)
         return;
 
     uint32_t weaponPtr = hCPU->gpr[3];

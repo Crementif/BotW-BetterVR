@@ -8,12 +8,24 @@ default = 1
 
 [Default]
 $enableDebugOverlay:int = 0
+$nativeCtrlEnabled:int = 0
 
 $accessibilityUIColor:int = 0
 $accessibilityUIColor_x = 0.000
 $accessibilityUIColor_y = 0.804
 $accessibilityUIColor_z = 1.000
 $accessibilityUIColor_w = 1.000
+
+[Preset]
+name = VR Controls
+category = Input
+default = 1
+$nativeCtrlEnabled:int = 0
+
+[Preset]
+name = Standard Controls
+category = Input
+$nativeCtrlEnabled:int = 1
 
 # Accessibility UI Color
 

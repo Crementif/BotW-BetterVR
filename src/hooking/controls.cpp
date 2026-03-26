@@ -893,7 +893,7 @@ void processJoystickInput(VPADButtons& oldXRStickHold, VPADButtons& newXRStickHo
 
 XrTime prev_sample = 0;
 
-void updatePreviousValues(OpenXR::GameState& gameState, uint32_t& buttonHold, HandGestureState& leftGesture, HandGestureState& rightGesture, XrTime inputTime)
+void updatePreviousValues(OpenXR::GameState& gameState, uint32_t buttonHold, HandGestureState& leftGesture, HandGestureState& rightGesture, XrTime inputTime)
 {
     // (re)set values for next frame
     gameState.previous_button_hold = buttonHold;
@@ -1121,7 +1121,8 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
     // set r3 to 1 for hooked VPADRead function to return success
     hCPU->gpr[3] = 1;
 
-    updatePreviousValues(gameState, newXRBtnHold, leftGesture, rightGesture, inputs.shared.inputTime);
+    // Store the effective hold state (gamepad + XR) so downstream systems can detect active use inputs regardless of input source.
+    updatePreviousValues(gameState, combinedHold, leftGesture, rightGesture, inputs.shared.inputTime);
 
     VRManager::instance().XR->m_gameState.store(gameState);
     VRManager::instance().XR->m_input.store(inputs);

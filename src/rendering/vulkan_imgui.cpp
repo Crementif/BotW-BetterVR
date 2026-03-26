@@ -372,7 +372,7 @@ void RND_Renderer::ImGuiOverlay::Render(long frameIdx, bool renderBackground) {
     };
 
     if (renderBackground || CemuHooks::UseBlackBarsDuringEvents()) {
-        const bool shouldCrop3DTo16_9 = GetSettings().cropFlatTo16x9 == 1;
+        const bool shouldCrop3DTo16_9 = GetSettings().ShouldFlatPreviewBeCroppedTo16x9();
 
         bool shouldRender3DBackground = VRManager::instance().XR->GetRenderer()->IsRendering3D(frameIdx) || CemuHooks::UseBlackBarsDuringEvents();
         bool shouldRenderHUDWithAlpha = shouldRender3DBackground && !CemuHooks::UseBlackBarsDuringEvents();
@@ -734,10 +734,18 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
                     ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_HeaderActive));
                     ImGui::Text("Camera / Player Options");
                     ImGui::PopStyleColor();
-                    if (cameraMode == CameraMode::THIRD_PERSON) {
+                    if (cameraMode == CameraMode::THIRD_PERSON || cameraMode == CameraMode::ORIGINAL) {
                         DrawSettingRow("Camera Distance", [&]() {
-                            settings.thirdPlayerDistance.AddSliderToGUI(&changed, 0.5f, 0.65f);
+                            settings.thirdPlayerDistance.AddSliderToGUI(&changed, 0.5f, 1.0f);
                         });
+
+                        if (cameraMode == CameraMode::ORIGINAL) {
+                            DrawSettingRow("Riding Vertical Offset", [&]() {
+                                settings.originalRidingVerticalOffset.AddToGUI(&changed, windowWidth.x, 0.0f, 1.0f, [](float value) {
+                                    return std::format("{:+.2f}m", value);
+                                });
+                            });
+                        }
                     }
                     else {
                         DrawSettingRow("Height Offset", [&]() {
@@ -766,20 +774,30 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
                         //});
                     }
 
+                    DrawSettingRow("Stereo Depth In Gameplay", [&]() {
+                        settings.gameplayStereoDepthScale.AddToGUI(&changed, windowWidth.x, 0.0f, 3.0f, [](float value) { return std::format("{:.2f}x", value); });
+                    });
+
                     ImGui::Spacing();
                     ImGui::Separator();
                     ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_HeaderActive));
                     ImGui::Text("Cutscenes");
                     ImGui::PopStyleColor();
 
-                    if (cameraMode != CameraMode::THIRD_PERSON) {
+                    if (cameraMode != CameraMode::THIRD_PERSON && cameraMode != CameraMode::ORIGINAL) {
                         DrawSettingRow("Camera In Cutscenes", [&]() {
                             settings.cutsceneCameraMode.AddComboToGUI(&changed, ModSettings::toDisplayString);
                         });
                     }
 
-                    DrawSettingRow("Black Bars In Third-Person Cutscenes", [&]() {
-                        settings.useBlackBarsForCutscenes.AddToGUI(&changed);
+                    if (cameraMode != CameraMode::ORIGINAL) {
+                        DrawSettingRow("Black Bars In Third-Person Cutscenes", [&]() {
+                            settings.useBlackBarsForCutscenes.AddToGUI(&changed);
+                        });
+                    }
+
+                    DrawSettingRow("Stereo Depth In Cutscenes", [&]() {
+                        settings.cutsceneStereoDepthScale.AddToGUI(&changed, windowWidth.x, 0.0f, 1.5f, [](float value) { return std::format("{:.2f}x", value); });
                     });
 
                     ImGui::Spacing();
@@ -787,12 +805,49 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
                     ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_HeaderActive));
                     ImGui::Text("UI");
                     ImGui::PopStyleColor();
-                    DrawSettingRow("UI Follows Where You Look", [&]() {
-                        settings.uiFollowsGaze.AddToGUI(&changed);
-                    });
+                    if (cameraMode != CameraMode::ORIGINAL) {
+                        DrawSettingRow("UI Follows Where You Look", [&]() {
+                            settings.uiFollowsGaze.AddToGUI(&changed);
+                        });
+                    }
 
                     ImGui::Spacing();
                     DrawLayerSettingsRow("Menu/HUD Distance & Size", &changed, settings.hudDistance, settings.hudSize);
+
+                    ImGui::Spacing();
+                    DrawSettingRow("Enable 3D Static Reticle", [&]() {
+                        settings.enableStaticReticle.AddToGUI(&changed);
+                    });
+
+                    if (settings.enableStaticReticle.Get()) {
+                        DrawSettingRow("Reticle 3D Separation", [&]() {
+                            settings.staticReticlePixelOffsetPx.AddToGUI(&changed, windowWidth.x, 0.0f, 500.0f, [](float value) { return std::format("{:.1f} px", value); });
+                        });
+
+                        DrawSettingRow("Reticle Radius", [&]() {
+                            settings.staticReticleRadiusPx.AddToGUI(&changed, windowWidth.x, 1.0f, 64.0f, [](float value) { return std::format("{:.1f} px", value); });
+                        });
+
+                        DrawSettingRow("Reticle Thickness", [&]() {
+                            settings.staticReticleThicknessPx.AddToGUI(&changed, windowWidth.x, 1.0f, 8.0f, [](float value) { return std::format("{:.1f} px", value); });
+                        });
+
+                        DrawSettingRow("Reticle Opacity", [&]() {
+                            settings.staticReticleOpacity.AddToGUI(&changed, windowWidth.x, 0.1f, 1.0f, [](float value) { return std::format("{:.2f}", value); });
+                        });
+
+                        DrawSettingRow("Reticle Color R", [&]() {
+                            settings.staticReticleColorR.AddToGUI(&changed, windowWidth.x, 0.0f, 1.0f, [](float value) { return std::format("{:.2f}", value); });
+                        });
+
+                        DrawSettingRow("Reticle Color G", [&]() {
+                            settings.staticReticleColorG.AddToGUI(&changed, windowWidth.x, 0.0f, 1.0f, [](float value) { return std::format("{:.2f}", value); });
+                        });
+
+                        DrawSettingRow("Reticle Color B", [&]() {
+                            settings.staticReticleColorB.AddToGUI(&changed, windowWidth.x, 0.0f, 1.0f, [](float value) { return std::format("{:.2f}", value); });
+                        });
+                    }
 
                     ImGui::Spacing();
                     if (cameraMode == CameraMode::FIRST_PERSON) {
@@ -813,13 +868,21 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
                     }
 
                     if (ImGui::CollapsingHeader("Advanced Settings")) {
-                        DrawSettingRow("Crop VR Image To 16:9 For Cemu Window", [&]() {
-                            settings.cropFlatTo16x9.AddToGUI(&changed);
-                        });
+                        if (cameraMode != CameraMode::ORIGINAL) {
+                            DrawSettingRow("Crop VR Image To 16:9 For Cemu Window", [&]() {
+                                settings.cropFlatTo16x9.AddToGUI(&changed);
+                            });
+                        }
 
                         DrawSettingRow("Show Debugging Overlays (for developers)", [&]() {
                             settings.enableDebugOverlay.AddToGUI(&changed);
                         });
+
+                        if (cameraMode == CameraMode::ORIGINAL) {
+                            DrawSettingRow("Gyro Flip Y/Z", [&]() {
+                                settings.gyroFlipYZOriginal.AddToGUI(&changed);
+                            });
+                        }
 
                         if (VRManager::instance().XR->m_capabilities.isOculusLinkRuntime) {
                             DrawSettingRow("Angular Velocity Fixer", [&]() {

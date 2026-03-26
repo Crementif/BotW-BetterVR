@@ -474,6 +474,7 @@ enum class EventMode : int32_t {
 enum class CameraMode : int32_t {
     THIRD_PERSON = 0,
     FIRST_PERSON = 1,
+    ORIGINAL = 2,
 };
 
 enum class PlayMode : int32_t {
@@ -528,6 +529,8 @@ struct ModSettings {
                 return "THIRD_PERSON";
             case CameraMode::FIRST_PERSON:
                 return "FIRST_PERSON";
+            case CameraMode::ORIGINAL:
+                return "OG";
             default:
                 return "";
         }
@@ -539,6 +542,8 @@ struct ModSettings {
                 return "Third Person";
             case CameraMode::FIRST_PERSON:
                 return "First Person (Recommended)";
+            case CameraMode::ORIGINAL:
+                return "OG";
             default:
                 return "";
         }
@@ -620,12 +625,21 @@ struct ModSettings {
 
     static constexpr float kDefaultAxisThreshold = 0.5f;
     static constexpr float kDefaultStickDeadzone = 0.15f;
+    static constexpr float kDefaultGameplayStereoDepthScale = 1.0f;
+    static constexpr float kDefaultCutsceneStereoDepthScale = 0.25f;
+    static constexpr float kDefaultReticlePixelOffsetPx = 100.0f;
+    static constexpr float kDefaultReticleRadiusPx = 15.0f;
+    static constexpr float kDefaultReticleThicknessPx = 2.0f;
+    static constexpr float kDefaultReticleOpacity = 0.65f;
 
     // playing mode settings
-    EnumSetting<CameraMode> cameraMode = EnumSetting<CameraMode>("CameraMode", CameraMode::FIRST_PERSON, ModSettings::toString, { CameraMode::FIRST_PERSON, CameraMode::THIRD_PERSON });
+    EnumSetting<CameraMode> cameraMode = EnumSetting<CameraMode>("CameraMode", CameraMode::FIRST_PERSON, ModSettings::toString, { CameraMode::FIRST_PERSON, CameraMode::THIRD_PERSON, CameraMode::ORIGINAL });
     EnumSetting<PlayMode> playMode = EnumSetting<PlayMode>("PlayMode", PlayMode::STANDING, ModSettings::toString, { PlayMode::STANDING, PlayMode::SEATED });
-    FloatSetting<float> thirdPlayerDistance = FloatSetting<float>("ThirdPlayerDistance", 0.5f, 0.0f);
+    FloatSetting<float> thirdPlayerDistance = FloatSetting<float>("ThirdPlayerDistance", 0.5f, 0.0f, 1.0f);
+    FloatSetting<float> originalRidingVerticalOffset = FloatSetting<float>("OriginalRidingVerticalOffset", 0.4f, 0.0f, 1.0f);
     EnumSetting<EventMode> cutsceneCameraMode = EnumSetting<EventMode>("CutsceneCameraMode", EventMode::FOLLOW_DEFAULT_EVENT_SETTINGS, ModSettings::toString, { EventMode::ALWAYS_FIRST_PERSON, EventMode::FOLLOW_DEFAULT_EVENT_SETTINGS, EventMode::ALWAYS_THIRD_PERSON });
+    FloatSetting<float> gameplayStereoDepthScale = FloatSetting<float>("GameplayStereoDepthScale", kDefaultGameplayStereoDepthScale, 0.0f, 3.0f);
+    FloatSetting<float> cutsceneStereoDepthScale = FloatSetting<float>("CutsceneStereoDepthScale", kDefaultCutsceneStereoDepthScale, 0.0f, 1.5f);
     BoolSetting useBlackBarsForCutscenes = BoolSetting("UseBlackBarsForCutscenes", false);
 
     // first-person settings
@@ -638,6 +652,15 @@ struct ModSettings {
 
     // advanced settings
     BoolSetting enableDebugOverlay = BoolSetting("EnableDebugOverlay", false);
+    BoolSetting gyroFlipYZOriginal = BoolSetting("GyroFlipYZOriginal", false);
+    BoolSetting enableStaticReticle = BoolSetting("EnableStaticReticle", true);
+    FloatSetting<float> staticReticlePixelOffsetPx = FloatSetting<float>("StaticReticlePixelOffsetPx", kDefaultReticlePixelOffsetPx, 0.0f, 500.0f);
+    FloatSetting<float> staticReticleRadiusPx = FloatSetting<float>("StaticReticleRadiusPx", kDefaultReticleRadiusPx, 1.0f, 64.0f);
+    FloatSetting<float> staticReticleThicknessPx = FloatSetting<float>("StaticReticleThicknessPx", kDefaultReticleThicknessPx, 1.0f, 8.0f);
+    FloatSetting<float> staticReticleOpacity = FloatSetting<float>("StaticReticleOpacity", kDefaultReticleOpacity, 0.1f, 1.0f);
+    FloatSetting<float> staticReticleColorR = FloatSetting<float>("StaticReticleColorR", 0.0f, 0.0f, 1.0f);
+    FloatSetting<float> staticReticleColorG = FloatSetting<float>("StaticReticleColorG", 1.0f, 0.0f, 1.0f);
+    FloatSetting<float> staticReticleColorB = FloatSetting<float>("StaticReticleColorB", 1.0f, 0.0f, 1.0f);
     EnumSetting<AngularVelocityFixerMode> buggyAngularVelocity = EnumSetting<AngularVelocityFixerMode>("BuggyAngularVelocity", AngularVelocityFixerMode::AUTO, ModSettings::toString, { AngularVelocityFixerMode::AUTO, AngularVelocityFixerMode::FORCED_ON, AngularVelocityFixerMode::FORCED_OFF });
     EnumSetting<PerformanceOverlayMode> performanceOverlay = EnumSetting<PerformanceOverlayMode>("PerformanceOverlay", PerformanceOverlayMode::DISABLE, ModSettings::toString, { PerformanceOverlayMode::DISABLE, PerformanceOverlayMode::WINDOW_ONLY, PerformanceOverlayMode::WINDOW_AND_VR });
     UIntSetting<uint32_t> performanceOverlayFrequency = UIntSetting<uint32_t>("PerformanceOverlayFrequency", 90);
@@ -652,7 +675,10 @@ struct ModSettings {
             &cameraMode,
             &playMode,
             &thirdPlayerDistance,
+            &originalRidingVerticalOffset,
             &cutsceneCameraMode,
+            &gameplayStereoDepthScale,
+            &cutsceneStereoDepthScale,
             &useBlackBarsForCutscenes,
             &playerHeightOffset,
             &leftHanded,
@@ -661,6 +687,15 @@ struct ModSettings {
             &hudSize,
             &cropFlatTo16x9,
             &enableDebugOverlay,
+            &gyroFlipYZOriginal,
+            &enableStaticReticle,
+            &staticReticlePixelOffsetPx,
+            &staticReticleRadiusPx,
+            &staticReticleThicknessPx,
+            &staticReticleOpacity,
+            &staticReticleColorR,
+            &staticReticleColorG,
+            &staticReticleColorB,
             &buggyAngularVelocity,
             &performanceOverlay,
             &performanceOverlayFrequency,
@@ -673,25 +708,43 @@ struct ModSettings {
     CameraMode GetCameraMode() const { return cameraMode; }
 
     PlayMode GetPlayMode() const { return playMode; }
-    bool DoesUIFollowGaze() const { return uiFollowsGaze; }
+    bool DoesUIFollowGaze() const {
+        if (GetCameraMode() == CameraMode::ORIGINAL) {
+            return false;
+        }
+        return uiFollowsGaze;
+    }
     bool IsLeftHanded() const { return leftHanded; }
     float GetPlayerHeightOffset() const {
-        // disable height offset in third-person mode
-        if (GetCameraMode() == CameraMode::THIRD_PERSON) {
+        // disable height offset in third-person-style modes
+        if (GetCameraMode() == CameraMode::THIRD_PERSON || GetCameraMode() == CameraMode::ORIGINAL) {
             return 0.0f;
         }
 
         return playerHeightOffset;
     }
     EventMode GetCutsceneCameraMode() const {
-        // if in third-person mode, always use third-person cutscene camera
-        if (GetCameraMode() == CameraMode::THIRD_PERSON) {
+        // if in third-person-style modes, always use third-person cutscene camera
+        if (GetCameraMode() == CameraMode::THIRD_PERSON || GetCameraMode() == CameraMode::ORIGINAL) {
             return EventMode::ALWAYS_THIRD_PERSON;
         }
         return cutsceneCameraMode;
     }
-    bool UseBlackBarsForCutscenes() const { return useBlackBarsForCutscenes; }
-    bool ShouldFlatPreviewBeCroppedTo16x9() const { return cropFlatTo16x9 == 1; }
+    float GetGameplayStereoDepthScale() const { return gameplayStereoDepthScale; }
+    float GetCutsceneStereoDepthScale() const { return cutsceneStereoDepthScale; }
+    float GetOriginalRidingVerticalOffset() const { return originalRidingVerticalOffset; }
+    bool UseBlackBarsForCutscenes() const {
+        if (GetCameraMode() == CameraMode::ORIGINAL) {
+            return false;
+        }
+        return useBlackBarsForCutscenes;
+    }
+    bool ShouldFlatPreviewBeCroppedTo16x9() const {
+        if (GetCameraMode() == CameraMode::ORIGINAL) {
+            return true;
+        }
+        return cropFlatTo16x9 == 1;
+    }
 
     bool ShowDebugOverlay() const { return enableDebugOverlay; }
     AngularVelocityFixerMode AngularVelocityFixer_GetMode() const { return buggyAngularVelocity; }
@@ -703,12 +756,22 @@ struct ModSettings {
     std::string ToString() const {
         std::string buffer = "";
         std::format_to(std::back_inserter(buffer), " - Camera Mode: {}\n", toDisplayString(GetCameraMode()));
+        std::format_to(std::back_inserter(buffer), " - Original Riding Vertical Offset: {:.2f}m\n", GetOriginalRidingVerticalOffset());
         std::format_to(std::back_inserter(buffer), " - Left Handed: {}\n", IsLeftHanded() ? "Yes" : "No");
         std::format_to(std::back_inserter(buffer), " - GUI Follow Setting: {}\n", DoesUIFollowGaze() ? "Follow Looking Direction" : "Fixed");
         std::format_to(std::back_inserter(buffer), " - Player Height: {} meters\n", GetPlayerHeightOffset());
         std::format_to(std::back_inserter(buffer), " - Crop Flat to 16:9: {}\n", ShouldFlatPreviewBeCroppedTo16x9() ? "Yes" : "No");
         std::format_to(std::back_inserter(buffer), " - Debug Overlay: {}\n", ShowDebugOverlay() ? "Enabled" : "Disabled");
+        std::format_to(std::back_inserter(buffer), " - Gyro Flip Y/Z (Original Camera): {}\n", gyroFlipYZOriginal.Get() ? "Enabled" : "Disabled");
+        std::format_to(std::back_inserter(buffer), " - Static Reticle: {}\n", enableStaticReticle.Get() ? "Enabled" : "Disabled");
+        std::format_to(std::back_inserter(buffer), " - Static Reticle Pixel Offset: {:.2f}px\n", staticReticlePixelOffsetPx.Get());
+        std::format_to(std::back_inserter(buffer), " - Static Reticle Radius: {:.2f}px\n", staticReticleRadiusPx.Get());
+        std::format_to(std::back_inserter(buffer), " - Static Reticle Thickness: {:.2f}px\n", staticReticleThicknessPx.Get());
+        std::format_to(std::back_inserter(buffer), " - Static Reticle Opacity: {:.2f}\n", staticReticleOpacity.Get());
+        std::format_to(std::back_inserter(buffer), " - Static Reticle Color: ({:.2f}, {:.2f}, {:.2f})\n", staticReticleColorR.Get(), staticReticleColorG.Get(), staticReticleColorB.Get());
         std::format_to(std::back_inserter(buffer), " - Cutscene Camera Mode: {}\n", toDisplayString(GetCutsceneCameraMode()));
+        std::format_to(std::back_inserter(buffer), " - Stereo Depth (Gameplay): {:.2f}x\n", GetGameplayStereoDepthScale());
+        std::format_to(std::back_inserter(buffer), " - Stereo Depth (Cutscenes): {:.2f}x\n", GetCutsceneStereoDepthScale());
         std::format_to(std::back_inserter(buffer), " - Show Black Bars for Third-Person Cutscenes: {}\n", UseBlackBarsForCutscenes() ? "Yes" : "No");
         std::format_to(std::back_inserter(buffer), " - Performance Overlay: {}\n", toDisplayString(performanceOverlay));
         std::format_to(std::back_inserter(buffer), " - Performance Overlay Frequency: {} Hz\n", uint32_t(performanceOverlayFrequency));

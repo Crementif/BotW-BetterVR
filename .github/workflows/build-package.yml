@@ -1,0 +1,126 @@
+name: Build & Package BetterVR
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: windows-2022
+
+    defaults:
+      run:
+        shell: pwsh
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up MSVC dev environment
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Install Vulkan SDK (direct from LunarG)
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          $latest = Invoke-RestMethod "https://vulkan.lunarg.com/sdk/latest/windows.json"
+          $ver = $latest.windows
+          if (-not $ver) { throw "Failed to determine latest Vulkan SDK version." }
+          Write-Host "Latest Vulkan SDK version: $ver"
+
+          $exe = "vulkansdk-windows-X64-$ver.exe"
+          $urlNew = "https://sdk.lunarg.com/sdk/download/$ver/windows/$exe"
+          $urlOld = "https://sdk.lunarg.com/sdk/download/$ver/windows/VulkanSDK-$ver-Installer.exe"
+
+          try {
+            Write-Host "Downloading: $urlNew"
+            Invoke-WebRequest $urlNew -OutFile $exe
+          } catch {
+            Write-Host "New-name download failed; trying legacy filename..."
+            Write-Host "Downloading: $urlOld"
+            Invoke-WebRequest $urlOld -OutFile $exe
+          }
+
+          $installRoot = "C:\VulkanSDK\$ver"
+          New-Item -ItemType Directory -Force -Path $installRoot | Out-Null
+
+          & ".\$exe" --root $installRoot --accept-licenses --default-answer --confirm-command install com.lunarg.vulkan.debug copy_only=1
+
+          "VULKAN_SDK=$installRoot" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "VK_SDK_PATH=$installRoot" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "$installRoot\Bin" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+
+          Write-Host "Installed Vulkan SDK to $installRoot"
+
+      - name: Clone vcpkg
+        run: |
+          git clone https://github.com/microsoft/vcpkg "$env:GITHUB_WORKSPACE\vcpkg"
+
+      - name: Bootstrap vcpkg
+        run: |
+          & "$env:GITHUB_WORKSPACE\vcpkg\bootstrap-vcpkg.bat" -disableMetrics
+
+      - name: Export vcpkg environment for scripts
+        run: |
+          "VCPKG_ROOT=$env:GITHUB_WORKSPACE\vcpkg" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "VCPKG_DEFAULT_TRIPLET=x64-windows-static-md" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Install vcpkg dependencies (manifest mode)
+        run: |
+          $ErrorActionPreference = "Stop"
+          $vcpkg = "$env:GITHUB_WORKSPACE\vcpkg\vcpkg.exe"
+
+          if (!(Test-Path "$env:GITHUB_WORKSPACE\vcpkg.json")) {
+            throw "vcpkg.json not found at repo root (expected manifest mode)."
+          }
+
+          & $vcpkg install `
+            --x-manifest-root "$env:GITHUB_WORKSPACE" `
+            --triplet "x64-windows-static-md"
+
+      - name: Patch CMakeUserPresets.json (set VCPKG_ROOT for all presets)
+        run: |
+          $presetPath = Join-Path $env:GITHUB_WORKSPACE "CMakeUserPresets.json"
+          if (!(Test-Path $presetPath)) { throw "CMakeUserPresets.json not found at repo root." }
+
+          $vcpkgRoot = Join-Path $env:GITHUB_WORKSPACE "vcpkg"
+          $json = Get-Content $presetPath -Raw | ConvertFrom-Json
+
+          if ($null -eq $json.configurePresets) { throw "configurePresets missing in CMakeUserPresets.json" }
+
+          foreach ($p in $json.configurePresets) {
+            if ($null -eq $p.environment) { $p | Add-Member -NotePropertyName environment -NotePropertyValue (@{}) }
+            $p.environment.VCPKG_ROOT = $vcpkgRoot
+          }
+
+          $json | ConvertTo-Json -Depth 50 | Set-Content $presetPath -Encoding UTF8
+          Write-Host "Patched VCPKG_ROOT to: $vcpkgRoot"
+
+      - name: Build (build_mod.bat)
+        run: |
+          if (!(Test-Path "$env:GITHUB_WORKSPACE\build_mod.bat")) {
+            throw "build_mod.bat not found at repo root."
+          }
+          cmd /c build_mod.bat RelWithDebInfo
+
+      - name: Package (package_mod.bat)
+        run: |
+          if (!(Test-Path "$env:GITHUB_WORKSPACE\package_mod.bat")) {
+            throw "package_mod.bat not found at repo root."
+          }
+          cmd /c package_mod.bat
+
+      - name: Upload package zip (no extra repackaging step)
+        uses: actions/upload-artifact@v4
+        with:
+          name: BetterVR-package
+          path: |
+            *.zip
+          if-no-files-found: error

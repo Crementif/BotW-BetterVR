@@ -44,7 +44,6 @@ li r3, 0
 stw r3, 0x00(r7)
 li r3, 1
 
-
 exitHookInput:
 ; epilogue
 lwz r7, 0x18(r1)
