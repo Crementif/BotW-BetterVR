@@ -14,6 +14,7 @@ import csv
 import hashlib
 import io
 import json
+import math
 import os
 from pathlib import Path
 import queue
@@ -256,22 +257,191 @@ def wait_for_gameplay(
     raise TimeoutError(f"stable gameplay was not reached within {timeout:.0f}s")
 
 
-def terminate_tree(process: subprocess.Popen[str]) -> None:
-    if process.poll() is not None:
+def terminate_pid_tree(pid: int) -> None:
+    if pid <= 0 or pid == os.getpid():
         return
     if os.name == "nt":
         subprocess.run(
-            ["taskkill", "/PID", str(process.pid), "/T", "/F"],
+            ["taskkill", "/PID", str(pid), "/T", "/F"],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             check=False,
         )
-    else:
-        process.terminate()
+        return
+    try:
+        os.kill(pid, 15)
+    except ProcessLookupError:
+        pass
+
+
+def terminate_tree(process: subprocess.Popen[str]) -> None:
+    # The BetterVR launcher can exit before the Cemu child. The child PID is
+    # handled separately from the gameplay-state packet, so this helper only
+    # owns the launcher process tree while it still exists.
+    if process.poll() is not None:
+        return
+    terminate_pid_tree(process.pid)
     try:
         process.wait(timeout=15)
     except subprocess.TimeoutExpired:
         process.kill()
+
+
+def copy_with_retry(source: Path, destination: Path, timeout: float = 5.0) -> bool:
+    deadline = time.monotonic() + timeout
+    while True:
+        try:
+            if not source.is_file():
+                return False
+            shutil.copy2(source, destination)
+            return True
+        except PermissionError:
+            if time.monotonic() >= deadline:
+                return False
+            time.sleep(0.1)
+
+
+def unlink_with_retry(path: Path, timeout: float = 5.0) -> bool:
+    deadline = time.monotonic() + timeout
+    while True:
+        try:
+            path.unlink(missing_ok=True)
+            return True
+        except PermissionError:
+            if time.monotonic() >= deadline:
+                return False
+            time.sleep(0.1)
+
+
+def _matrix_multiply(left: list[float], right: list[float]) -> list[float]:
+    return [
+        sum(left[row * 4 + inner] * right[inner * 4 + column] for inner in range(4))
+        for row in range(4)
+        for column in range(4)
+    ]
+
+
+def _mean_abs_delta(left: list[float], right: list[float]) -> float:
+    return sum(abs(a - b) for a, b in zip(left, right, strict=True)) / max(1, len(left))
+
+
+def analyze_camera_uniform(payload: dict[str, Any]) -> dict[str, Any]:
+    """Turn raw camera UBO samples into machine-checkable matrix evidence."""
+    samples = [item for item in payload.get("samples", []) if isinstance(item, dict)]
+    left = [item for item in samples if item.get("eye") == "left"]
+    right = [item for item in samples if item.get("eye") == "right"]
+    candidates: list[tuple[int, dict[str, Any], dict[str, Any]]] = []
+    for left_item in left:
+        for right_item in right:
+            if left_item.get("drawPairKey") != right_item.get("drawPairKey"):
+                continue
+            marker_distance = abs(
+                int(left_item.get("eyeMarkerSequence", 0)) - int(right_item.get("eyeMarkerSequence", 0))
+            )
+            candidates.append((marker_distance, left_item, right_item))
+    if not candidates:
+        return {"valid": False, "issues": ["no left/right raw camera samples share a draw pair key"]}
+
+    marker_distance, left_item, right_item = min(candidates, key=lambda item: item[0])
+    left_floats = left_item.get("floatLE") or []
+    right_floats = right_item.get("floatLE") or []
+    word_count = min(len(left_floats), len(right_floats))
+    issues: list[str] = []
+    if word_count < 64:
+        issues.append(f"camera sample contains only {word_count} words; at least 64 are required")
+    finite_words = sum(
+        1
+        for value in left_floats[:word_count] + right_floats[:word_count]
+        if isinstance(value, (int, float)) and math.isfinite(value)
+    )
+    finite_fraction = finite_words / max(1, word_count * 2)
+    if finite_fraction < 0.95:
+        issues.append(f"only {finite_fraction:.3f} of camera words decode as finite floats")
+
+    differing_words: list[int] = []
+    for index in range(word_count):
+        a, b = left_floats[index], right_floats[index]
+        if not isinstance(a, (int, float)) or not isinstance(b, (int, float)):
+            continue
+        if abs(float(a) - float(b)) > 1.0e-7:
+            differing_words.append(index)
+    if not differing_words:
+        issues.append("left/right camera samples are identical")
+
+    matrices: list[dict[str, Any]] = []
+    decoded_left: list[list[float]] = []
+    decoded_right: list[list[float]] = []
+    # Source recon proves the first four members are packed 3x4, 4x4,
+    # 4x4, 3x4 matrices—not four 64-byte matrices.
+    layout = [
+        (0, "view", 0, 12),
+        (1, "viewProjection", 12, 16),
+        (2, "projection", 28, 16),
+        (3, "inverseView", 44, 12),
+    ]
+    for member, semantic, start, matrix_words in layout:
+        left_matrix = (
+            [float(value) for value in left_floats[start : start + matrix_words]]
+            if word_count >= start + matrix_words
+            else []
+        )
+        right_matrix = (
+            [float(value) for value in right_floats[start : start + matrix_words]]
+            if word_count >= start + matrix_words
+            else []
+        )
+        if len(left_matrix) != matrix_words or len(right_matrix) != matrix_words:
+            continue
+        left_4x4 = left_matrix + [0.0, 0.0, 0.0, 1.0] if matrix_words == 12 else left_matrix
+        right_4x4 = right_matrix + [0.0, 0.0, 0.0, 1.0] if matrix_words == 12 else right_matrix
+        decoded_left.append(left_4x4)
+        decoded_right.append(right_4x4)
+        matrices.append(
+            {
+                "member": member,
+                "semantic": semantic,
+                "byteOffset": start * 4,
+                "format": "mat3x4" if matrix_words == 12 else "mat4x4",
+                "leftRows": [left_matrix[row : row + 4] for row in range(0, matrix_words, 4)],
+                "rightRows": [right_matrix[row : row + 4] for row in range(0, matrix_words, 4)],
+                "meanAbsEyeDelta": _mean_abs_delta(left_matrix, right_matrix),
+                "maxAbsEyeDelta": max(abs(a - b) for a, b in zip(left_matrix, right_matrix, strict=True)),
+            }
+        )
+
+    relationships: dict[str, float] = {}
+    if len(decoded_left) == 4:
+        identity = [1.0 if row == column else 0.0 for row in range(4) for column in range(4)]
+        relationships = {
+            "viewTimesInvViewResidual": _mean_abs_delta(_matrix_multiply(decoded_left[0], decoded_left[3]), identity),
+            "invViewTimesViewResidual": _mean_abs_delta(_matrix_multiply(decoded_left[3], decoded_left[0]), identity),
+            "projTimesViewToViewProjResidual": _mean_abs_delta(
+                _matrix_multiply(decoded_left[2], decoded_left[0]), decoded_left[1]
+            ),
+            "viewTimesProjToViewProjResidual": _mean_abs_delta(
+                _matrix_multiply(decoded_left[0], decoded_left[2]), decoded_left[1]
+            ),
+        }
+        if min(relationships["viewTimesInvViewResidual"], relationships["invViewTimesViewResidual"]) > 0.05:
+            issues.append("members 0 and 3 do not form a plausible view/inverse-view pair")
+        if relationships["projTimesViewToViewProjResidual"] > 0.05:
+            issues.append("member 1 does not match projection times view")
+
+    return {
+        "valid": not issues,
+        "issues": issues,
+        "drawPairKey": left_item.get("drawPairKey"),
+        "markerDistance": marker_distance,
+        "leftAddress": left_item.get("address"),
+        "rightAddress": right_item.get("address"),
+        "wordCount": word_count,
+        "finiteFraction": finite_fraction,
+        "differingWordCount": len(differing_words),
+        "differingWordIndices": differing_words,
+        "changed16ByteChunks": sorted({index // 4 for index in differing_words}),
+        "cameraMembers": matrices,
+        "matrixRelationships": relationships,
+    }
 
 
 def parse_args() -> argparse.Namespace:
@@ -287,6 +457,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--capture-seconds", type=float, default=0.5)
     parser.add_argument("--max-draws", type=int, default=250_000)
     parser.add_argument("--max-uniform-bytes", type=int, default=65_536)
+    parser.add_argument("--raw-camera-samples", type=int, default=64)
     return parser.parse_args()
 
 
@@ -336,6 +507,7 @@ def main() -> int:
     )
     client = McpClient(process)
     trace_started = False
+    owned_cemu_pid: int | None = None
     packet: dict[str, Any] = {
         "schemaVersion": 1,
         "launcherDir": str(launcher_dir),
@@ -347,6 +519,8 @@ def main() -> int:
         "traceConfig": {
             "maxDraws": args.max_draws,
             "maxUniformBytes": args.max_uniform_bytes,
+            "rawCameraUniformSize": 2336,
+            "maxRawCameraSamples": args.raw_camera_samples,
             "captureSeconds": args.capture_seconds,
             "stableFramesRequired": args.stable_frames,
         },
@@ -354,7 +528,16 @@ def main() -> int:
 
     try:
         tools = client.initialize(args.mcp_timeout)
-        required_tools = {"bvr_begin_draw_trace", "bvr_end_draw_trace", "bvr_get_eye_diff", "bvr_get_uniform_diff"}
+        required_tools = {
+            "bvr_begin_draw_trace",
+            "bvr_end_draw_trace",
+            "bvr_get_eye_diff",
+            "bvr_get_uniform_diff",
+            "bvr_get_uniform_samples",
+            "bvr_get_guest_state",
+            "bvr_trace_render_graph",
+            "bvr_get_operation_diff",
+        }
         missing = sorted(required_tools.difference(tools))
         if missing:
             raise RuntimeError(f"Cemu does not expose required stereo-oracle tools: {missing}")
@@ -362,6 +545,14 @@ def main() -> int:
 
         gate_state = wait_for_gameplay(state_path, simulator_command, args.gameplay_timeout, args.stable_frames)
         packet["gameplayGate"] = gate_state
+        owned_cemu_pid = int(gate_state.get("pid", 0)) or None
+        packet["debuggerDisassembly"] = {
+            "asmMtxInverse": client.call_tool("disassemble", {"address": 0x03C6FF74, "count": 32}),
+            "calcFrameVirtualCallsites": client.call_tool(
+                "disassemble", {"address": 0x039A94F0, "count": 64}
+            ),
+        }
+        packet["guestAbiAtGate"] = client.call_tool("bvr_get_guest_state", {})
 
         packet["traceBegin"] = client.call_tool(
             "bvr_begin_draw_trace",
@@ -369,6 +560,8 @@ def main() -> int:
                 "max_draws": args.max_draws,
                 "capture_uniforms": True,
                 "max_uniform_bytes": args.max_uniform_bytes,
+                "raw_uniform_size": 2336,
+                "max_raw_uniform_samples": args.raw_camera_samples,
             },
         )
         trace_started = True
@@ -383,6 +576,18 @@ def main() -> int:
         trace_started = False
         packet["eyeDiff"] = client.call_tool("bvr_get_eye_diff", {"max_mismatches": 64}, timeout=120.0)
         packet["uniformDiff"] = client.call_tool("bvr_get_uniform_diff", {"max_ranges": 64}, timeout=120.0)
+        packet["cameraUniformSamples"] = client.call_tool(
+            "bvr_get_uniform_samples",
+            {"stage": 2, "bank": 1, "size": 2336, "max_samples_per_eye": 8, "max_words": 584},
+            timeout=120.0,
+        )
+        packet["cameraRecon"] = analyze_camera_uniform(packet["cameraUniformSamples"])
+        packet["renderGraph"] = client.call_tool(
+            "bvr_trace_render_graph", {"recent_passes": 32, "max_resources": 64}, timeout=120.0
+        )
+        packet["operationDiff"] = client.call_tool(
+            "bvr_get_operation_diff", {"max_mismatches": 128}, timeout=120.0
+        )
         packet["queueTail"] = client.call_tool("bvr_get_queue_snapshot", {"recent": 64}, timeout=120.0)
         packet["finalState"] = read_json(state_path)
 
@@ -397,14 +602,29 @@ def main() -> int:
         captured = max(1, int(trace_end.get("captured", 0)))
         if int(trace_end.get("dropped", 0)) != 0:
             issues.append("trace overflowed; shorten the capture or raise max_draws")
+        if int(trace_end.get("droppedOperations", 0)) != 0:
+            issues.append("operation trace overflowed; shorten the capture or raise max_draws")
         if int(eye_diff.get("eyeMarkers", 0)) < 2:
             issues.append("fewer than two PM4 eye markers were captured")
-        if int(uniform_diff.get("pairedEyePasses", 0)) < 1:
-            issues.append("no left/right PM4 pass pair was formed")
+        paired_eye_passes = int(uniform_diff.get("pairedEyePasses", 0))
+        if paired_eye_passes < 2:
+            issues.append("fewer than two complete left/right PM4 pass pairs were formed")
         if int(uniform_diff.get("pairedDraws", 0)) < 1:
             issues.append("no left/right draw pair was formed")
-        if int(eye_diff.get("unknownPhaseDraws", 0)) / captured > 0.02:
-            issues.append("more than 2% of captured draws lack a PM4 eye tag")
+        if not (packet.get("cameraRecon") or {}).get("valid"):
+            issues.append("raw 2,336-byte camera block could not be paired and decoded")
+        # PM4 markers close and tag the preceding pass. A timed trace therefore
+        # normally ends with one unclosed suffix. Bound that suffix by the
+        # largest complete pass instead of applying a percentage threshold that
+        # incorrectly rejects short captures with thousands of draws per pass.
+        render_passes = (packet.get("renderGraph") or {}).get("passes") or []
+        largest_complete_pass = max((int(item.get("draws", 0)) for item in render_passes), default=0)
+        unknown_draws = int(eye_diff.get("unknownPhaseDraws", 0))
+        boundary_allowance = max(64, int(largest_complete_pass * 1.25))
+        if unknown_draws > boundary_allowance:
+            issues.append(
+                f"untagged draw suffix ({unknown_draws}) exceeds one marker-bounded pass ({boundary_allowance})"
+            )
         if not is_stable_gameplay(final_state):
             issues.append("final state is not stable gameplay with two NORMAL eyes")
         try:
@@ -420,7 +640,15 @@ def main() -> int:
                 "noTraceOverflow": True,
                 "pm4EyeMarkers": True,
                 "pairedDraws": True,
+                "pairedRawCameraBlock": True,
+                "atMostOneBoundaryPassUntagged": True,
+                "completeRenderGraphOperations": True,
                 "normalDistinctFinalEyes": True,
+            },
+            "boundary": {
+                "unknownDraws": unknown_draws,
+                "largestCompletePass": largest_complete_pass,
+                "allowance": boundary_allowance,
             },
         }
         if issues:
@@ -438,17 +666,22 @@ def main() -> int:
         packet["finishedUtc"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
         output_path = args.out / "stereo_oracle.json"
         output_path.write_text(json.dumps(packet, indent=2), encoding="utf-8")
-        for name in ("BetterVR_log.txt", "BetterVR_state.json", "BetterVR_events.csv", "log.txt"):
-            source = launcher_dir / name
-            if source.is_file():
-                shutil.copy2(source, args.out / name)
         try:
             client.call_tool("stop_game", {}, timeout=10.0)
         except Exception:
             pass
+        if owned_cemu_pid is not None:
+            terminate_pid_tree(owned_cemu_pid)
         terminate_tree(process)
+        for name in ("BetterVR_log.txt", "BetterVR_state.json", "BetterVR_events.csv", "log.txt"):
+            source = launcher_dir / name
+            if not copy_with_retry(source, args.out / name):
+                packet.setdefault("cleanupWarnings", []).append(f"could not copy {source}")
         for runtime_name in ("BetterVR_settings.ini", "BetterVR_cmd.ini", "BetterVR_state.json", "BetterVR_events.csv", "BetterVR_log.txt"):
-            (launcher_dir / runtime_name).unlink(missing_ok=True)
+            runtime_path = launcher_dir / runtime_name
+            if not unlink_with_retry(runtime_path):
+                packet.setdefault("cleanupWarnings", []).append(f"could not remove {runtime_path}")
+        output_path.write_text(json.dumps(packet, indent=2), encoding="utf-8")
         print(f"[oracle] wrote {output_path}", flush=True)
 
     if packet.get("success"):
