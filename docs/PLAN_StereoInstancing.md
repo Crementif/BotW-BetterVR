@@ -76,6 +76,10 @@ Two Cemu implementation details from the earlier recon are especially valuable:
 - Guest uniform blocks are represented as dynamic UBO offsets. Changing a proven camera block can therefore be a dynamic-offset substitution with no descriptor rewrite. This is the preferred Tier-2 camera path.
 - `LatteMRT::ApplyCurrentState()` keys framebuffer identity from resolved `LatteTextureView` pointers, while compatible render-pass formats participate in pipeline compatibility. Proper sibling views should naturally obtain separate cached framebuffers without recompiling shaders. This is an optimization hypothesis to verify with cache-hit counters, not a reason to bypass lifetime safety.
 
+Fresh static recon adds a more important guest-side opportunity. BotW already allocates camera state and camera UBOs as arrays indexed by view: normal rendering populates view 0, while the snapshot camera uses view 2. `gsys::ModelRenderContext::initialize` uses the same init-time view count for both the 796-byte CPU view records and `gsys::ShaderContext`'s per-view UBO slots. `calcGPU` then writes view, view-projection, projection, inverse-view, z-plane, environment, and previous-frame members into the selected block. Ordinary object blocks remain world/bone data; billboard shape data is the notable per-view exception.
+
+That makes a **guest-baked view 1** the preferred full-fidelity camera source: provision one additional view slot at boot, let BotW populate it from BetterVR's right-eye camera without running a second draw pass, and make Cemu select that block for the right issue. It preserves BotW's own matrix conventions, environment inheritance, history, double buffering, and billboard handling. This is still gated on live validation of the init caller, the inverse-matrix destination, two post-record virtual hooks, and the actual block size. If any of those make the view-count patch unsafe, host-side block synthesis remains the fallback.
+
 ## 4. Target architecture
 
 ```text
@@ -83,6 +87,7 @@ BotW PPC (one frame generation)
   simulation once
   union-frustum culling once
   calcDraw / GX2 command production once
+  bake left + right per-view camera blocks once (no second draw pass)
                      |
                      v
 Cemu Latte command processor
@@ -162,11 +167,11 @@ BetterVR may enter the mono guest loop only after a fresh fork acknowledgement f
 
 ## 6. Reverse-engineering phase: measure before selecting the camera path
 
-The current true two-pass renderer is the oracle. Extend `BVRDrawTrace` before implementing replay.
+The current true two-pass renderer is the oracle. Extend `BVRDrawTrace` before implementing replay. Static source recon (2026-08-13) already answers parts of §6.3 and pins the §7 seams — see `NOTES_StereoInstancing_SourceRecon.md`; the trace phase confirms those findings live rather than discovering them.
 
 ### 6.1 Trace schema
 
-For every draw, clear, surface copy, resolve, compute dispatch, query boundary, and streamout operation, record:
+For every draw, clear, surface copy, special-state image operation, query boundary, and streamout operation, record:
 
 - PPC frame, eye phase, command-buffer nesting depth, pass ID, and ordinal
 - shaders, topology, index/instance parameters, special-state flags
@@ -177,6 +182,8 @@ For every draw, clear, surface copy, resolve, compute dispatch, query boundary, 
 - shader-specific 16-byte uniform chunk hashes so field offsets can be ranked without retaining bulk guest data
 - query/conditional-render/streamout state
 - whether the operation writes guest-visible memory
+
+Also keep assertion counters for compute dispatch, conditional rendering, MSAA resolve, and mip generation. Static recon found no active BotW/Cemu path for these categories, so a nonzero counter is a compatibility change that must fail closed rather than silently escape the inventory.
 
 Keep large byte dumps opt-in. The normal trace stores hashes and bounded samples so a several-second capture remains usable by an LLM.
 
@@ -192,11 +199,11 @@ All draw tools must use command-stream-ordered eye identity. The live `BVR2.eyeP
 
 ### 6.3 Questions this phase must answer
 
-1. Do matched eye draws differ only in a small shared camera/environment block, or in per-object blocks?
-2. Which shader stages consume those differences?
-3. Which shaders use full constant banks versus remapped/register uniforms?
-4. What non-draw image operations are needed to preserve each eye's post-processing chain?
-5. How often do streamout, occlusion queries, conditional rendering, compute, and Cemu special states occur in normal gameplay and transitions?
+1. Does the live camera-block signature match the statically recovered per-view block, and what is its exact runtime size?
+2. Which shader stages and shader-assignment slots consume that block or values remapped from it?
+3. Which shaders can switch a full constant-bank dynamic offset, and which require remapped/register staging from the right-eye source block?
+4. What non-draw image operations are needed to preserve each eye's post-processing chain, including special-state draws and format-conversion copies?
+5. How often do particle streamout, per-view occlusion queries, and Cemu special states occur in normal gameplay and transitions, and do the categories found statically absent stay absent?
 6. What is the maximum draw/pass/target count per frame, and what native overhead budget remains below 11.11 ms?
 
 **Gate:** do not implement camera UBO synthesis until matched two-pass data proves the block identity and field offsets. The geometry-only clip-transform path can proceed independently.
@@ -216,19 +223,40 @@ This measurement narrows the design:
 
 The 45,413 matched pairs are a strong working corpus, not proof that every draw has a twin. Unmatched draws remain to be classified as pass-boundary effects, genuine eye-specific work, or matcher ambiguity. Eligibility stays fail-closed until that classification and the non-draw operation trace are complete.
 
+### 6.5 Static source findings adopted into the implementation
+
+The companion source recon narrows several open-ended work items:
+
+- The camera source is one 35-member per-view `agl::UniformBlock`; members 0–3 are view, view-projection, projection, and inverse-view, and members 11–14 mirror them for previous-frame state. A strong live signature is a `mat3x4` at byte 0 followed by the `mat4x4` view-projection at byte 48. The camera block's shader-assignment location triple is at `+152/+153/+154` for vertex/pixel/geometry stages.
+- BotW already has a native per-view count and a view-indexed billboard path. The oracle therefore validates and locates the guest-baked block rather than assuming all right-eye matrices must be synthesized by Cemu.
+- Guest compute is unused; streamout is confined to `nw::eft` particles; occlusion-query allocation is already indexed/gated by the view bitmask. Cemu has no active conditional-render consumption, mip-generation path, or MSAA resolve path in this renderer. Runtime counters remain mandatory so these static absences cannot become silent assumptions.
+- The exhaustive Cemu packet worklist is the 12 `IT_HLE_*` operations, the special-state 5/8 image draws, and the format-conversion surface-copy draw. Presentation, waits, timers, query callbacks, guest notifications, and swap packets run once.
+- A shader-epilogue change must bump `RendererShader::GeneratePrecompiledCacheId()` as well as the generic, transferable, and pipeline cache versions. The precompiled SPIR-V path is keyed from the guest shader identity, so changing generated GLSL alone would otherwise load stale shaders.
+
+Three debugger checks remain before the guest-baked view slot is promoted from preferred design to implementation fact: inspect `ASM_MTXInverse`'s second destination, trace the scene-component vtable `+44` hook after record construction, and trace the `ModelJobQueueSceneUpdater` vtable `+52` upload call. Read the live camera-block size during the same run.
+
 ## 7. Cemu implementation work packages
 
 ### 7.1 Extract a prepared-draw seam
 
 Refactor Vulkan `draw_execute` without changing stock behavior:
 
-1. `PrepareDraw` performs guest-dependent work once: special-state checks, index decoding, vertex and uniform buffer synchronization, texture discovery, and shader lookup.
-2. `IssuePreparedDraw(EyeIssueContext)` performs eye-dependent work: target selection, eye uniform offset, descriptor/pipeline binding, render-pass selection, and `vkCmdDraw*`.
-3. Stock Cemu calls `IssuePreparedDraw(left/default)` once. BetterVR twin-issue calls it twice.
+1. `PrepareDraw` performs the draw/unsupported-state gate, streamout preparation, index decoding, vertex/guest-UBO synchronization, texture discovery, and shader lookup once.
+2. `IssuePreparedDraw(EyeIssueContext)` performs uniform-variable staging/ring allocation, index and descriptor binding, target/FBO selection, pipeline lookup, render-pass selection, dynamic offsets, and `vkCmdDraw*` per eye.
+3. `FinishPreparedDraw` performs streamout finish and the guest draw-counter increment once.
+4. Stock Cemu calls one issue. BetterVR twin-issue calls left then right from the same prepared state.
 
 `PreparedDraw` needs stable resolved index allocation, base vertex/instance/count, active shader objects, left dynamic offsets, resolved texture bindings, and flags describing unsupported side effects. Cemu's normal performance counters continue to count one guest draw; separate BVR counters count host eye issues.
 
 This refactor is the first build gate: stock Cemu/BotW output and performance must remain unchanged with the feature disabled.
+
+The split has three review-blocking traps from the current Vulkan path:
+
+- The minimal-pipeline fast path does not include FBO identity. Every eye/FBO flip must force the full render-pass-compatible pipeline lookup; carrying the left fast-path result into the right issue is invalid.
+- Uniform-variable ring exhaustion can end the render pass and submit a command buffer from inside uniform staging. `PreparedDraw` may retain logical/resource state, but it must not retain command-buffer-scoped bindings or offsets across an issue.
+- `m_state.activeFBO` is normally established by `draw_beginSequence`, not `draw_execute`. Each eye issue must explicitly apply/bind its attachment set before querying viewport/fragment-coordinate scale or selecting its pipeline.
+
+The file-scope `s_vkUniformData` scratch is also not eye-stable storage. Generate and copy each eye's uniform payload into its own live ring range before it is overwritten.
 
 ### 7.2 RenderGraphPairRegistry
 
@@ -241,10 +269,9 @@ Create a dedicated host-only registry rather than pretending sibling textures oc
 - exclude siblings from guest readback, physical-overlap tracking, CPU invalidation, and `isUpdatedOnGPU` bookkeeping
 - expose `MapAttachment`, `MapSampledView`, `MapClear`, and `MapCopy`
 
-Before choosing the factory, test two designs in a small fork-only probe:
+The first implementation uses a renderer-owned host image/view plus a widened FBO attachment descriptor carrying `{view, format, aspect, size}`. Cemu's surface-copy path already proves the Vulkan framebuffer side can consume bare renderer views; this avoids registering fake guest textures or physical addresses. A two-layer array backing remains the multiview migration target, not the first twin-issue dependency.
 
-- a renderer-owned clone created through a new explicit host-only texture API (preferred), or
-- a two-layer array backing where layer 0 is the guest view and layer 1 is the sibling (closer to eventual multiview, but more invasive).
+If implementation evidence forces a real `LatteTextureVk` sibling, add an explicit `isHostOnly` contract and audit global texture registration, graphic-pack rules, overlap/invalidation sweeps, guest readback, and physical-memory hashing before enabling it.
 
 No fake physical addresses ship unless an audit proves every texture-cache overlap/readback path ignores them.
 
@@ -267,10 +294,11 @@ Draws alone are insufficient for a complete right render graph. Add explicit twi
 
 - `IT_HLE_CLEAR_COLOR_DEPTH_STENCIL` (including rewriting the BetterVR magic eye payload)
 - `IT_HLE_COPY_SURFACE_NEW`
-- resolves, mip generation, and any format-conversion copy observed by the Phase-0 trace
+- special-state 8 clears and special-state 5 depth-to-color transfers
+- the format-conversion surface-copy path, which internally issues a draw
 - barriers/layout transitions needed by the sibling images
 
-Run timers, memory writes, bottom-of-pipe callbacks, swap requests, and guest notification packets once. Queries and streamout remain guest-authoritative left-only unless the trace proves a visual right-eye dependency; the right issue must suppress their writes/offset advancement.
+Run scanout/presentation copies, swaps, waits, timers, memory writes, bottom-of-pipe callbacks, query begin/end bookkeeping, and guest notifications once. Queries and streamout remain guest-authoritative left-only unless the trace proves a visual right-eye dependency; the right issue must suppress their writes/offset advancement. Cemu currently has no MSAA resolve or mip-generation path to duplicate, but assertion counters guard that assumption.
 
 ### 7.5 Eligibility/fallback table
 
@@ -279,7 +307,7 @@ Each unsupported draw/pass increments a reason-specific counter and selects a de
 | Condition | Initial policy |
 |---|---|
 | streamout active | issue guest draw once; mark frame incomplete and request two-pass next generation |
-| active occlusion/conditional query with guest-visible result | do not duplicate query side effects; twin visual draw only if renderer can disable query for the right issue, otherwise fallback |
+| active occlusion query with guest-visible result | use BotW's per-view query mask where proven; never duplicate guest query side effects, and fallback if the right visual issue cannot disable them |
 | Cemu special-state draw/copy | handle through its specific paired image operation or fallback |
 | missing target pair | allocate before issue if safe; otherwise fallback frame |
 | unsupported target format/sample layout | fallback frame and log exact format/state |
@@ -297,24 +325,27 @@ Inject a 4x4 `bvrClipTransform` into the final geometry position export and set 
 
 The earlier plan's cheaper parallel-eye epilogue, `gl_Position.x += C0 + C1 * w`, is retained as a diagnostic cross-check. The full 4x4 transform is the implementation target because it also covers asymmetric projections and per-eye rotation without adding meaningful per-vertex complexity relative to the rest of the emulated shader.
 
-Cemu's legacy decompiler funnels position exports through `SET_POSITION` in `LatteDecompilerEmitGLSLHeader.hpp`/`LatteDecompilerEmitGLSL.cpp`. Add the matrix to the Vulkan uniform-variable ring, update the active eye's dynamic offset per issue, cover vertex-only and geometry/copy-shader output paths, and bump the shader-cache version.
+Cemu's legacy decompiler funnels position exports through `SET_POSITION` in `LatteDecompilerEmitGLSLHeader.hpp`/`LatteDecompilerEmitGLSL.cpp`. Add the matrix to the Vulkan uniform-variable ring, update the active eye's dynamic offset per issue, cover vertex-only and geometry/copy-shader output paths, and bump all four shader/pipeline cache versions listed in §6.5.
 
 This tier validates real geometry/parallax early. It does not correct fragment-stage camera position, view-dependent specular/Fresnel, or game logic that selects eye-dependent shader branches.
 
-### Tier 2: identified camera UBO substitution
+### Tier 2: guest-baked right view plus camera UBO substitution
 
-Using the uniform diff results:
+Prefer BotW's native per-view machinery over reconstructing its block in the host:
 
-- register the small set of camera/environment block address+size signatures;
-- copy each left block once per frame into a host upload allocation;
-- overwrite proven fields (view, projection, view-projection, inverses, camera position/direction, previous-view values) using the right-eye data;
-- replace the dynamic UBO offset for vertex, geometry, and fragment stages during the right issue.
+- patch the render-context init count so view 1 receives its own 796-byte CPU record and double-buffered UBO slot;
+- populate view 1 each frame through `updateRenderingMatricesUsingCamera` using BetterVR's right camera/projection, without invoking the render loop a second time;
+- let the normal `calcGPU` view loop produce view, projection, view-projection, inverse, environment inheritance, z-plane, and previous-frame fields;
+- register the camera block by shader/stage/bank/size plus the matrix-content signature;
+- replace the full constant-bank dynamic offset with view 1's block for eligible vertex, geometry, and fragment stages during the right issue.
 
 Descriptors remain reusable because Cemu binds uniform blocks as dynamic UBOs; only the dynamic offset changes. Block matching must include shader/stage/bank/size and optionally a matrix-content signature, not a raw guest address that may be recycled.
 
+This route also lets BotW calculate view-indexed billboard `ShpBlock` data correctly. If increasing the native view count or driving its update path proves unsafe, fall back to copying the left camera block into a host upload allocation and overwriting only oracle-proven fields.
+
 ### Tier 3: remapped/register uniforms
 
-If the oracle finds eye differences in uniform registers or remapped gathers, patch the corresponding right-eye values in the Vulkan uniform staging blob before allocating the right issue's uniform-ring range. Keep left and right allocations live until command-buffer completion.
+The current oracle proves this is required: remapped/register mode dominates the captured shaders. Map each ranked remapped field back to the guest-baked view-1 block, then patch the corresponding right-eye values in the Vulkan uniform staging blob before allocating the right issue's uniform-ring range. Keep left and right allocations live until command-buffer completion.
 
 ### Fidelity gate
 
@@ -386,17 +417,17 @@ Commit by independently reviewable slices: trace schema/tools; prepared-draw no-
 
 1. **Plan checkpoint:** commit this plan and its handoff link; leave experimental image reprojection disabled.
 2. **Oracle tooling:** implement UBO/render-graph/non-draw tracing in `cemu-mcp`, build it, and capture a stable true two-pass gameplay corpus.
-3. **Architecture decision record:** select target-pair ownership and camera tiers from the corpus; record rejected alternatives with evidence.
+3. **Architecture decision record and debugger closure:** validate the recovered camera-block signature/size and the three guest hooks, prove the extra-view allocation/update path, then record target-pair ownership and rejected alternatives with evidence.
 4. **Prepared-draw refactor:** land and validate the disabled-mode no-op split.
-5. **Handshake:** add ABI v3 capability/state exchange and prove fail-closed behavior on stock and forked Cemu.
+5. **Handshake and dormant right-view source:** add ABI v3 capability/state exchange, provision/populate guest view 1 behind a disabled feature flag, and prove fail-closed behavior on stock and forked Cemu.
 6. **Independent right render graph:** host-only target pairs plus paired clear/copy handling, initially with identity eye transform.
 7. **True geometry stereo:** enable the clip-to-clip shader transform and pass final-eye/parallax/flicker gates.
-8. **Full shading fidelity:** synthesize/substitute the oracle-identified camera UBO/register data and compare to two-pass references.
+8. **Full shading fidelity:** select the guest-baked view-1 UBO for full-bank shaders, map it into remapped/register staging for the remaining shaders, and compare against two-pass references.
 9. **Performance pass:** profile target switching, descriptors, shader/pipeline cache churn, and native issue overhead; batch only measured hotspots.
 10. **Multiview:** convert eligible render-graph islands to two-layer targets and `gl_ViewIndex`, keeping twin-issue fallback.
 11. **Transitions and soak:** certify fallback/re-entry across real content, then productize the fork and default the feature on only when capability handshake succeeds.
 
-The first code after this plan is therefore **trace expansion**, not replay. That is the shortest route to avoiding another visually plausible but structurally wrong shortcut.
+**Current checkpoint (2026-08-13):** step 1 and the uniform-diff half of step 2 are complete. The next implementation unit is the render-graph/non-draw trace plus step 3's debugger closure and matrix correlation. Arbitrary PM4 replay remains parked until immediate prepared-draw twin issue is correct and profiling justifies it.
 
 ## 14. Effort and decision checkpoints
 

@@ -161,7 +161,7 @@ Also learned the hard way: **asm-only rebuilds can leave the launcher's embedded
 3. Wire whatever ships into `mod_settings.h` as one user-facing toggle; keep the raw mask for the lab.
 4. Load/cutscene guards: the ABI latch already commits masks at generation boundaries; still gate reuse OFF during loads (fault-flag telemetry will show if the pair-validator fires).
 5. Re-attack the **mono-mode load stall** with the queue-protocol knowledge (same DO_DRAW/staging family).
-6. Long term: proposal 2 (record-once/issue-twice in the Cemu fork) — now tractable with the decompile + MCP debugger + `jit_lookup`. **Full implementation plan: `docs/PLAN_StereoInstancing.md` (2026-08-13)** — it supersedes items 1–2 above unless instancing stalls.
+6. Long term: proposal 2 (record-once/issue-twice in the Cemu fork) — now tractable with the decompile + MCP debugger + `jit_lookup`. **Full implementation plan: `docs/PLAN_StereoInstancing.md` (2026-08-13)**, with file:line evidence in `docs/NOTES_StereoInstancing_SourceRecon.md` — it supersedes items 1–2 above unless instancing stalls.
 
 ---
 
