@@ -174,6 +174,7 @@ For every draw, clear, surface copy, resolve, compute dispatch, query boundary, 
 - all sampled texture identities and subresources
 - UBO stage/bank, guest address, byte size, content hash, and uniform mode
 - uniform-register/remapped-data hash
+- shader-specific 16-byte uniform chunk hashes so field offsets can be ranked without retaining bulk guest data
 - query/conditional-render/streamout state
 - whether the operation writes guest-visible memory
 
@@ -187,7 +188,7 @@ Keep large byte dumps opt-in. The normal trace stores hashes and bounded samples
 - `bvr_get_operation_diff`: unmatched clears/copies/queries/dispatches between eyes
 - `bvr_get_instancing_stats`: live replay/fallback/timing counters
 
-All tools must report tag confidence because the Latte thread consumes GX2 packets asynchronously from the PPC eye-phase writes.
+All draw tools must use command-stream-ordered eye identity. The live `BVR2.eyePhase` field is useful for host status, but it is not a valid Latte draw tag: the GPU thread can consume both submitted eyes after PPC has already advanced that mutable field. The implemented oracle therefore closes each pass with BetterVR's existing magic 3D `GX2ClearBuffersEx` marker and retroactively labels only the draws preceding that marker. A trace prefix/suffix without a marker remains unknown and is rejected above a bounded threshold.
 
 ### 6.3 Questions this phase must answer
 
@@ -199,6 +200,21 @@ All tools must report tag confidence because the Latte thread consumes GX2 packe
 6. What is the maximum draw/pass/target count per frame, and what native overhead budget remains below 11.11 ms?
 
 **Gate:** do not implement camera UBO synthesis until matched two-pass data proves the block identity and field offsets. The geometry-only clip-transform path can proceed independently.
+
+### 6.4 First measured oracle result (2026-08-13)
+
+The first end-to-end, gameplay-gated oracle is implemented in `tools/capture_stereo_oracle.py` and Cemu branch `codex/bvr-stereo-instancing`. It launches the isolated debugger fork through BetterVR, waits for 90 advancing stable gameplay frames with both final eyes `NORMAL`, arms a bounded trace, and fails closed on overflow, missing PM4 markers, no matched draws, stale/non-gameplay state, or identical final OpenXR eyes.
+
+The accepted `v4_chunk_offsets` corpus captured 123,132 draws, 303,021 uniform bindings, and 7,393,722 16-byte chunk hashes across 16 complete left/right PM4 pass pairs. It had zero dropped draws, zero truncated uniform entries, 20 boundary-unknown draws, 45,413 matched draw pairs, distinct final eyes (`meanAbsDifference=0.0469`), and no asymmetric-flicker or frozen-eye event in the accepted window. The local evidence packet is `bench_out/stereo_oracle_20260813_v4_chunk_offsets/stereo_oracle.json` and is intentionally not committed because it is generated benchmark data.
+
+This measurement narrows the design:
+
+- The cheap dynamic-UBO-offset path is real but not universal. Of captured vertex draws, 104,445 used remapped uniforms, 7,491 full constant-file mode, and only 9,926 full constant-bank mode. Pixel draws were similarly dominated by remapped data (75,444 versus 8,663 full constant-bank).
+- Matched vertex register/remapped payloads differed on 39,585 of 40,971 comparisons, but the differences concentrate at repeatable shader-specific 16-byte offsets. Examples include offsets `48` and `96` in 160-byte payloads and offsets `256`, `288`, and `304` in a 4096-byte payload. That pattern is compatible with shared view/projection fields; it is not evidence that every byte or every per-object block must be regenerated.
+- Several full constant banks also carry systematic eye differences: VS banks 1 and 6 differed in every matched comparison, VS bank 8 in about 92.6%, PS bank 1 in every comparison, and PS bank 6 in about 80.6%. Other banks changed address but not content, proving that address inequality alone cannot classify eye-varying data.
+- The next camera-identification step must correlate the ranked chunks with BetterVR's exact left/right matrices and capture selected raw values. Tier 3 remapped-uniform patching is now a required first-class path, not a remote fallback. Tier 1's clip transform remains the lowest-risk way to establish geometry correctness before full shading substitution.
+
+The 45,413 matched pairs are a strong working corpus, not proof that every draw has a twin. Unmatched draws remain to be classified as pass-boundary effects, genuine eye-specific work, or matcher ambiguity. Eligibility stays fail-closed until that classification and the non-draw operation trace are complete.
 
 ## 7. Cemu implementation work packages
 

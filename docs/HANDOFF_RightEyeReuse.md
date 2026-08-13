@@ -56,7 +56,7 @@ Built because blind iteration (edit → rebuild → reboot → squint at a previ
 - **`bisect_mask.ps1 [-Boot] [-Masks @(...)] [-HoldSec n]`** — automated mask ladder over a live instance; CLEAN/MARGINAL/FLICKER verdict per mask; **aborts when the instance doesn't recover on the control mask** (permanent corruption is a real failure mode, see §4).
 - **`ab_run.ps1 -TestMask n`** — baseline vs test full runs, verdict diff.
 - **`analyze_dump.ps1`** — cdb-based dump analysis; classifies faulting address as module code vs anonymous memory (anonymous = Cemu's PPC JIT cache = crash is in recompiled *game* code). Note: Cemu's own crashlog (in the launcher-echoed `log.txt`) contains the **guest** context — PPC IP, r0–r31, PPC stack — usually more useful than the host dump.
-- **cemu-debugger MCP** — breakpoints, memory watch, disassemble/assemble, memory & value scans, button input, and `jit_lookup(host_address)` → maps a JIT-cache crash address to the PPC function (scans `ppcRecompilerFuncTable`). The fork now also exposes `bvr_begin_draw_trace`, `bvr_end_draw_trace`, `bvr_get_eye_diff`, and `bvr_get_queue_snapshot` for bounded GX2 draw comparison. Don't run a game in it and in `E:\Cemu_2.6` simultaneously (shared `mlc01`).
+- **cemu-debugger MCP** — breakpoints, memory watch, disassemble/assemble, memory & value scans, button input, and `jit_lookup(host_address)` → maps a JIT-cache crash address to the PPC function (scans `ppcRecompilerFuncTable`). The stereo branch also exposes `bvr_begin_draw_trace`, `bvr_end_draw_trace`, `bvr_get_eye_diff`, `bvr_get_uniform_diff`, and `bvr_get_queue_snapshot`. Uniform capture reports modes, bounded whole-range hashes, and shader-specific 16-byte changed offsets. Draw eye tags come from the PM4-ordered magic 3D capture clears; the asynchronous guest `eyePhase` sample is diagnostic only. Don't run a game in it and in `E:\Cemu_2.6` simultaneously (shared `mlc01`).
 
 ### Bench logging
 
@@ -221,14 +221,17 @@ The launcher harness no longer kills a pre-existing Cemu/BetterVR process by cal
 
 ### Cemu GX2 eye trace
 
-`E:\Github\cemu-mcp` adds a bounded Latte command-processor trace and four MCP tools:
+`E:\Github\cemu-mcp` adds a bounded Latte command-processor trace and five MCP tools:
 
-- `bvr_begin_draw_trace(max_draws)`
+- `bvr_begin_draw_trace(max_draws, capture_uniforms, max_uniform_bytes)`
 - `bvr_get_queue_snapshot(recent)`
 - `bvr_get_eye_diff(max_mismatches)`
+- `bvr_get_uniform_diff(max_ranges)`
 - `bvr_end_draw_trace()`
 
-Every entry records PPC frame/eye phase, topology, instance/base/index information, shader addresses, color target, and a camera-independent pipeline fingerprint. The diff treats each eye as a multiset so it can identify right-eye missing/extra work while allowing view matrices to differ. Because Cemu executes GPU packets asynchronously, the tool reports unknown/between-phase draws and carries an explicit tag-confidence caveat; correlate it with final-image telemetry and PPC events when a command buffer crosses an eye boundary.
+Every entry records the asynchronous guest frame/eye sample, authoritative PM4 marker eye/pass, topology, instance/base/index information, shader addresses, color target, uniform modes/ranges, and a camera-independent pipeline fingerprint. The uniform diff pairs complete left/right marker passes by capture slot, ignores transient index/target addresses, and ranks shader/stage/bank 16-byte changed offsets. A trace prefix or suffix without its closing capture marker stays unknown instead of being guessed.
+
+`tools/capture_stereo_oracle.py --out <directory>` is the automated Phase-0 runner. It uses an isolated Cemu fork directory, drives the title screen through the simulator, requires 90 advancing stable in-game frames before tracing, captures a short bounded two-pass corpus, saves the eye/uniform reports and logs, validates distinct healthy final OpenXR eyes, and terminates only its own launcher/Cemu process tree. The accepted 2026-08-13 corpus is `bench_out/stereo_oracle_20260813_v4_chunk_offsets/`; see the full interpretation in `docs/PLAN_StereoInstancing.md` section 6.4.
 
 ### Simulator-visible flicker detector
 
