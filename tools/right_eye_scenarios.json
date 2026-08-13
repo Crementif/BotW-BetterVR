@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "control": { "name": "control", "skipMask": 0, "rightEyeReuse": false, "synthRightEye": false },
+  "candidates": [
+    { "name": "freeze_rebake_resubmit", "rightEyeReuse": true, "synthRightEye": false },
+    { "name": "gpu_synth_right", "skipMask": 0, "rightEyeReuse": false, "synthRightEye": true }
+  ]
+}

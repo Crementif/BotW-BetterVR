@@ -78,10 +78,32 @@ VkResult VRLayer::VkInstanceOverrides::CreateInstance(PFN_vkCreateInstance creat
     }
 #endif
 
+    // dependencies of the device-side VK_EXT_swapchain_maintenance1 used for present throttling
+    const size_t extensionCountBeforeSurfaceMaintenance = modifiedExtensions.size();
+    for (const char* wanted : { VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME, VK_EXT_SURFACE_MAINTENANCE_1_EXTENSION_NAME }) {
+        bool alreadyEnabled = false;
+        for (const char* extensionName : modifiedExtensions) {
+            if (extensionName && std::strcmp(extensionName, wanted) == 0) {
+                alreadyEnabled = true;
+                break;
+            }
+        }
+        if (!alreadyEnabled) {
+            modifiedExtensions.push_back(wanted);
+        }
+    }
+
     modifiedCreateInfo.enabledExtensionCount = (uint32_t)modifiedExtensions.size();
     modifiedCreateInfo.ppEnabledExtensionNames = modifiedExtensions.empty() ? nullptr : modifiedExtensions.data();
 
     VkResult result = createInstanceFunc(&modifiedCreateInfo, pAllocator, pInstance);
+    if (result == VK_ERROR_EXTENSION_NOT_PRESENT && modifiedExtensions.size() != extensionCountBeforeSurfaceMaintenance) {
+        // retry without the surface-maintenance extensions on older loaders/drivers
+        modifiedExtensions.resize(extensionCountBeforeSurfaceMaintenance);
+        modifiedCreateInfo.enabledExtensionCount = (uint32_t)modifiedExtensions.size();
+        modifiedCreateInfo.ppEnabledExtensionNames = modifiedExtensions.empty() ? nullptr : modifiedExtensions.data();
+        result = createInstanceFunc(&modifiedCreateInfo, pAllocator, pInstance);
+    }
 #ifdef _DEBUG
     if (result == VK_ERROR_EXTENSION_NOT_PRESENT && addedDebugUtilsExtension) {
         debugUtilsEnabled = false;
@@ -223,6 +245,10 @@ void VRLayer::VkInstanceOverrides::GetPhysicalDeviceQueueFamilyProperties(const 
     return pDispatch.GetPhysicalDeviceQueueFamilyProperties(physicalDevice, pQueueFamilyPropertyCount, pQueueFamilyProperties);
 }
 
+// set when VK_EXT_swapchain_maintenance1 was enabled on the device, allowing the
+// present throttle in QueuePresentKHR to hand skipped swapchain images back
+bool g_swapchainMaintenance1Enabled = false;
+
 const std::vector<std::string> additionalDeviceExtensions = {
     VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME,
     VK_KHR_EXTERNAL_MEMORY_WIN32_EXTENSION_NAME,
@@ -230,6 +256,7 @@ const std::vector<std::string> additionalDeviceExtensions = {
     VK_KHR_EXTERNAL_SEMAPHORE_EXTENSION_NAME,
     VK_KHR_EXTERNAL_SEMAPHORE_WIN32_EXTENSION_NAME,
     VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME,
+    VK_EXT_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME,
 #if ENABLE_VK_DEVICE_FAULT
     VK_EXT_DEVICE_FAULT_EXTENSION_NAME,
 #endif
@@ -367,6 +394,19 @@ VkResult VRLayer::VkInstanceOverrides::CreateDevice(const vkroots::VkPhysicalDev
     }
     else if (!timelineSemaphoresEnabled) {
         Log::print<ERROR>("Timeline semaphores are not supported by this GPU! VR functionality may not work.");
+    }
+
+    // swapchain maintenance1 lets the present throttle release acquired-but-unpresented images
+    static VkPhysicalDeviceSwapchainMaintenance1FeaturesEXT createSwapchainMaintenance1Features = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SWAPCHAIN_MAINTENANCE_1_FEATURES_EXT };
+    g_swapchainMaintenance1Enabled = isExtensionSupported(VK_EXT_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME);
+    if (g_swapchainMaintenance1Enabled) {
+        createSwapchainMaintenance1Features.swapchainMaintenance1 = VK_TRUE;
+        createSwapchainMaintenance1Features.pNext = nextChain;
+        nextChain = &createSwapchainMaintenance1Features;
+        Log::print<INFO>("Enabling VK_EXT_swapchain_maintenance1 for present throttling");
+    }
+    else {
+        Log::print<WARNING>("VK_EXT_swapchain_maintenance1 not supported; window presents can pace the game on slow displays");
     }
 
     VkDeviceCreateInfo modifiedCreateInfo = { VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO };

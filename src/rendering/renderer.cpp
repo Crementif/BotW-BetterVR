@@ -2,14 +2,21 @@
 
 #include "renderer.h"
 #include "instance.h"
+#include "telemetry.h"
 #include "texture.h"
 #include "hooking/bow.h"
 #include "hooking/cemu_hooks.h"
 #include "utils/d3d12_utils.h"
+#include "utils/ipc_control.h"
 #include "utils/render_utils.h"
 #include "hooking/imgui_menus.h"
 
+static uint32_t s_frameCounter = 0; // host frame number shared with telemetry/IPC
+
 std::atomic_bool RND_Renderer::Layer2D::s_isBowAimingActive = false;
+
+extern std::atomic<double> g_lastVkPresentMs; // written by the layer's QueuePresentKHR hook
+static double s_lastXrEndFrameMs = 0.0;
 
 static float GetSnapTurnFadeAmount() {
     auto* xr = VRManager::instance().XR.get();
@@ -108,6 +115,17 @@ void RND_Renderer::StartFrame() {
     BetterVRProfiler::AdvanceFrame();
     m_isInitialized = true;
 
+    // runtime control channel: poll for commands before this frame's flag push so a new
+    // skip mask takes effect on the same frame it was requested
+    ++s_frameCounter;
+    IpcControl::instance().Tick(s_frameCounter);
+
+    // push the host-controlled performance flags into PPC-visible memory from here (and not
+    // only from hook_UpdateSettings) so they reliably reach the game on every screen,
+    // including menus/title screens where parts of the game's frame loop don't run
+    CemuHooks::setMemory<uint32_t>(0x10416BF8, CemuHooks::GetEffectiveRenderSkipMask());
+    CemuHooks::setMemory<uint32_t>(0x10416BFC, CemuHooks::ShouldUseSynthesizedRightEye() ? 1u : 0u);
+
     XrFrameWaitInfo waitFrameInfo = { XR_TYPE_FRAME_WAIT_INFO };
     auto waitStart = std::chrono::high_resolution_clock::now();
     checkXRResult(xrWaitFrame(m_session, &waitFrameInfo, &m_frameState), "Failed to wait for next frame!");
@@ -169,6 +187,9 @@ void RND_Renderer::EndFrame() {
     bool reusedStable3D = false;
     long presented3DFrameIdx = -1;
     const std::array<XrView, 2>* presented3DViews = nullptr;
+    bool presented3DSynthRight = false;
+    SynthRightEyeInfo presented3DSynthInfo = {};
+    bool projectionPrepared = false;
 
     if (hudFrameIdx != -1) {
         RenderFrame& hudFrame = m_renderFrames[hudFrameIdx];
@@ -188,10 +209,17 @@ void RND_Renderer::EndFrame() {
             if (hudFrame.Is3DComplete() && !hudFrame.HasFatalIssue() && hudFrame.views.has_value() && IsCurrent3DPresentationAllowed(hudFrame)) {
                 presented3DFrameIdx = hudFrameIdx;
                 presented3DViews = &hudFrame.views.value();
+                presented3DSynthRight = hudFrame.synthesizedRight;
+                if (presented3DSynthRight) {
+                    presented3DSynthInfo.hasMatrix = hudFrame.synthReprojMtx.has_value();
+                    presented3DSynthInfo.reprojMtx = hudFrame.synthReprojMtx.value_or(glm::fmat4(1.0f));
+                }
             }
             else if (m_stable3D.valid && IsStable3DReuseAllowed(hudFrame)) {
                 presented3DFrameIdx = m_stable3D.frameIdx;
                 presented3DViews = &m_stable3D.views;
+                presented3DSynthRight = m_stable3D.synthesizedRight;
+                presented3DSynthInfo = m_stable3D.synthInfo;
                 reusedStable3D = true;
             }
         }
@@ -217,7 +245,8 @@ void RND_Renderer::EndFrame() {
             }
 
             SharedTexture* fadeTexture = shouldRender2D ? m_layer2D->GetSharedTextures()[hudFrameIdx].get() : nullptr;
-            RND_D3D12::CommandContext<false> renderFrame(VRManager::instance().D3D12.get(), [this, shouldRender2D, shouldRender3D, hudFrameIdx, presented3DFrameIdx, presented3DViews, fadeTexture, &debugDrawData](RND_D3D12::CommandContext<false>* context) {
+            const SynthRightEyeInfo* synthRightEye = presented3DSynthRight ? &presented3DSynthInfo : nullptr;
+            RND_D3D12::CommandContext<false> renderFrame(VRManager::instance().D3D12.get(), [this, shouldRender2D, shouldRender3D, hudFrameIdx, presented3DFrameIdx, presented3DViews, fadeTexture, &debugDrawData, synthRightEye](RND_D3D12::CommandContext<false>* context) {
                 D3D12_SET_NAME(context->GetRecordList(), L"RenderXRFrame");
 
                 if (shouldRender2D) {
@@ -225,9 +254,22 @@ void RND_Renderer::EndFrame() {
                 }
                 if (shouldRender3D) {
                     m_layer3D->RecordRender(context, OpenXR::EyeSide::LEFT, presented3DFrameIdx, *presented3DViews, fadeTexture, debugDrawData);
-                    m_layer3D->RecordRender(context, OpenXR::EyeSide::RIGHT, presented3DFrameIdx, *presented3DViews, fadeTexture, debugDrawData);
+                    m_layer3D->RecordRender(context, OpenXR::EyeSide::RIGHT, presented3DFrameIdx, *presented3DViews, fadeTexture, debugDrawData, synthRightEye);
+                    // Inspect the exact images submitted to OpenXR. This deliberately
+                    // happens after both present passes so synthesized-right output and
+                    // presentation-shader defects cannot hide behind clean source images.
+                    m_layer3D->RecordFinalTelemetry(context);
                 }
             });
+        }
+
+        // on-demand full eye-texture dump: runs after the frame's render commands were
+        // submitted (in-order queue) and only consumes the request when 3D textures exist
+        if (presented3DFrameIdx != -1 && IpcControl::instance().ConsumeDumpRequest()) {
+            EyeTelemetry::instance().DumpEyeTextures(VRManager::instance().D3D12.get(),
+                m_layer3D->GetFinalColor(OpenXR::EyeSide::LEFT),
+                m_layer3D->GetFinalColor(OpenXR::EyeSide::RIGHT),
+                s_frameCounter);
         }
 
         if (shouldRender2D) {
@@ -237,12 +279,13 @@ void RND_Renderer::EndFrame() {
 
         if (shouldRender3D) {
             layer3DViews = m_layer3D->FinishRendering(*presented3DViews);
+            m_lastProjectionViews = layer3DViews;
+            m_hasLastProjectionViews = true;
             layer3D.layerFlags = 0;
             layer3D.space = VRManager::instance().XR->m_stageSpace;
             layer3D.viewCount = (uint32_t)layer3DViews.size();
             layer3D.views = layer3DViews.data();
-            compositionLayers.emplace_back(reinterpret_cast<XrCompositionLayerBaseHeader*>(&layer3D));
-            m_lastPresented3D = true;
+            projectionPrepared = true;
 
             if (reusedStable3D) {
                 ++m_stable3DReusedCount;
@@ -252,16 +295,59 @@ void RND_Renderer::EndFrame() {
                 PromoteStable3D(hudFrameIdx);
             }
         }
-        else if (m_layer3D != nullptr) {
-            ++m_3DSuppressedCount;
-        }
-
-        // add 2D layer after 3D layer so that it appears on top
-        for (auto& layer : layer2DQuads) {
-            compositionLayers.emplace_back(reinterpret_cast<XrCompositionLayerBaseHeader*>(&layer));
-        }
 
         hudFrame.Reset();
+    }
+
+    // A new game stereo capture can temporarily invalidate the shared-texture
+    // reference while its left/right/depth pieces arrive. Submitting zero projection
+    // layers during that gap makes the runtime alternate the world with black/HUD-only
+    // frames. Re-submit the last released OpenXR projection images instead; OpenXR
+    // swapchain subimages remain valid until replaced by a later release.
+    const bool projectionExpected = m_layer3D != nullptr && CemuHooks::IsInGame() &&
+        !CemuHooks::UseBlackBarsDuringEvents() && !isFadeVisible;
+    if (!projectionPrepared && projectionExpected && m_hasLastProjectionViews) {
+        layer3DViews = m_lastProjectionViews;
+        layer3D.layerFlags = 0;
+        layer3D.space = VRManager::instance().XR->m_stageSpace;
+        layer3D.viewCount = (uint32_t)layer3DViews.size();
+        layer3D.views = layer3DViews.data();
+        projectionPrepared = true;
+        ++m_cachedProjectionReuseCount;
+    }
+
+    if (projectionPrepared) {
+        compositionLayers.emplace_back(reinterpret_cast<XrCompositionLayerBaseHeader*>(&layer3D));
+        m_lastPresented3D = true;
+        ++m_projectionSubmittedCount;
+        m_consecutiveProjectionOmissions = 0;
+    }
+    else if (m_layer3D != nullptr) {
+        ++m_3DSuppressedCount;
+        if (projectionExpected) {
+            ++m_projectionOmittedWhenExpectedCount;
+            ++m_consecutiveProjectionOmissions;
+            m_maxConsecutiveProjectionOmissions = std::max(m_maxConsecutiveProjectionOmissions, m_consecutiveProjectionOmissions);
+        }
+    }
+
+    // Add 2D after projection so HUD quads remain on top, including cached-world frames.
+    for (auto& layer : layer2DQuads) {
+        compositionLayers.emplace_back(reinterpret_cast<XrCompositionLayerBaseHeader*>(&layer));
+    }
+
+    ++m_compositorFrameCount;
+    if (m_projectionPresenceInitialized && m_lastProjectionPresence != projectionPrepared) {
+        ++m_projectionPresenceTransitions;
+    }
+    m_projectionPresenceInitialized = true;
+    m_lastProjectionPresence = projectionPrepared;
+    m_lastCompositionLayerCount = (uint32_t)compositionLayers.size();
+    if (compositionLayers.empty()) {
+        ++m_emptyCompositionFrameCount;
+    }
+    else if (!projectionPrepared && !layer2DQuads.empty()) {
+        ++m_twoDOnlyCompositionFrameCount;
     }
 
     // decrement camera capture counter since its active only for a few frames
@@ -270,6 +356,41 @@ void RND_Renderer::EndFrame() {
     }
 
     m_lastFrameWorkTimeMs = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - m_frameStartTime).count();
+
+    // benchmark logging: rolling averages so before/after runs can be compared from the log.
+    // "frame" is the delta between OpenXR predicted display times (the game/present cadence),
+    // "work" is host time spent inside the frame, "xrWait" is time blocked in xrWaitFrame
+    // (headroom left before the headset cadence throttles the game).
+    {
+        static double s_benchFrameAccum = 0.0;
+        static double s_benchWorkAccum = 0.0;
+        static double s_benchWaitAccum = 0.0;
+        static double s_benchXrEndAccum = 0.0;
+        static double s_benchVkPresentAccum = 0.0;
+        static uint32_t s_benchSamples = 0;
+        s_benchFrameAccum += m_lastFrameTimeMs;
+        s_benchWorkAccum += m_lastFrameWorkTimeMs;
+        s_benchWaitAccum += m_lastWaitTimeMs;
+        s_benchXrEndAccum += s_lastXrEndFrameMs;
+        s_benchVkPresentAccum += g_lastVkPresentMs.load(std::memory_order_relaxed);
+        if (++s_benchSamples >= 600) {
+            const double invSamples = 1.0 / (double)s_benchSamples;
+            const double avgFrameMs = s_benchFrameAccum * invSamples;
+            const auto telemetryL = EyeTelemetry::instance().GetStats(OpenXR::EyeSide::LEFT);
+            const auto telemetryR = EyeTelemetry::instance().GetStats(OpenXR::EyeSide::RIGHT);
+            Log::print<INFO>("[bench] {} frames: avg frame {:.2f} ms ({:.1f} FPS), avg work {:.2f} ms, avg xrWait {:.2f} ms, avg xrEnd {:.2f} ms, avg vkPresent {:.2f} ms, synthRightEye={}, skipDrc={}, mask=0x{:X}, whiteL={} whiteR={} eyeL={} eyeR={}",
+                s_benchSamples, avgFrameMs, avgFrameMs > 0.0 ? 1000.0 / avgFrameMs : 0.0,
+                s_benchWorkAccum * invSamples, s_benchWaitAccum * invSamples,
+                s_benchXrEndAccum * invSamples, s_benchVkPresentAccum * invSamples,
+                CemuHooks::ShouldUseSynthesizedRightEye() ? "on" : "off",
+                GetSettings().ShouldSkipDrcRendering() ? "on" : "off",
+                CemuHooks::GetEffectiveRenderSkipMask(),
+                telemetryL.whiteFrames, telemetryR.whiteFrames,
+                EyeTelemetry::StateName(telemetryL.state), EyeTelemetry::StateName(telemetryR.state));
+            s_benchFrameAccum = s_benchWorkAccum = s_benchWaitAccum = s_benchXrEndAccum = s_benchVkPresentAccum = 0.0;
+            s_benchSamples = 0;
+        }
+    }
 
     XrFrameEndInfo frameEndInfo = { XR_TYPE_FRAME_END_INFO };
     frameEndInfo.displayTime = m_frameState.predictedDisplayTime;
@@ -289,12 +410,20 @@ void RND_Renderer::EndFrame() {
             m_fatalSlotInvalidations);
     }
 
+    const auto xrEndStart = std::chrono::high_resolution_clock::now();
     XrResult xrResult = xrEndFrame(m_session, &frameEndInfo);
+    s_lastXrEndFrameMs = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - xrEndStart).count();
     if (XR_FAILED(xrResult)) {
         Log::print<ERROR>("xrEndFrame #{} FAILED with result {}", s_endFrameCount, (int)xrResult);
     }
 
     VRManager::instance().D3D12->EndFrame();
+
+    // stamp this frame's telemetry samples with the fence value D3D12->EndFrame just
+    // signaled (covers all queue work) and decode any samples whose fence completed
+    auto* d3d12 = VRManager::instance().D3D12.get();
+    EyeTelemetry::instance().OnFrameSubmitted(d3d12->GetLastSignaledFenceValue(), s_frameCounter, CemuHooks::GetEffectiveRenderSkipMask());
+    EyeTelemetry::instance().Collect(d3d12->GetFenceCompletedValue());
 }
 
 void RND_Renderer::LatchFrameCameraReference(long frameIdx) {
@@ -401,6 +530,9 @@ void RND_Renderer::PromoteStable3D(long frameIdx) {
     m_stable3D.stereoGeneration = frame.activeStereoGeneration;
     m_stable3D.valid = true;
     m_stable3D.views = frame.views.value();
+    m_stable3D.synthesizedRight = frame.synthesizedRight;
+    m_stable3D.synthInfo.hasMatrix = frame.synthReprojMtx.has_value();
+    m_stable3D.synthInfo.reprojMtx = frame.synthReprojMtx.value_or(glm::fmat4(1.0f));
 }
 
 RND_Renderer::Layer3D::Layer3D(VkExtent2D inputRes, VkExtent2D outputRes) {
@@ -518,22 +650,32 @@ void RND_Renderer::Layer3D::PrepareDebugDraw(const DebugDrawRenderData& debugDra
     m_debugDrawPipeline->UploadRenderData(debugDrawData);
 }
 
-void RND_Renderer::Layer3D::RecordRender(RND_D3D12::CommandContext<false>* context, OpenXR::EyeSide side, long frameIdx, const std::array<XrView, 2>& views, SharedTexture* fadeTexture, const DebugDrawRenderData& debugDrawData) {
+void RND_Renderer::Layer3D::RecordRender(RND_D3D12::CommandContext<false>* context, OpenXR::EyeSide side, long frameIdx, const std::array<XrView, 2>& views, SharedTexture* fadeTexture, const DebugDrawRenderData& debugDrawData, const SynthRightEyeInfo* synthRightEye) {
     BetterVRProfiler::Scope profile(BetterVRProfiler::Section::Layer3DRender);
 
     checkAssert(context != nullptr, "Layer3D render context is missing!");
 
-    auto& texture = m_textures[side][frameIdx];
-    auto& depthTexture = m_depthTextures[side][frameIdx];
+    // for a synthesized right eye the game never rendered right-eye textures, so bind the
+    // left eye's color+depth and let the present shader reproject them into this view
+    const bool synthesizeThisEye = synthRightEye != nullptr && side == OpenXR::EyeSide::RIGHT;
+    const OpenXR::EyeSide sourceSide = synthesizeThisEye ? OpenXR::EyeSide::LEFT : side;
+
+    auto& texture = m_textures[sourceSide][frameIdx];
+    auto& depthTexture = m_depthTextures[sourceSide][frameIdx];
     checkAssert(fadeTexture != nullptr, "Layer3D fade texture is missing!");
 
     m_presentPipelines[side]->SetUvTransform(RenderUtils::GetPresentationUvTransform(
         views[side].fov,
         VRManager::instance().XR->GetRenderer()->m_gameRenderAspectRatio
     ));
+    m_presentPipelines[side]->SetReprojection(synthesizeThisEye && synthRightEye->hasMatrix ? &synthRightEye->reprojMtx : nullptr);
 
-    context->WaitFor(texture.get(), texture->GetD3D12WaitValue());
-    context->WaitFor(depthTexture.get(), depthTexture->GetD3D12WaitValue());
+    // the left-eye pass in this same command context already waits on and signals the left
+    // textures; adding a second wait/signal pair would desync the Vulkan<->D3D12 fence protocol
+    if (!synthesizeThisEye) {
+        context->WaitFor(texture.get(), texture->GetD3D12WaitValue());
+        context->WaitFor(depthTexture.get(), depthTexture->GetD3D12WaitValue());
+    }
 
     // swapchains are already in D3D12_RESOURCE_STATE_RENDER_TARGET and depth in D3D12_RESOURCE_STATE_DEPTH_WRITE according to OpenXR spec
     m_presentPipelines[side]->BindAttachment(0, texture->d3d12GetTexture());
@@ -558,9 +700,32 @@ void RND_Renderer::Layer3D::RecordRender(RND_D3D12::CommandContext<false>* conte
     }
 
     // no transition needed here as OpenXR requires the swapchain to be returned in RENDER_TARGET/DEPTH_WRITE too
-    context->Signal(texture.get(), texture->GetD3D12SignalValue());
-    context->Signal(depthTexture.get(), depthTexture->GetD3D12SignalValue());
+    if (!synthesizeThisEye) {
+        context->Signal(texture.get(), texture->GetD3D12SignalValue());
+        context->Signal(depthTexture.get(), depthTexture->GetD3D12SignalValue());
+    }
     // Log::print("[D3D12 - 3D Layer] Rendering finished");
+}
+
+void RND_Renderer::Layer3D::RecordFinalTelemetry(RND_D3D12::CommandContext<false>* context) {
+    auto* commandList = context->GetRecordList();
+    auto* device = VRManager::instance().D3D12->GetDevice();
+    for (int side = 0; side < 2; ++side) {
+        ID3D12Resource* output = m_swapchains[side]->GetTexture();
+        if (output == nullptr || output->GetDesc().SampleDesc.Count != 1) {
+            continue;
+        }
+        D3D12_RESOURCE_BARRIER toCopy = {};
+        toCopy.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        toCopy.Transition.pResource = output;
+        toCopy.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        toCopy.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
+        toCopy.Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_SOURCE;
+        commandList->ResourceBarrier(1, &toCopy);
+        EyeTelemetry::instance().RecordSample(device, commandList, side, output);
+        std::swap(toCopy.Transition.StateBefore, toCopy.Transition.StateAfter);
+        commandList->ResourceBarrier(1, &toCopy);
+    }
 }
 
 const std::array<XrCompositionLayerProjectionView, 2>& RND_Renderer::Layer3D::FinishRendering(const std::array<XrView, 2>& views) {

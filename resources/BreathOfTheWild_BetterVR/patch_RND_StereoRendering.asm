@@ -21,6 +21,16 @@ currentEyeSide:
 currentFrameCounter:
 .int 0
 
+; host-controlled flag (see CemuHooks::hook_UpdateSettings): when set, the game renders a
+; single (left) eye per frame and the compositor synthesizes the right eye from color+depth
+0x10416BFC = VR_FLAG_SYNTH_RIGHT_EYE:
+0x10416BFC = .int 0x00000000
+
+; latched copy of VR_FLAG_SYNTH_RIGHT_EYE, stable for the duration of one frame so the
+; capture hooks and actor job routing can't tear when the host toggles the setting mid-frame
+currentFrameIsMono:
+.int 0
+
 0x10463EB0 = FadeProgress__sInstance:
 0x031FB1B4 = sub_31FB1B4_getTimeForGameUpdateMaybe:
 0x0309F72C = sead_GameFramework_lockFrameDrawContext:
@@ -129,6 +139,12 @@ addi r3, r3, calculateUIMaybe@l
 mtctr r3
 bctrl ; bl calculateUIMaybe
 
+; latch the synthesized-right-eye flag once per frame
+lis r3, VR_FLAG_SYNTH_RIGHT_EYE@ha
+lwz r3, VR_FLAG_SYNTH_RIGHT_EYE@l(r3)
+lis r12, currentFrameIsMono@ha
+stw r3, currentFrameIsMono@l(r12)
+
 ; ========================================================================
 ; FIRST EYE SIDE
 ; ========================================================================
@@ -142,11 +158,74 @@ bctrl ; sead__GameFrameworkCafe__procDraw
 ; doesn't seem to be necessary
 ;bl import.gx2.GX2DrawDone
 
+; synthesized-right-eye mode: run a single render pass and present it directly,
+; skipping the entire second-eye section below
+lis r3, currentFrameIsMono@ha
+lwz r3, currentFrameIsMono@l(r3)
+cmpwi r3, 0
+bne monoEyeTail
+
 li r0, 0
 lis r12, currentEyeSide@ha
 stw r0, currentEyeSide@l(r12)
 li r3, 1
 bl import.coreinit.hook_EndCameraSide
+
+; The frame loop is pipelined: the procDraw above completes the outstanding right
+; side from the previous generation. This is the only safe point to commit a new
+; reuse mask so the following left and right calcDraw phases see one stable value.
+; Publish the small ABI snapshot with an odd/even sequence for lock-free host reads.
+lis r12, _bvrSnapshotSeq@ha
+lwz r11, _bvrSnapshotSeq@l(r12)
+addi r11, r11, 1
+stw r11, _bvrSnapshotSeq@l(r12)
+
+lis r3, VR_RENDER_SKIP_MASK@ha
+lwz r3, VR_RENDER_SKIP_MASK@l(r3)
+lis r12, _bvrDesiredMask@ha
+stw r3, _bvrDesiredMask@l(r12)
+
+; Queue preservation and UpdateModelJobQueue suppression are a required pair.
+; Silently activating only one is known to empty or permanently desynchronize the
+; double-buffered model queues, so fail open and record the rejected request.
+andi. r0, r3, 0x3000
+cmpwi r0, 0x1000
+beq bvr_invalidReuseMask
+cmpwi r0, 0x2000
+bne bvr_reuseMaskValidated
+bvr_invalidReuseMask:
+li r0, 0x3000
+andc r3, r3, r0
+lis r12, _bvrFaultFlags@ha
+lwz r11, _bvrFaultFlags@l(r12)
+ori r11, r11, 0x0001 ; invalid queue-preserve/UMJQ dependency
+stw r11, _bvrFaultFlags@l(r12)
+bvr_reuseMaskValidated:
+
+lis r12, _bvrActiveMask@ha
+lwz r11, _bvrActiveMask@l(r12)
+cmpw r11, r3
+beq bvr_maskAlreadyActive
+stw r3, _bvrActiveMask@l(r12)
+lis r12, _bvrMaskEpoch@ha
+lwz r11, _bvrMaskEpoch@l(r12)
+addi r11, r11, 1
+stw r11, _bvrMaskEpoch@l(r12)
+lis r12, _cFrame@ha
+lwz r11, _cFrame@l(r12)
+lis r12, _bvrActivationFrame@ha
+stw r11, _bvrActivationFrame@l(r12)
+lis r12, _bvrLastControlEvent@ha
+stw r3, _bvrLastControlEvent@l(r12)
+bvr_maskAlreadyActive:
+
+li r0, 0
+lis r12, _bvrEyePhase@ha
+stw r0, _bvrEyePhase@l(r12)
+lis r12, _bvrSnapshotSeq@ha
+lwz r11, _bvrSnapshotSeq@l(r12)
+addi r11, r11, 1
+stw r11, _bvrSnapshotSeq@l(r12)
 
 ; increase frame counter
 lis r12, currentFrameCounter@ha
@@ -195,6 +274,10 @@ mr r3, r30
 bctrl ; sead__GameFrameworkCafe__procDraw
 
 ; this is a replacement for a GX2DrawDone that prevents command buffers from being corrupted
+; NOTE: a bounded-lag variant (wait on the previous frame's timestamp) was tried and caused
+; "Detected error in GPU command buffer" crashes once the frame rate was uncapped past 60 -
+; the emulated CPU recycles GX2 command buffers faster than the GPU consumes them, so the
+; full wait-for-just-submitted drain is required here
 bl storeLastSubmittedTimeStamp
 bl waitForLastSubmittedTimeStamp
 ;bl import.gx2.GX2DrawDone
@@ -227,6 +310,8 @@ bl import.coreinit.hook_EndCameraSide
 li r0, 1
 lis r12, currentEyeSide@ha
 stw r0, currentEyeSide@l(r12)
+lis r12, _bvrEyePhase@ha
+stw r0, _bvrEyePhase@l(r12)
 li r3, 1
 bl import.coreinit.hook_BeginCameraSide
 
@@ -302,6 +387,9 @@ bl import.gx2.GX2DrawDone
 skipStallDuringLoadingScreens_two:
 
 continueWithRendering:
+li r0, 2
+lis r12, _bvrEyePhase@ha
+stw r0, _bvrEyePhase@l(r12)
 ; regular continue code below
 lis r3, sead_GameFramework_unlockFrameDrawContext@ha
 addi r3, r3, sead_GameFramework_unlockFrameDrawContext@l
@@ -352,6 +440,103 @@ mtlr r0
 lwz r31, 0x0C(r1)
 addi r1, r1, 0x10
 blr
+
+; ========================================================================
+; SINGLE EYE (synthesized right eye) TAIL
+; The game renders one pass with the left camera; the compositor reprojects
+; it into the right eye. This replaces the whole SECOND EYE SIDE section.
+; ========================================================================
+
+monoEyeTail:
+; finish the single camera side; report the right side so the host's
+; once-per-frame housekeeping in hook_EndCameraSide still runs
+li r0, 0
+lis r12, currentEyeSide@ha
+stw r0, currentEyeSide@l(r12)
+li r3, 1
+bl import.coreinit.hook_EndCameraSide
+
+; increase frame counter (still alternates between the two capture slots)
+lis r12, currentFrameCounter@ha
+lwz r3, currentFrameCounter@l(r12)
+addi r3, r3, 1
+cmpwi r3, 2
+bne mono_skipResetFrameCounter
+li r3, 0
+mono_skipResetFrameCounter:
+stw r3, currentFrameCounter@l(r12)
+
+li r3, 0
+bl import.coreinit.hook_BeginCameraSide
+
+lwz r12, 0(r30)
+lwz r11, 0xFC(r12)
+mtctr r11
+mr r3, r30
+bctrl ; sead__GameFrameworkCafe__calcDraw
+
+lwz r12, 0(r30)
+lwz r0, 0x7C(r12)
+mtctr r0
+mr r3, r30
+bctrl ; sead__Framework__procReset
+
+; run the regular locked present path (mirror of the stereo second-eye tail)
+lwz r12, 0x74(r30)
+clrlwi. r11, r12, 31
+li r31, 1
+beq mono_loc_31FA90C
+extrwi. r0, r12, 1,30
+beq mono_loc_31FA90C
+li r31, 0
+
+mono_loc_31FA90C:
+lwz r0, 0x4C(r30)
+cmpwi r0, 0
+clrlwi r31, r31, 24
+beq mono_loc_31FA928
+mtctr r0
+li r3, 1
+bctrl ; some lockAndUnlockFrameFunc call
+
+mono_loc_31FA928:
+cmpwi r31, 0
+beq mono_loc_31FA944
+lwz r12, 0(r30)
+lwz r12, 0x10C(r12)
+mtctr r12
+mr r3, r30
+bctrl ; sead__GameFrameworkCafe__presentAndDrawDone
+
+mono_loc_31FA944:
+lwz r0, 0x4C(r30)
+cmpwi r0, 0
+beq mono_loc_31FA95C
+mtctr r0
+li r3, 0
+bctrl ; lockOrUnlockDrawContextMgr
+
+mono_loc_31FA95C:
+; stall during loading screens to ensure rendering is done (same as the stereo path)
+lis r3, FadeProgress__sInstance@ha
+lwz r3, FadeProgress__sInstance@l(r3)
+cmpwi r3, 0
+beq mono_skipStallDuringLoadingScreens
+
+lbz r3, 0x10(r3)
+cmpwi r3, 0
+beq mono_skipStallDuringLoadingScreens
+
+mr r11, r4
+li r3, 0
+li r4, 100
+bla import.coreinit.OSSleepTicks
+mr r4, r11
+
+bl import.gx2.GX2DrawDone
+mono_skipStallDuringLoadingScreens:
+
+b continueWithRendering
 
 0x031FA880 = ba custom_sead_GameFramework_procFrame
 
@@ -684,50 +869,15 @@ addi r3, r3, sead__Delegate__RootTaskAndControllerMgr__invoke@l
 cmpw r10, r3
 beq doCallRec
 
-;b doCallRec
-b dontCallRec
+; this hook runs for every method tree node on both eye passes, so it has to stay
+; lean: the old logging blocks called printToCemuConsoleWithFormat unconditionally
+; (which sets up a 0x1040-byte stack frame before checking the disable flag)
+b continue_callRec
 
 doCallRec:
-; --- LOGGING ---
-stwu r1, -0x20(r1)
-stw r3, 0x1C(r1)
-stw r4, 0x18(r1)
-stw r5, 0x14(r1)
-stw r6, 0x10(r1)
-mr r6, r10
-lis r5, str_callRec_didCall@ha
-addi r5, r5, str_callRec_didCall@l
-bl printToCemuConsoleWithFormat
-lwz r3, 0x1C(r1)
-lwz r4, 0x18(r1)
-lwz r5, 0x14(r1)
-lwz r6, 0x10(r1)
-addi r1, r1, 0x20
-; --- LOGGING ---
-
 lwz r3, 0x1C(r1)
 lwz r4, 0x18(r1)
 bctrl
-
-b continue_callRec
-
-dontCallRec:
-; --- LOGGING ---
-stwu r1, -0x20(r1)
-stw r3, 0x1C(r1)
-stw r4, 0x18(r1)
-stw r5, 0x14(r1)
-stw r6, 0x10(r1)
-mr r6, r10
-lis r5, str_callRec_didNotCall@ha
-addi r5, r5, str_callRec_didNotCall@l
-bl printToCemuConsoleWithFormat
-lwz r3, 0x1C(r1)
-lwz r4, 0x18(r1)
-lwz r5, 0x14(r1)
-lwz r6, 0x10(r1)
-addi r1, r1, 0x20
-; --- LOGGING ---
 
 b continue_callRec
 

@@ -32,9 +32,14 @@ Swapchain<T>::Swapchain(uint32_t width, uint32_t height, uint32_t sampleCount): 
     swapchainCreateInfo.format = m_format;
     swapchainCreateInfo.mipCount = 1;
     swapchainCreateInfo.faceCount = 1;
-    swapchainCreateInfo.usageFlags = (D3D12Utils::IsDepthFormat(T) ? XR_SWAPCHAIN_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT : XR_SWAPCHAIN_USAGE_COLOR_ATTACHMENT_BIT) | XR_SWAPCHAIN_USAGE_SAMPLED_BIT;
+    // Final-output telemetry and incident dumps copy the exact submitted images.
+    // Declare transfer-source usage so that operation is valid on strict runtimes too.
+    swapchainCreateInfo.usageFlags = (D3D12Utils::IsDepthFormat(T) ? XR_SWAPCHAIN_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT : XR_SWAPCHAIN_USAGE_COLOR_ATTACHMENT_BIT) |
+        XR_SWAPCHAIN_USAGE_SAMPLED_BIT | XR_SWAPCHAIN_USAGE_TRANSFER_SRC_BIT;
     swapchainCreateInfo.createFlags = 0;
+    Log::print<INFO>("Creating XR swapchain: {}x{} format={} samples={} usage={:#x}", width, height, (int)m_format, sampleCount, swapchainCreateInfo.usageFlags);
     checkXRResult(xrCreateSwapchain(VRManager::instance().XR->GetSession(), &swapchainCreateInfo, &m_swapchain), "Failed to create OpenXR swapchain images!");
+    Log::print<INFO>("Created XR swapchain: {}x{} format={}", width, height, (int)m_format);
 
     uint32_t swapchainImagesCount = 0;
     checkXRResult(xrEnumerateSwapchainImages(m_swapchain, 0, &swapchainImagesCount, NULL), "Failed to enumerate swapchain images!");

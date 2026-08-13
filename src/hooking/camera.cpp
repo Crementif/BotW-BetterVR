@@ -704,6 +704,69 @@ void CemuHooks::hook_FixExtraStaminaGaugeIconPositions(PPCInterpreter_t* hCPU) {
 
 glm::mat4 CemuHooks::s_lastCameraMtx = glm::mat4(1.0f);
 
+// Latest per-eye view/projection matrices captured for the synthesized-right-eye mode.
+// The left entries are exactly what the game rendered its (only) eye with; the right
+// entries are what the game WOULD have used, computed from the same camera anchor.
+namespace {
+    struct SynthStereoMatrices {
+        std::mutex lock;
+        std::array<glm::fmat4, 2> view = { glm::fmat4(1.0f), glm::fmat4(1.0f) };
+        std::array<glm::fmat4, 2> proj = { glm::fmat4(1.0f), glm::fmat4(1.0f) };
+        bool viewValid = false;
+        bool projValid = false;
+    };
+    SynthStereoMatrices s_synthStereo;
+}
+
+uint32_t CemuHooks::GetEffectiveRenderSkipMask() {
+    uint32_t mask = GetSettings().GetRenderSkipMask();
+    // loading screens and cutscenes hang when the right-eye calc functions are skipped
+    // (their completion handshake runs through the calcView/queue path), so suspend
+    // everything except the DRC skip while a fade or event is active
+    if ((mask & ~1u) != 0 && (IsAnyFadeScreenVisible() || HasActiveCutscene() || !IsInGame())) {
+        mask &= 1u;
+    }
+    return mask;
+}
+
+bool CemuHooks::ShouldUseSynthesizedRightEye() {
+    if (!GetSettings().UseSynthesizedRightEye()) {
+        return false;
+    }
+    auto* xr = VRManager::instance().XR.get();
+    auto* renderer = xr != nullptr ? xr->GetRenderer() : nullptr;
+    if (renderer == nullptr || !renderer->IsInitialized()) {
+        return false;
+    }
+    // the game's own photo/save mono captures and cutscene black bars need the regular stereo path
+    if (UseMonoFrameBufferTemporarilyDuringMenusOrPictures()) {
+        return false;
+    }
+    if (UseBlackBarsDuringEvents()) {
+        return false;
+    }
+    // cutscene and loading-screen progression still depends on the second render pass in
+    // ways the single-pass mode doesn't cover yet (the intro event and save-loads hang),
+    // so fall back to true stereo whenever an event or fade is active
+    if (HasActiveCutscene()) {
+        return false;
+    }
+    if (IsAnyFadeScreenVisible()) {
+        return false;
+    }
+    return true;
+}
+
+std::optional<glm::fmat4> CemuHooks::GetSynthReprojectionMatrix() {
+    std::lock_guard lk(s_synthStereo.lock);
+    if (!s_synthStereo.viewValid || !s_synthStereo.projValid) {
+        return std::nullopt;
+    }
+    const glm::fmat4 leftClip = s_synthStereo.proj[OpenXR::EyeSide::LEFT] * s_synthStereo.view[OpenXR::EyeSide::LEFT];
+    const glm::fmat4 rightClip = s_synthStereo.proj[OpenXR::EyeSide::RIGHT] * s_synthStereo.view[OpenXR::EyeSide::RIGHT];
+    return rightClip * glm::inverse(leftClip);
+}
+
 // s_lastCameraMtx is still the previous frame's anchor while the actor calc jobs run, so anything
 // that also reads the live player matrix has to re-resolve it or it mixes two simulation steps
 glm::mat4 CemuHooks::GetFreshCameraReferenceMtx() {
@@ -733,6 +796,15 @@ void CemuHooks::hook_GetRenderCamera(PPCInterpreter_t* hCPU) {
     glm::mat4 newWorldVR = glm::translate(glm::mat4(1.0f), newPos) * glm::mat4_cast(newRot);
     glm::mat4 newViewVR = glm::inverse(newWorldVR);
     DebugDraw::instance().UpdateEyeView(side, newViewVR);
+
+    if (side == EyeSide::LEFT && GetSettings().UseSynthesizedRightEye()) {
+        auto [rightPos, rightRot] = BuildGameplayCameraPose(gameplayPos, gameplayRot, EyeSide::RIGHT);
+        glm::mat4 rightWorld = glm::translate(glm::mat4(1.0f), rightPos) * glm::mat4_cast(rightRot);
+        std::lock_guard lk(s_synthStereo.lock);
+        s_synthStereo.view[EyeSide::LEFT] = newViewVR;
+        s_synthStereo.view[EyeSide::RIGHT] = glm::inverse(rightWorld);
+        s_synthStereo.viewValid = true;
+    }
 
     camera.mtx.setLEMatrix(newViewVR);
 
@@ -814,6 +886,22 @@ void CemuHooks::hook_GetRenderProjection(PPCInterpreter_t* hCPU) {
     newDeviceMatrix[2][1] *= zScale;
     newDeviceMatrix[2][2] = (newDeviceMatrix[2][2] + newDeviceMatrix[3][2] * zOffset) * zScale;
     newDeviceMatrix[2][3] = newDeviceMatrix[2][3] * zScale + newDeviceMatrix[3][3] * zOffset;
+
+    if (side == EyeSide::LEFT && GetSettings().UseSynthesizedRightEye()) {
+        auto rightFovOpt = GetGameProjectionFOV(EyeSide::RIGHT, perspectiveProjection);
+        if (rightFovOpt.has_value()) {
+            glm::fmat4 rightDeviceMatrix = RenderUtils::CalculateProjectionMatrix(perspectiveProjection.zNear.getLE(), perspectiveProjection.zFar.getLE(), rightFovOpt.value());
+            rightDeviceMatrix[2][0] *= zScale;
+            rightDeviceMatrix[2][1] *= zScale;
+            rightDeviceMatrix[2][2] = (rightDeviceMatrix[2][2] + rightDeviceMatrix[3][2] * zOffset) * zScale;
+            rightDeviceMatrix[2][3] = rightDeviceMatrix[2][3] * zScale + rightDeviceMatrix[3][3] * zOffset;
+
+            std::lock_guard lk(s_synthStereo.lock);
+            s_synthStereo.proj[EyeSide::LEFT] = newDeviceMatrix;
+            s_synthStereo.proj[EyeSide::RIGHT] = rightDeviceMatrix;
+            s_synthStereo.projValid = true;
+        }
+    }
 
     {
         auto* rendererForDebugDraw = VRManager::instance().XR->GetRenderer();

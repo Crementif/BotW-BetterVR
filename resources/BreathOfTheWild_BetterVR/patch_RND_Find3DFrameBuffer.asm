@@ -15,6 +15,10 @@ magic3DColorValue_leftSide:
 magic3DColorValue_rightSide:
 .float 0.987654321
 
+; capture index 1 marks a mono capture whose right eye the host synthesizes
+magic3DClearingValueMono:
+.float (1.0 / 32.0)
+
 magic3DDepthValue_leftSide:
 .float 0.0123456789
 magic3DDepthValue_rightSide:
@@ -111,9 +115,16 @@ lwz r12, useStubHooks_preventClearCalls@l(r12)
 cmpwi r12, 1
 beq exit_hookPostHDRComposedImage
 
-; identifier type of clear
+; identifier type of clear (0 = stereo 3D capture, 1 = mono 3D capture)
 lis r7, magic3DClearingValues@ha
 lfs f1, magic3DClearingValues@l+0x0(r7)
+lis r7, currentFrameIsMono@ha
+lwz r7, currentFrameIsMono@l(r7)
+cmpwi r7, 0
+beq monoCaptureIdxDone
+lis r7, magic3DClearingValueMono@ha
+lfs f1, magic3DClearingValueMono@l(r7)
+monoCaptureIdxDone:
 
 ; store frame counter in alpha channel
 lis r12, currentFrameCounter@ha

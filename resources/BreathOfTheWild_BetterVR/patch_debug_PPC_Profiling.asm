@@ -622,9 +622,9 @@ blr
 0x03A128D4 = ba Profile_gsys__SystemTask__preCalc
 0x03A135A0 = ba Profile_gsys__SystemTask__postCalc
 0x03A146E4 = ba Profile_gsys__SystemTask__drawTV
-0x03A14808 = ba Profile_gsys__SystemTask__drawDRC
 0x03A148D8 = ba Profile_gsys__SystemTask__postDrawTV
-0x03A14974 = ba Profile_gsys__SystemTask__postDrawDRC
+; drawDRC_/postDrawDRC_ entry hooks are owned by hook_maybeSkipDrawDRC/hook_maybeSkipPostDrawDRC
+; in patch_RND_StereoRendering_Optimizations.asm, so they can't also be profiled here
 
 0x037A5DB0 = ba Profile_Actor__job0_1
 0x037A7D40 = ba Profile_Actor__job0_2

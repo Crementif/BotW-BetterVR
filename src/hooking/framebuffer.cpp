@@ -101,11 +101,13 @@ void VkDeviceOverrides::CmdClearColorImage(const vkroots::VkCommandBufferDispatc
 
     if (side != (OpenXR::EyeSide)-1) {
         // r value in magical clear value is the capture idx after rounding down
+        // 0 = stereo 3D capture, 1 = mono 3D capture (right eye gets synthesized), 2 = 2D HUD capture
         const long captureIdx = std::lroundf(pColor->float32[0] * 32.0f);
         const long frameIdx = pColor->float32[3] < 0.5f ? 0 : 1;
-        checkAssert(captureIdx == 0 || captureIdx == 2, "Invalid capture index!");
+        checkAssert(captureIdx == 0 || captureIdx == 1 || captureIdx == 2, "Invalid capture index!");
+        const bool isSynthStereoCapture = captureIdx == 1;
 
-        Log::print<RENDERING>("[{}] Clearing color image for {} layer for {} side", frameIdx, captureIdx == 0 ? "3D" : "2D", side == OpenXR::EyeSide::LEFT ? "left" : "right");
+        Log::print<RENDERING>("[{}] Clearing color image for {} layer for {} side", frameIdx, captureIdx == 2 ? "2D" : (isSynthStereoCapture ? "3D-mono" : "3D"), side == OpenXR::EyeSide::LEFT ? "left" : "right");
 
         auto* renderer = VRManager::instance().XR->GetRenderer();
         if (!renderer) {
@@ -117,7 +119,7 @@ void VkDeviceOverrides::CmdClearColorImage(const vkroots::VkCommandBufferDispatc
         auto& imguiOverlay = renderer->m_imguiOverlay;
 
         // initialize the textures of both 2D and 3D layer if either is found since they share the same VkImage and resolution
-        if (captureIdx == 0 || captureIdx == 2) {
+        if (captureIdx == 0 || captureIdx == 1 || captureIdx == 2) {
             if (!layer2D) {
                 lockImageResolutions.lock();
                 if (const auto it = imageResolutions.find(image); it != imageResolutions.end()) {
@@ -181,7 +183,7 @@ void VkDeviceOverrides::CmdClearColorImage(const vkroots::VkCommandBufferDispatc
         const bool useMonoCapture = CemuHooks::UseMonoFrameBufferTemporarilyDuringMenusOrPictures();
 
         // 3D layer - color texture for 3D rendering
-        if (captureIdx == 0) {
+        if (captureIdx == 0 || captureIdx == 1) {
             auto skip3DColorCapture = [&](bool disableAlpha) -> void {
                 returnToLayout();
                 if (useMonoCapture) {
@@ -239,13 +241,21 @@ void VkDeviceOverrides::CmdClearColorImage(const vkroots::VkCommandBufferDispatc
             renderer->On3DColorCopied(side, frameIdx);
             QueuePendingCopyOperation(commandBuffer, texture);
 
+            // a mono capture is the only 3D capture of its frame: mark the frame so the
+            // compositor synthesizes the right eye by reprojecting this left-eye capture
+            if (isSynthStereoCapture && side == EyeSide::LEFT) {
+                frame.synthesizedRight = true;
+                frame.synthReprojMtx = CemuHooks::GetSynthReprojectionMatrix();
+            }
+
             if (useMonoCapture) {
                 returnToLayout();
                 return;
             }
 
             // imgui needs only one eye to render Cemu's 2D output, so use right side since it looks better
-            if (side == EyeSide::RIGHT) {
+            // (in synthesized-right-eye mode the left capture is the only one, so mirror from it)
+            if (side == EyeSide::RIGHT || (isSynthStereoCapture && side == EyeSide::LEFT)) {
                 // note: Uses vkCmdCopyImage to copy the (right-eye-only) image to the imgui overlay's texture
                 float desktopAspectRatio = layer3D->GetAspectRatio(side);
                 const RenderUtils::UvTransform& desktopUvTransform = layer3D->GetPresentUvTransform(side);
@@ -553,6 +563,122 @@ VkResult VkDeviceOverrides::QueueSubmit(const vkroots::VkQueueDispatch& pDispatc
     return result;
 }
 
+// timing shared with the renderer's [bench] logging to locate frame-pacing stalls
+std::atomic<double> g_lastVkPresentMs = 0.0;
+
+extern bool g_swapchainMaintenance1Enabled; // set in layer.cpp CreateDevice
+
+namespace {
+    // Presents to the desktop window can block for a full display refresh (~15ms on the
+    // 60Hz virtual displays used by streaming setups), which paces the whole game loop.
+    // The VR output goes through OpenXR and never needs the window, so real presents are
+    // throttled to ~30Hz; skipped frames consume the present's wait semaphores with an
+    // empty fenced submit and, once that fence signals, hand the image back to the
+    // swapchain via VK_EXT_swapchain_maintenance1.
+    struct PendingImageRelease {
+        VkFence fence = VK_NULL_HANDLE;
+        VkSwapchainKHR swapchain = VK_NULL_HANDLE;
+        uint32_t imageIndex = 0;
+    };
+    std::mutex s_presentThrottleMutex;
+    std::vector<PendingImageRelease> s_pendingImageReleases;
+    std::vector<VkFence> s_freeReleaseFences;
+    std::chrono::steady_clock::time_point s_lastRealPresent = {};
+    constexpr std::chrono::milliseconds kWindowPresentInterval{ 33 };
+
+    void FlushPendingImageReleases(const vkroots::VkDeviceDispatch* deviceDispatch, bool waitAll) {
+        for (auto it = s_pendingImageReleases.begin(); it != s_pendingImageReleases.end();) {
+            VkResult fenceStatus = waitAll
+                ? deviceDispatch->WaitForFences(deviceDispatch->Device, 1, &it->fence, VK_TRUE, 100'000'000ull)
+                : deviceDispatch->GetFenceStatus(deviceDispatch->Device, it->fence);
+            if (fenceStatus != VK_SUCCESS) {
+                ++it;
+                continue;
+            }
+            VkReleaseSwapchainImagesInfoKHR releaseInfo = { VK_STRUCTURE_TYPE_RELEASE_SWAPCHAIN_IMAGES_INFO_KHR };
+            releaseInfo.swapchain = it->swapchain;
+            releaseInfo.imageIndexCount = 1;
+            releaseInfo.pImageIndices = &it->imageIndex;
+            deviceDispatch->ReleaseSwapchainImagesEXT(deviceDispatch->Device, &releaseInfo);
+            deviceDispatch->ResetFences(deviceDispatch->Device, 1, &it->fence);
+            s_freeReleaseFences.push_back(it->fence);
+            it = s_pendingImageReleases.erase(it);
+        }
+    }
+
+    VkFence AcquireReleaseFence(const vkroots::VkDeviceDispatch* deviceDispatch) {
+        if (!s_freeReleaseFences.empty()) {
+            VkFence fence = s_freeReleaseFences.back();
+            s_freeReleaseFences.pop_back();
+            return fence;
+        }
+        VkFenceCreateInfo fenceInfo = { VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
+        VkFence fence = VK_NULL_HANDLE;
+        deviceDispatch->CreateFence(deviceDispatch->Device, &fenceInfo, nullptr, &fence);
+        return fence;
+    }
+
+    // returns true when the present was skipped (and the images scheduled for release)
+    bool TrySkipWindowPresent(const vkroots::VkQueueDispatch& pDispatch, VkQueue queue, const VkPresentInfoKHR* pPresentInfo) {
+        if (!g_swapchainMaintenance1Enabled) {
+            return false;
+        }
+        std::lock_guard lk(s_presentThrottleMutex);
+        const auto now = std::chrono::steady_clock::now();
+        if (s_lastRealPresent.time_since_epoch().count() == 0 || (now - s_lastRealPresent) >= kWindowPresentInterval) {
+            s_lastRealPresent = now;
+            return false;
+        }
+
+        const vkroots::VkDeviceDispatch* deviceDispatch = pDispatch.pDeviceDispatch;
+        FlushPendingImageReleases(deviceDispatch, false);
+
+        VkFence fence = AcquireReleaseFence(deviceDispatch);
+        if (fence == VK_NULL_HANDLE) {
+            return false;
+        }
+
+        // consume the present's wait semaphores; the fence tells us when the GPU is
+        // done with the frame so the image can be safely handed back
+        std::vector<VkPipelineStageFlags> waitStages(pPresentInfo->waitSemaphoreCount, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT);
+        VkSubmitInfo emptySubmit = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
+        emptySubmit.waitSemaphoreCount = pPresentInfo->waitSemaphoreCount;
+        emptySubmit.pWaitSemaphores = pPresentInfo->pWaitSemaphores;
+        emptySubmit.pWaitDstStageMask = waitStages.empty() ? nullptr : waitStages.data();
+        if (pDispatch.QueueSubmit(queue, 1, &emptySubmit, fence) != VK_SUCCESS) {
+            s_freeReleaseFences.push_back(fence);
+            return false;
+        }
+
+        for (uint32_t i = 0; i < pPresentInfo->swapchainCount; i++) {
+            s_pendingImageReleases.push_back({ fence, pPresentInfo->pSwapchains[i], pPresentInfo->pImageIndices[i] });
+            if (pPresentInfo->pResults != nullptr) {
+                pPresentInfo->pResults[i] = VK_SUCCESS;
+            }
+        }
+        return true;
+    }
+}
+
+void VkDeviceOverrides::DestroySwapchainKHR(const vkroots::VkDeviceDispatch& pDispatch, VkDevice device, VkSwapchainKHR swapchain, const VkAllocationCallbacks* pAllocator) {
+    // drop pending throttled-present releases that reference this swapchain before it dies;
+    // their images are freed with the swapchain, but the fences must finish and be recycled
+    {
+        std::lock_guard lk(s_presentThrottleMutex);
+        for (auto it = s_pendingImageReleases.begin(); it != s_pendingImageReleases.end();) {
+            if (it->swapchain != swapchain) {
+                ++it;
+                continue;
+            }
+            pDispatch.WaitForFences(device, 1, &it->fence, VK_TRUE, 1'000'000'000ull);
+            pDispatch.ResetFences(device, 1, &it->fence);
+            s_freeReleaseFences.push_back(it->fence);
+            it = s_pendingImageReleases.erase(it);
+        }
+    }
+    pDispatch.DestroySwapchainKHR(device, swapchain, pAllocator);
+}
+
 VkResult VkDeviceOverrides::QueuePresentKHR(const vkroots::VkQueueDispatch& pDispatch, VkQueue queue, const VkPresentInfoKHR* pPresentInfo) {
     VRManager::instance().XR->ProcessEvents();
 
@@ -564,7 +690,14 @@ VkResult VkDeviceOverrides::QueuePresentKHR(const vkroots::VkQueueDispatch& pDis
         renderer->StartFrame();
     }
 
+    if (TrySkipWindowPresent(pDispatch, queue, pPresentInfo)) {
+        g_lastVkPresentMs.store(0.0, std::memory_order_relaxed);
+        return VK_SUCCESS;
+    }
+
+    const auto presentStart = std::chrono::high_resolution_clock::now();
     VkResult result = pDispatch.QueuePresentKHR(queue, pPresentInfo);
+    g_lastVkPresentMs.store(std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - presentStart).count(), std::memory_order_relaxed);
     if (result == VK_ERROR_DEVICE_LOST) {
         Log::print<ERROR>("QueuePresentKHR failed with error {}", result);
         LogDeviceFaultInfo();

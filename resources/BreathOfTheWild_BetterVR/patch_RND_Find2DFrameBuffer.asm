@@ -38,6 +38,13 @@ stw r4, 0x0C(r1)
 ; cmpwi r3, 1
 ; beq skipClearing2DColorBuffer
 
+; in synthesized-right-eye mode there is only one pass per frame, and it has to carry
+; the HUD capture (which the host consumes from the left-eye-ordered magic values)
+lis r3, currentFrameIsMono@ha
+lwz r3, currentFrameIsMono@l(r3)
+cmpwi r3, 0
+bne leftEye2DValues
+
 lis r3, currentEyeSide@ha
 lwz r3, currentEyeSide@l(r3)
 cmpwi r3, 1

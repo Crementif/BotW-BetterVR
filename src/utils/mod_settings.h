@@ -554,6 +554,18 @@ struct ModSettings {
     FloatSetting hudSize{ "HudSize", 0.85f, 0.4f, 1.75f };
     FloatSetting bowArcOpacity{ "BowArcTransparency", 0.7f, 0.0f, 1.0f };
 
+    // performance settings
+    BoolSetting skipDrcRendering{ "SkipDrcRendering", true };
+    BoolSetting synthesizedRightEye{ "SynthesizedRightEye", false };
+    // bits 1-12 of the PPC-side VR_RENDER_SKIP_MASK: skip per-frame render preparation on
+    // the right eye pass (see the bit table in patch_RND_StereoRendering_Optimizations.asm);
+    // bit 0 is owned by skipDrcRendering. DEFAULT OFF: in the pipelined frame loop the
+    // right-eye calc pass rebuilds state the next drawn frame depends on, so plain skips
+    // blank the world on alternating frames (visible as heavy flicker). The bits stay
+    // exposed for experiments, but need "preserve the skipped pass's outputs" patches
+    // (preventModelQueueClear-style) per subsystem before any can ship enabled.
+    UIntSetting rightEyeCalcSkipMask{ "RightEyeCalcSkipMask", 0, 0, 0x3FFE };
+
     // advanced settings
     BoolSetting enableDebuggerTools{ "EnableDebugOverlay", false };
     BoolSetting debugShowEntityBoxesIn3DView{ "DebugShowEntityBoxesIn3DView", false };
@@ -667,6 +679,10 @@ struct ModSettings {
         }
     }
     float GetWeaponDamageOutputScale() const { return GetSwingSensitivity() == SwingSensitivity::SWING_CUSTOM ? customDamageOutputScale : 1.0f; }
+
+    bool ShouldSkipDrcRendering() const { return skipDrcRendering; }
+    bool UseSynthesizedRightEye() const { return synthesizedRightEye; }
+    uint32_t GetRenderSkipMask() const { return (rightEyeCalcSkipMask & 0x3FFEu) | (skipDrcRendering ? 1u : 0u); }
 
     bool IsDebuggingToolsEnabled() const;
     bool ShouldShowRoomPhysics() const { return IsDebuggingToolsEnabled() && debugShowRoomscalePhysics; }

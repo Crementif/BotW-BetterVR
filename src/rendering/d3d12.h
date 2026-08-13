@@ -17,6 +17,10 @@ public:
     ID3D12Device* GetDevice() { return m_device.Get(); };
     ID3D12CommandQueue* GetCommandQueue() { return m_queue.Get(); };
 
+    // fence progress accessors for non-stalling readbacks (telemetry)
+    uint64_t GetLastSignaledFenceValue() const { return m_nextFenceValue - 1; }
+    uint64_t GetFenceCompletedValue() const { return m_fence->GetCompletedValue(); }
+
     void StartFrame();
     void EndFrame();
 
@@ -34,6 +38,13 @@ public:
         void BindDepthTarget(ID3D12Resource* dstTexture, DXGI_FORMAT overwriteFormat);
         void BindSettings(float screenWidth, float screenHeight, const RenderUtils::UvTransform& uvTransform = {});
         void SetUvTransform(const RenderUtils::UvTransform& uvTransform) { m_uvTransform = uvTransform; }
+        // when set, the pixel shader inverse-warps the bound (left-eye) texture into this eye's view
+        void SetReprojection(const glm::mat4* leftToRightClipMtx) {
+            m_reprojectionEnabled = leftToRightClipMtx != nullptr;
+            if (leftToRightClipMtx != nullptr) {
+                m_reprojectionMatrix = *leftToRightClipMtx;
+            }
+        }
         void Render(ID3D12GraphicsCommandList* commandList, ID3D12Resource* swapchain);
 
     private:
@@ -43,6 +54,8 @@ public:
         float m_renderWidth = 0.0f;
         float m_renderHeight = 0.0f;
         RenderUtils::UvTransform m_uvTransform = {};
+        bool m_reprojectionEnabled = false;
+        glm::mat4 m_reprojectionMatrix = glm::mat4(1.0f);
 
         void RecreatePipeline();
 

@@ -61,15 +61,19 @@ VkResult VRLayer::VkDeviceOverrides::GetPhysicalDeviceSurfacePresentModesKHR(con
 
     checkAssert(result == VK_SUCCESS, "Failed to get physical device surface present modes!");
 
-    // if VK_PRESENT_MODE_IMMEDIATE_KHR is present, always just return that
-    for (uint32_t i = 0; i < testPresentModes; i++) {
-        if (supportedPresentModes[i] == VK_PRESENT_MODE_IMMEDIATE_KHR) {
-            // immediate is supported, only return 1 mode
-            if (pPresentModes != VK_NULL_HANDLE) {
-                pPresentModes[0] = VK_PRESENT_MODE_IMMEDIATE_KHR;
-            }
-            else {
-                *pPresentModeCount = 1;
+    // prefer MAILBOX over IMMEDIATE: on virtual/streamed displays (Virtual Desktop, Parsec)
+    // even IMMEDIATE presents can block at the display's refresh rate, which would pace the
+    // whole game loop at ~60Hz; MAILBOX replaces the queued image and never blocks
+    for (VkPresentModeKHR preferred : { VK_PRESENT_MODE_MAILBOX_KHR, VK_PRESENT_MODE_IMMEDIATE_KHR }) {
+        for (uint32_t i = 0; i < testPresentModes; i++) {
+            if (supportedPresentModes[i] == preferred) {
+                if (pPresentModes != VK_NULL_HANDLE) {
+                    pPresentModes[0] = preferred;
+                }
+                else {
+                    *pPresentModeCount = 1;
+                }
+                return VK_SUCCESS;
             }
         }
     }
@@ -79,5 +83,19 @@ VkResult VRLayer::VkDeviceOverrides::GetPhysicalDeviceSurfacePresentModesKHR(con
 }
 
 VkResult VRLayer::VkDeviceOverrides::CreateSwapchainKHR(const vkroots::VkDeviceDispatch& pDispatch, VkDevice device, const VkSwapchainCreateInfoKHR* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkSwapchainKHR* pSwapchain) {
-    return pDispatch.CreateSwapchainKHR(device, pCreateInfo, pAllocator, pSwapchain);
+    // force MAILBOX when supported (see GetPhysicalDeviceSurfacePresentModesKHR above); also
+    // give the swapchain a third image so a queued-but-unconsumed image never stalls acquire
+    VkSwapchainCreateInfoKHR modifiedCreateInfo = *pCreateInfo;
+    uint32_t supportedCount = 0;
+    if (pDispatch.GetPhysicalDeviceSurfacePresentModesKHR(pDispatch.PhysicalDevice, pCreateInfo->surface, &supportedCount, nullptr) == VK_SUCCESS && supportedCount > 0) {
+        std::vector<VkPresentModeKHR> supported(supportedCount);
+        if (pDispatch.GetPhysicalDeviceSurfacePresentModesKHR(pDispatch.PhysicalDevice, pCreateInfo->surface, &supportedCount, supported.data()) == VK_SUCCESS) {
+            if (std::ranges::find(supported, VK_PRESENT_MODE_MAILBOX_KHR) != supported.end()) {
+                modifiedCreateInfo.presentMode = VK_PRESENT_MODE_MAILBOX_KHR;
+                modifiedCreateInfo.minImageCount = std::max(modifiedCreateInfo.minImageCount, 3u);
+                Log::print<INFO>("Forcing MAILBOX present mode for Cemu's swapchain (was mode {})", (int)pCreateInfo->presentMode);
+            }
+        }
+    }
+    return pDispatch.CreateSwapchainKHR(device, &modifiedCreateInfo, pAllocator, pSwapchain);
 }

@@ -529,6 +529,8 @@ lis r4, strActor_job0_1@ha
 addi r4, r4, strActor_job0_1@l
 lis r5, currentEyeSide@ha
 lwz r5, currentEyeSide@l(r5)
+lis r6, currentFrameIsMono@ha
+lwz r6, currentFrameIsMono@l(r6)
 lis r12, useStubHooks@ha
 lwz r12, useStubHooks@l(r12)
 cmpwi r12, 1
@@ -634,6 +636,8 @@ lis r4, strActor_job0_2@ha
 addi r4, r4, strActor_job0_2@l
 lis r5, currentEyeSide@ha
 lwz r5, currentEyeSide@l(r5)
+lis r6, currentFrameIsMono@ha
+lwz r6, currentFrameIsMono@l(r6)
 lis r12, useStubHooks@ha
 lwz r12, useStubHooks@l(r12)
 cmpwi r12, 1
@@ -687,6 +691,8 @@ lis r4, strActor_job1_1@ha
 addi r4, r4, strActor_job1_1@l
 lis r5, currentEyeSide@ha
 lwz r5, currentEyeSide@l(r5)
+lis r6, currentFrameIsMono@ha
+lwz r6, currentFrameIsMono@l(r6)
 lis r12, useStubHooks@ha
 lwz r12, useStubHooks@l(r12)
 cmpwi r12, 1
@@ -743,6 +749,8 @@ lis r4, strActor_job1_2@ha
 addi r4, r4, strActor_job1_2@l
 lis r5, currentEyeSide@ha
 lwz r5, currentEyeSide@l(r5)
+lis r6, currentFrameIsMono@ha
+lwz r6, currentFrameIsMono@l(r6)
 lis r12, useStubHooks@ha
 lwz r12, useStubHooks@l(r12)
 cmpwi r12, 1
@@ -798,6 +806,8 @@ lis r4, strActor_job2_1@ha
 addi r4, r4, strActor_job2_1@l
 lis r5, currentEyeSide@ha
 lwz r5, currentEyeSide@l(r5)
+lis r6, currentFrameIsMono@ha
+lwz r6, currentFrameIsMono@l(r6)
 lis r12, useStubHooks@ha
 lwz r12, useStubHooks@l(r12)
 cmpwi r12, 1
@@ -853,6 +863,8 @@ lis r4, strActor_job2_2@ha
 addi r4, r4, strActor_job2_2@l
 lis r5, currentEyeSide@ha
 lwz r5, currentEyeSide@l(r5)
+lis r6, currentFrameIsMono@ha
+lwz r6, currentFrameIsMono@l(r6)
 lis r12, useStubHooks@ha
 lwz r12, useStubHooks@l(r12)
 cmpwi r12, 1
@@ -908,6 +920,8 @@ lis r4, strActor_job4@ha
 addi r4, r4, strActor_job4@l
 lis r5, currentEyeSide@ha
 lwz r5, currentEyeSide@l(r5)
+lis r6, currentFrameIsMono@ha
+lwz r6, currentFrameIsMono@l(r6)
 lis r12, useStubHooks@ha
 lwz r12, useStubHooks@l(r12)
 cmpwi r12, 1
@@ -957,11 +971,19 @@ stw r3, 0x1C(r1)
 stw r4, 0x18(r1)
 stw r5, 0x14(r1)
 
+; in single-pass mode this job normally runs on the right eye's pass, which no
+; longer exists, so run it on the only pass instead
+lis r3, currentFrameIsMono@ha
+lwz r3, currentFrameIsMono@l(r3)
+cmpwi r3, 0
+bne runPlayerUpdateJob_mono
+
 lis r3, currentEyeSide@ha
 lwz r3, currentEyeSide@l(r3)
 cmpwi r3, 0
 beq exit_OnlyRunPlayerUpdateJobOnce
 
+runPlayerUpdateJob_mono:
 lis r3, originalPlayerVelocityUpdater@ha
 addi r3, r3, originalPlayerVelocityUpdater@l
 mtctr r3
@@ -992,11 +1014,19 @@ stw r3, 0x1C(r1)
 stw r4, 0x18(r1)
 stw r5, 0x14(r1)
 
+; in single-pass mode this job normally runs on the right eye's pass, which no
+; longer exists, so run it on the only pass instead
+lis r3, currentFrameIsMono@ha
+lwz r3, currentFrameIsMono@l(r3)
+cmpwi r3, 0
+bne runEventUpdateJob_mono
+
 lis r3, currentEyeSide@ha
 lwz r3, currentEyeSide@l(r3)
 cmpwi r3, 0
 beq exit_OnlyRunEventUpdateJobOnce
 
+runEventUpdateJob_mono:
 lis r3, FixedSizeJQ_enque_job@ha
 addi r3, r3, FixedSizeJQ_enque_job@l
 mtctr r3

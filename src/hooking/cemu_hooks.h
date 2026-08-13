@@ -155,6 +155,12 @@ public:
         return s_isRiding > 0 || s_isRidingSandSeal > 0;
     }
     static bool UseMonoFrameBufferTemporarilyDuringMenusOrPictures();
+    // synthesized-right-eye mode: the game renders one (left) eye and the compositor
+    // reprojects it into the right view using the captured depth buffer
+    static bool ShouldUseSynthesizedRightEye();
+    static std::optional<glm::fmat4> GetSynthReprojectionMatrix();
+    // the render-skip bitmask with load/cutscene safety gating applied
+    static uint32_t GetEffectiveRenderSkipMask();
 
     static std::string s_currentEvent;
     static std::string s_currentPlayerNormalState;

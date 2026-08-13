@@ -326,6 +326,10 @@ void RND_D3D12::PresentPipeline<depth>::UpdateSettingsBuffer(ID3D12Resource* swa
         .customFadeColorG = 0.0f,
         .customFadeColorB = 0.0f,
         .isFadeActive = 0.0f,
+        .reprojectionEnabled = m_reprojectionEnabled ? 1.0f : 0.0f,
+        .reprojectionPad0 = 0.0f,
+        .reprojectionPad1 = 0.0f,
+        .reprojectionMatrix = m_reprojectionMatrix,
     };
 
     if constexpr (depth) {

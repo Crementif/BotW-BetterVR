@@ -870,6 +870,49 @@ void RND_Renderer::ImGuiOverlay::DrawSettingsTab(const ImVec2& windowWidth, bool
             settings.preventFirstPersonRagdoll.AddToGUI(changed);
         });
 
+        DrawSettingRow(windowWidth, "Skip GamePad Screen Rendering (Faster)", [&]() {
+            settings.skipDrcRendering.AddToGUI(changed);
+        });
+
+        DrawSettingRow(windowWidth, "Synthesized Right Eye (Experimental, Much Faster)", [&]() {
+            settings.synthesizedRightEye.AddToGUI(changed);
+        });
+
+        DrawSettingRow(windowWidth, "Right-Eye Calc Skips (Experimental Bitmask)", [&]() {
+            uint32_t mask = settings.rightEyeCalcSkipMask;
+            bool maskChanged = false;
+            static constexpr std::pair<uint32_t, const char*> kSkipBits[] = {
+                { 0x0002, "CalcModel" },
+                { 0x0004, "CalcWorld" },
+                { 0x0008, "PreSort" },
+                { 0x0010, "CalcView" },
+                { 0x0020, "CalcViewGPU" },
+                { 0x0040, "InvokeCalcWorld" },
+                { 0x0080, "QueueSort" },
+                { 0x0100, "FxView" },
+                { 0x0200, "LightPrePass" },
+                { 0x0400, "GIProbe" },
+                { 0x0800, "GIReflection" },
+                { 0x1000, "JobQueue" },
+                { 0x2000, "QueuePreserve" },
+            };
+            int drawnOnLine = 0;
+            for (const auto& [bit, label] : kSkipBits) {
+                if (drawnOnLine++ % 4 != 0) {
+                    ImGui::SameLine();
+                }
+                bool enabled = (mask & bit) != 0;
+                if (ImGui::Checkbox(label, &enabled)) {
+                    mask = enabled ? (mask | bit) : (mask & ~bit);
+                    maskChanged = true;
+                }
+            }
+            if (maskChanged) {
+                settings.rightEyeCalcSkipMask = mask;
+                *changed = true;
+            }
+        });
+
         DrawSettingRow(windowWidth, "Enable Debugger Tools (Reduces Performance)", [&]() {
             bool enableDebuggerTools = settings.enableDebuggerTools;
             if (ImGui::Checkbox("##EnableDebuggerTools", &enableDebuggerTools)) {

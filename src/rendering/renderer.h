@@ -43,9 +43,18 @@ public:
         Stereo3D,
     };
 
+    // set on frames whose right eye is synthesized on the GPU from the left eye's
+    // color+depth instead of being rendered by the game (see SynthesizedRightEye setting)
+    struct SynthRightEyeInfo {
+        bool hasMatrix = false;
+        glm::fmat4 reprojMtx = glm::fmat4(1.0f);
+    };
+
     struct RenderFrame {
         std::optional<std::array<XrView, 2>> views;
         std::optional<glm::fmat4> cameraReferenceMtx;
+        bool synthesizedRight = false;
+        std::optional<glm::fmat4> synthReprojMtx;
         CaptureRecordKind recordKind = CaptureRecordKind::None;
         uint64_t activeStereoGeneration = 0;
         uint64_t lastActivityOrdinal = 0;
@@ -71,7 +80,15 @@ public:
         bool IsHudOnlyRecord() const { return recordKind == CaptureRecordKind::HudOnly; }
         bool HasAcceptedCapture(uint32_t captureMask) const { return (acceptedCaptureMask & captureMask) == captureMask; }
         bool HasFatalIssue() const { return (issueFlags & CaptureIssue_FatalMask) != 0; }
-        bool Is3DComplete() const { return IsStereoRecord() && HasAcceptedCapture(CaptureMask_ColorLeft | CaptureMask_ColorRight | CaptureMask_DepthLeft | CaptureMask_DepthRight); }
+        bool Is3DComplete() const {
+            if (!IsStereoRecord()) {
+                return false;
+            }
+            if (synthesizedRight) {
+                return HasAcceptedCapture(CaptureMask_ColorLeft | CaptureMask_DepthLeft);
+            }
+            return HasAcceptedCapture(CaptureMask_ColorLeft | CaptureMask_ColorRight | CaptureMask_DepthLeft | CaptureMask_DepthRight);
+        }
         bool Is2DComplete() const { return HasAcceptedCapture(CaptureMask_Hud); }
 
         bool AddIssue(uint32_t issueFlag) {
@@ -112,6 +129,8 @@ public:
         void Reset() {
             views = std::nullopt;
             cameraReferenceMtx = std::nullopt;
+            synthesizedRight = false;
+            synthReprojMtx = std::nullopt;
             recordKind = CaptureRecordKind::None;
             activeStereoGeneration = 0;
             lastActivityOrdinal = 0;
@@ -132,6 +151,8 @@ public:
         long frameIdx = -1;
         uint64_t stereoGeneration = 0;
         bool valid = false;
+        bool synthesizedRight = false;
+        SynthRightEyeInfo synthInfo = {};
         std::array<XrView, 2> views = { XrView{ XR_TYPE_VIEW }, XrView{ XR_TYPE_VIEW } };
     };
 
@@ -229,7 +250,8 @@ public:
         void PrepareRendering(OpenXR::EyeSide side);
         void StartRendering();
         void PrepareDebugDraw(const DebugDrawRenderData& debugDrawData);
-        void RecordRender(RND_D3D12::CommandContext<false>* context, OpenXR::EyeSide side, long frameIdx, const std::array<XrView, 2>& views, SharedTexture* fadeTexture, const DebugDrawRenderData& debugDrawData);
+        void RecordRender(RND_D3D12::CommandContext<false>* context, OpenXR::EyeSide side, long frameIdx, const std::array<XrView, 2>& views, SharedTexture* fadeTexture, const DebugDrawRenderData& debugDrawData, const SynthRightEyeInfo* synthRightEye = nullptr);
+        void RecordFinalTelemetry(RND_D3D12::CommandContext<false>* context);
         const std::array<XrCompositionLayerProjectionView, 2>& FinishRendering(const std::array<XrView, 2>& views);
 
         float GetAspectRatio(OpenXR::EyeSide side) const { return m_recommendedAspectRatios[side]; }
@@ -237,6 +259,8 @@ public:
         long GetCurrentFrameIdx() const { return m_currentFrameIdx; }
         auto& GetSharedTextures() { return m_textures; }
         auto& GetDepthSharedTextures() { return m_depthTextures; }
+        ID3D12Resource* GetFinalColor(OpenXR::EyeSide side) const { return m_swapchains[side]->GetTexture(); }
+        ID3D12Resource* GetFinalDepth(OpenXR::EyeSide side) const { return m_depthSwapchains[side]->GetTexture(); }
 
     private:
         std::array<std::unique_ptr<Swapchain<DXGI_FORMAT_R8G8B8A8_UNORM_SRGB>>, 2> m_swapchains;
@@ -377,6 +401,23 @@ public:
 
     bool IsFadeActive() const { return m_isFadeActive.load(std::memory_order_relaxed); }
 
+    uint64_t GetCurrent3DPresentedCount() const { return m_current3DPresentedCount; }
+    uint64_t GetStable3DReusedCount() const { return m_stable3DReusedCount; }
+    uint64_t Get3DSuppressedCount() const { return m_3DSuppressedCount; }
+    uint64_t GetDuplicateCaptureDrops() const { return m_duplicateCaptureDrops; }
+    uint64_t GetFatalSlotInvalidations() const { return m_fatalSlotInvalidations; }
+    uint64_t GetCompositorFrameCount() const { return m_compositorFrameCount; }
+    uint64_t GetProjectionSubmittedCount() const { return m_projectionSubmittedCount; }
+    uint64_t GetCachedProjectionReuseCount() const { return m_cachedProjectionReuseCount; }
+    uint64_t GetProjectionOmittedWhenExpectedCount() const { return m_projectionOmittedWhenExpectedCount; }
+    uint64_t GetProjectionPresenceTransitions() const { return m_projectionPresenceTransitions; }
+    uint64_t GetEmptyCompositionFrameCount() const { return m_emptyCompositionFrameCount; }
+    uint64_t GetTwoDOnlyCompositionFrameCount() const { return m_twoDOnlyCompositionFrameCount; }
+    uint32_t GetConsecutiveProjectionOmissions() const { return m_consecutiveProjectionOmissions; }
+    uint32_t GetMaxConsecutiveProjectionOmissions() const { return m_maxConsecutiveProjectionOmissions; }
+    uint32_t GetLastCompositionLayerCount() const { return m_lastCompositionLayerCount; }
+    bool WasProjectionSubmittedLastFrame() const { return m_lastProjectionPresence; }
+
 private:
     bool IsCurrent3DPresentationAllowed(const RenderFrame& frame) const;
     bool IsStable3DReuseAllowed(const RenderFrame& frame) const;
@@ -412,6 +453,20 @@ protected:
     uint64_t m_3DSuppressedCount = 0;
     uint64_t m_duplicateCaptureDrops = 0;
     uint64_t m_fatalSlotInvalidations = 0;
+    std::array<XrCompositionLayerProjectionView, 2> m_lastProjectionViews = {};
+    bool m_hasLastProjectionViews = false;
+    uint64_t m_compositorFrameCount = 0;
+    uint64_t m_projectionSubmittedCount = 0;
+    uint64_t m_cachedProjectionReuseCount = 0;
+    uint64_t m_projectionOmittedWhenExpectedCount = 0;
+    uint64_t m_projectionPresenceTransitions = 0;
+    uint64_t m_emptyCompositionFrameCount = 0;
+    uint64_t m_twoDOnlyCompositionFrameCount = 0;
+    uint32_t m_consecutiveProjectionOmissions = 0;
+    uint32_t m_maxConsecutiveProjectionOmissions = 0;
+    uint32_t m_lastCompositionLayerCount = 0;
+    bool m_projectionPresenceInitialized = false;
+    bool m_lastProjectionPresence = false;
 
     std::chrono::high_resolution_clock::time_point m_frameStartTime;
 

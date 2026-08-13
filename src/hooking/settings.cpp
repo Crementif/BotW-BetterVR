@@ -152,6 +152,11 @@ void CemuHooks::hook_UpdateSettings(PPCInterpreter_t* hCPU) {
     uint32_t recordingOutputMode = 0;
     readMemoryBE(0x10416BF4, &recordingOutputMode);
     s_recordingOutputMode.store(recordingOutputMode, std::memory_order_relaxed);
+
+    // push the host-controlled performance flags into the PPC-visible flag block
+    // (same repurposed bytes as DISABLE_PPC_LOGGING_GET/recordingOutputMode above)
+    setMemory<uint32_t>(0x10416BF8, GetEffectiveRenderSkipMask());
+    setMemory<uint32_t>(0x10416BFC, ShouldUseSynthesizedRightEye() ? 1u : 0u);
     
     if (GetSettings().IsDebuggingToolsEnabled()) {
         VRManager::instance().Hooks->m_entityDebugger->UpdateEntityMemory();
@@ -208,82 +213,66 @@ constexpr uint32_t playerVtable = 0x101E5FFC;
 void CemuHooks::hook_RouteActorJob(PPCInterpreter_t* hCPU) {
     hCPU->instructionPointer = hCPU->sprNew.LR;
 
-    uint32_t actorPtr = hCPU->gpr[3];
-    uint32_t jobName = hCPU->gpr[4];
-    uint32_t side = hCPU->gpr[5]; // 0 = left, 1 = right
+    const uint32_t actorPtr = hCPU->gpr[3];
+    const uint32_t jobNamePtr = hCPU->gpr[4];
+    const uint32_t side = hCPU->gpr[5]; // 0 = left, 1 = right
+    const uint32_t monoFrame = hCPU->gpr[6]; // nonzero while the synthesized-right-eye single pass is active
 
-    std::string jobNameStr = std::string((char*)(s_memoryBaseAddress + jobName));
+    // a mono frame has exactly one pass, so every job runs on it (vanilla game behavior)
+    if (monoFrame != 0) {
+        hCPU->gpr[3] = 0;
+        return;
+    }
 
-    ActorWiiU actor;
-    readMemory(actorPtr, &actor);
-    std::string actorName = actor.name.getLE();
+    // This runs for every actor x every job x both eyes each frame, so the routing
+    // decision has to stay allocation-free. The job name pointer is one of the seven
+    // string constants baked into the graphic pack's codecave, so the only string
+    // compare that matters ("job0_1" or not) is cached per pointer, and the player
+    // check is the same vtable compare the assembly-side stubs use.
+    static std::array<std::pair<uint32_t, bool>, 16> s_jobNameIsJob0_1 = {};
+    static size_t s_jobNameCount = 0;
 
-#define SKIP_ON_LEFT_SIDE if (side == 0) { hCPU->gpr[3] = 1; }
-#define SKIP_ON_RIGHT_SIDE if (side == 1) { hCPU->gpr[3] = 1; }
-#define USE_ALTERED_PATH_ON_LEFT_SIDE if (side == 0) { hCPU->gpr[3] = 2; }
-#define USE_ALTERED_PATH_ON_RIGHT_SIDE if (side == 1) { hCPU->gpr[3] = 2; }
-
-    hCPU->gpr[3] = 0;
-    if (actorName == "GameROMPlayer") {
-        if (jobNameStr == "job0_1") {
-            // this only runs the climbing portion of this actor job on the left eye's side
-            // so that later jobs on the left side can use the state set by this portion of code
-            USE_ALTERED_PATH_ON_LEFT_SIDE
-        }
-        else if (jobNameStr == "job0_2") {
-            SKIP_ON_RIGHT_SIDE
-        }
-        else if (jobNameStr == "job1_1") {
-            SKIP_ON_RIGHT_SIDE
-        }
-        else if (jobNameStr == "job1_2") {
-            SKIP_ON_RIGHT_SIDE
-        }
-        else if (jobNameStr == "job2_1_ragdoll_related") {
-            SKIP_ON_RIGHT_SIDE
-        }
-        else if (jobNameStr == "job2_2") {
-            SKIP_ON_RIGHT_SIDE
-        }
-        else if (jobNameStr == "job4") {
-            SKIP_ON_RIGHT_SIDE
+    bool isJob0_1 = false;
+    bool cached = false;
+    for (size_t i = 0; i < s_jobNameCount; i++) {
+        if (s_jobNameIsJob0_1[i].first == jobNamePtr) {
+            isJob0_1 = s_jobNameIsJob0_1[i].second;
+            cached = true;
+            break;
         }
     }
-    else {
-        if (jobNameStr == "job0_1") {
-            SKIP_ON_LEFT_SIDE
-        }
-        else if (jobNameStr == "job0_2") {
-            SKIP_ON_RIGHT_SIDE
-        }
-        else if (jobNameStr == "job1_1") {
-            SKIP_ON_RIGHT_SIDE
-        }
-        else if (jobNameStr == "job1_2") {
-            SKIP_ON_RIGHT_SIDE
-        }
-        else if (jobNameStr == "job2_1_ragdoll_related") {
-            SKIP_ON_RIGHT_SIDE
-        }
-        else if (jobNameStr == "job2_2") {
-            SKIP_ON_RIGHT_SIDE
-        }
-        else if (jobNameStr == "job4") {
-            SKIP_ON_RIGHT_SIDE
+    if (!cached) {
+        isJob0_1 = std::strcmp((const char*)(s_memoryBaseAddress + jobNamePtr), "job0_1") == 0;
+        if (s_jobNameCount < s_jobNameIsJob0_1.size()) {
+            s_jobNameIsJob0_1[s_jobNameCount++] = { jobNamePtr, isJob0_1 };
         }
     }
 
-    if (hCPU->gpr[3] == 0) {
-        //Log::print<INFO>("[{}] Ran {}", actorName, jobNameStr);
-    }
-    else if (hCPU->gpr[3] == 2) {
-        //Log::print<INFO>("[{}] Ran ALTERED VERSION of {}", actorName, jobNameStr);
-    }
+    const bool isPlayer = getMemory<uint32_t>(actorPtr + offsetof(BaseProc, vtable)) == playerVtable;
 
     // exit r3:
-    // 1 = skip job
     // 0 = perform job
-    // 2 = altered job
+    // 1 = skip job
+    // 2 = altered job (player climbing portion of job0_1)
+    uint32_t result = 0;
+    if (isJob0_1) {
+        if (isPlayer) {
+            // only run the climbing portion of this actor job on the left eye's side
+            // so that later jobs on the left side can use the state set by this portion of code
+            if (side == 0) {
+                result = 2;
+            }
+        }
+        else if (side == 0) {
+            result = 1;
+        }
+    }
+    else if (side == 1) {
+        // every other job runs on the left eye only
+        result = 1;
+    }
+
+    hCPU->gpr[3] = result;
 }
 
 // todo: this only runs when it's shown for the first time!
