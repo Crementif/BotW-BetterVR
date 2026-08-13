@@ -159,7 +159,7 @@ function Press-A {
     '{"hand": 1, "trigger": 0.0}' | Set-Content "$simDir\controller_pose_command.json" -Encoding ascii
 }
 
-$dialogTitles = @("BetterVR Update Available", "BetterVR Launcher - Outdated Cemu", "BetterVR Launcher - FPS++ Required", "Launch SteamVR?")
+$dialogTitles = @("BetterVR Update Available", "BetterVR Launcher - Outdated Cemu", "BetterVR Launcher - FPS++ Required", "Launch SteamVR?", "Graphic pack error")
 $start = Get-Date
 $minimized = $false
 $pressTimes = @(75, 85, 95, 105, 115)
@@ -211,7 +211,8 @@ while (((Get-Date) - $start).TotalSeconds -lt $DurationSec) {
             $state.eyeL.lastSampleFrame -ge ($state.frame - 12) -and $state.eyeR.lastSampleFrame -ge ($state.frame - 12)) {
             $ingameReached = $true
             $ingameMarked = $true
-            Send-BvrCommand @{ marker = "harness-ingame-t$([int]$elapsed)" } | Out-Null
+            $epochId = [int][DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+            Send-BvrCommand @{ marker = "harness-ingame-t$([int]$elapsed)"; epoch = $epochId } | Out-Null
             Write-Output ("IN-GAME confirmed by state file (t={0:n0}s) eyeL={1} eyeR={2}" -f $elapsed, $state.eyeL.state, $state.eyeR.state)
             if ($KeepAlive) { break }
         }

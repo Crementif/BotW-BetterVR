@@ -139,16 +139,13 @@ addi r3, r3, calculateUIMaybe@l
 mtctr r3
 bctrl ; bl calculateUIMaybe
 
-; latch the synthesized-right-eye flag once per frame
-lis r3, VR_FLAG_SYNTH_RIGHT_EYE@ha
-lwz r3, VR_FLAG_SYNTH_RIGHT_EYE@l(r3)
-lis r12, currentFrameIsMono@ha
-stw r3, currentFrameIsMono@l(r12)
-
 ; ========================================================================
 ; FIRST EYE SIDE
 ; ========================================================================
 
+; procDraw completes the calcDraw left outstanding by the previous generation.
+; Mono deliberately keeps this vanilla one-frame pipeline; invoking procDraw in
+; the same generation as calcDraw can wedge Cemu's Vulkan submission path.
 lwz r12, 0(r30)
 lwz r0, 0xF4(r12)
 mtctr r0
@@ -158,12 +155,19 @@ bctrl ; sead__GameFrameworkCafe__procDraw
 ; doesn't seem to be necessary
 ;bl import.gx2.GX2DrawDone
 
-; synthesized-right-eye mode: run a single render pass and present it directly,
-; skipping the entire second-eye section below
-lis r3, currentFrameIsMono@ha
-lwz r3, currentFrameIsMono@l(r3)
+; currentFrameIsMono describes the procDraw that just completed; it must not be
+; overwritten before that capture. Read the host request only now, at the safe
+; generation boundary, to choose which topology the following calcDraw schedules.
+monoGenerationBoundary:
+lis r3, VR_FLAG_SYNTH_RIGHT_EYE@ha
+lwz r3, VR_FLAG_SYNTH_RIGHT_EYE@l(r3)
 cmpwi r3, 0
 bne monoEyeTail
+
+; The next outstanding draw is regular stereo.
+li r0, 0
+lis r12, currentFrameIsMono@ha
+stw r0, currentFrameIsMono@l(r12)
 
 li r0, 0
 lis r12, currentEyeSide@ha
@@ -185,12 +189,11 @@ lwz r3, VR_RENDER_SKIP_MASK@l(r3)
 lis r12, _bvrDesiredMask@ha
 stw r3, _bvrDesiredMask@l(r12)
 
-; Queue preservation and UpdateModelJobQueue suppression are a required pair.
-; Silently activating only one is known to empty or permanently desynchronize the
-; double-buffered model queues, so fail open and record the rejected request.
+; Queue preservation is only meaningful with UpdateModelJobQueue suppression.
+; UpdateModelJobQueue suppression by itself is now valid: the normal right-eye queue
+; clear/swap cadence continues, while the host compositor ignores the disposable right
+; image and submits the independently copied left image for both OpenXR views.
 andi. r0, r3, 0x3000
-cmpwi r0, 0x1000
-beq bvr_invalidReuseMask
 cmpwi r0, 0x2000
 bne bvr_reuseMaskValidated
 bvr_invalidReuseMask:
@@ -448,8 +451,16 @@ blr
 ; ========================================================================
 
 monoEyeTail:
-; finish the single camera side; report the right side so the host's
-; once-per-frame housekeeping in hook_EndCameraSide still runs
+; The procDraw above completed this generation's only source. Keep the timestamp
+; for diagnostics, but do not immediately wait for it: a same-frame drain serializes
+; Cemu's CPU calc work behind the GPU and costs roughly one complete scene render.
+; Mono has only one outstanding draw generation, so retain the normal pipelined
+; procDraw -> calcDraw -> present ordering and let the backend fences provide the
+; command-buffer lifetime guarantee. A bounded timestamp ring can be added here if
+; a sustained uncapped run proves that the backend pool is smaller than its fences.
+bl storeLastSubmittedTimeStamp
+;bl waitForLastSubmittedTimeStamp
+
 li r0, 0
 lis r12, currentEyeSide@ha
 stw r0, currentEyeSide@l(r12)
@@ -466,6 +477,16 @@ li r3, 0
 mono_skipResetFrameCounter:
 stw r3, currentFrameCounter@l(r12)
 
+; Mono actor jobs use vanilla routing: every job runs exactly once on the left pass.
+li r0, 1
+lis r12, currentFrameIsMono@ha
+stw r0, currentFrameIsMono@l(r12)
+
+li r0, 0
+lis r12, currentEyeSide@ha
+stw r0, currentEyeSide@l(r12)
+lis r12, _bvrEyePhase@ha
+stw r0, _bvrEyePhase@l(r12)
 li r3, 0
 bl import.coreinit.hook_BeginCameraSide
 
@@ -481,7 +502,8 @@ mtctr r0
 mr r3, r30
 bctrl ; sead__Framework__procReset
 
-; run the regular locked present path (mirror of the stereo second-eye tail)
+; Complete the vanilla frame tail. The outstanding draw is consumed by procDraw at
+; the start of the following procFrame.
 lwz r12, 0x74(r30)
 clrlwi. r11, r12, 31
 li r31, 1
@@ -497,7 +519,7 @@ clrlwi r31, r31, 24
 beq mono_loc_31FA928
 mtctr r0
 li r3, 1
-bctrl ; some lockAndUnlockFrameFunc call
+bctrl ; lock frame draw context callback
 
 mono_loc_31FA928:
 cmpwi r31, 0
@@ -514,27 +536,9 @@ cmpwi r0, 0
 beq mono_loc_31FA95C
 mtctr r0
 li r3, 0
-bctrl ; lockOrUnlockDrawContextMgr
+bctrl ; unlock frame draw context callback
 
 mono_loc_31FA95C:
-; stall during loading screens to ensure rendering is done (same as the stereo path)
-lis r3, FadeProgress__sInstance@ha
-lwz r3, FadeProgress__sInstance@l(r3)
-cmpwi r3, 0
-beq mono_skipStallDuringLoadingScreens
-
-lbz r3, 0x10(r3)
-cmpwi r3, 0
-beq mono_skipStallDuringLoadingScreens
-
-mr r11, r4
-li r3, 0
-li r4, 100
-bla import.coreinit.OSSleepTicks
-mr r4, r11
-
-bl import.gx2.GX2DrawDone
-mono_skipStallDuringLoadingScreens:
 
 b continueWithRendering
 

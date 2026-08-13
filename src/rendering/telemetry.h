@@ -79,7 +79,9 @@ public:
     // BMPs to BetterVR_dumps\. Depth is deliberately excluded: D3D12 cannot copy the
     // runtime-owned D32 swapchains to a linear readback buffer on all runtimes, while
     // flicker review needs the exact submitted color images. Returns files written.
-    int DumpEyeTextures(RND_D3D12* d3d12, ID3D12Resource* colorL, ID3D12Resource* colorR, uint32_t frameNo);
+    int DumpEyeTextures(RND_D3D12* d3d12, ID3D12Resource* colorL, ID3D12Resource* colorR,
+        uint32_t frameNo, D3D12_RESOURCE_STATES initialState = D3D12_RESOURCE_STATE_RENDER_TARGET,
+        const char* namePrefix = "color");
 
 private:
     struct Slot {

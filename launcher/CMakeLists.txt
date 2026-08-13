@@ -50,6 +50,7 @@ add_custom_command(
     COMMAND ${CMAKE_COMMAND} -E touch ${BETTERVR_LAUNCHER_EMBED_STAMP}
     DEPENDS
         BetterVR_Layer
+        $<TARGET_FILE:BetterVR_Layer>
         ${CMAKE_SOURCE_DIR}/resources/BetterVR_Layer.json
         ${BETTERVR_LAUNCHER_EMBED_SCRIPT}
         ${GRAPHIC_PACK_FILES}
@@ -64,6 +65,7 @@ add_dependencies(BetterVR_Launcher BetterVR_LauncherAssets)
 # changes when an asset's bytes change. Ninja cannot see that dependency, so the
 # stamp is what forces rc.exe to re-read the assets.
 set_source_files_properties(${BETTERVR_LAUNCHER_EMBED_RC} PROPERTIES OBJECT_DEPENDS ${BETTERVR_LAUNCHER_EMBED_STAMP})
+set_property(TARGET BetterVR_Launcher APPEND PROPERTY LINK_DEPENDS ${BETTERVR_LAUNCHER_EMBED_STAMP})
 
 target_sources(BetterVR_Launcher PRIVATE ${BETTERVR_LAUNCHER_EMBED_SOURCE} ${BETTERVR_LAUNCHER_EMBED_HEADER} ${BETTERVR_LAUNCHER_EMBED_RC})
 target_include_directories(BetterVR_Launcher PRIVATE ${BETTERVR_LAUNCHER_EMBED_DIR})

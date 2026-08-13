@@ -556,6 +556,9 @@ struct ModSettings {
 
     // performance settings
     BoolSetting skipDrcRendering{ "SkipDrcRendering", true };
+    // Experimental mono-throughput path. It currently mirrors the one rendered eye;
+    // depth reprojection is deliberately disabled until its final-eye output passes
+    // stereo validation, so this must not be presented as stereoscopic rendering.
     BoolSetting synthesizedRightEye{ "SynthesizedRightEye", false };
     // bits 1-12 of the PPC-side VR_RENDER_SKIP_MASK: skip per-frame render preparation on
     // the right eye pass (see the bit table in patch_RND_StereoRendering_Optimizations.asm);

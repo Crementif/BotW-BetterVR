@@ -213,6 +213,7 @@ void RND_Renderer::EndFrame() {
                 if (presented3DSynthRight) {
                     presented3DSynthInfo.hasMatrix = hudFrame.synthReprojMtx.has_value();
                     presented3DSynthInfo.reprojMtx = hudFrame.synthReprojMtx.value_or(glm::fmat4(1.0f));
+                    presented3DSynthInfo.sourceSide = hudFrame.synthSourceSide;
                 }
             }
             else if (m_stable3D.valid && IsStable3DReuseAllowed(hudFrame)) {
@@ -270,6 +271,10 @@ void RND_Renderer::EndFrame() {
                 m_layer3D->GetFinalColor(OpenXR::EyeSide::LEFT),
                 m_layer3D->GetFinalColor(OpenXR::EyeSide::RIGHT),
                 s_frameCounter);
+            EyeTelemetry::instance().DumpEyeTextures(VRManager::instance().D3D12.get(),
+                m_layer3D->GetSharedColor(OpenXR::EyeSide::LEFT, presented3DFrameIdx),
+                m_layer3D->GetSharedColor(OpenXR::EyeSide::RIGHT, presented3DFrameIdx),
+                s_frameCounter, D3D12_RESOURCE_STATE_COMMON, "source");
         }
 
         if (shouldRender2D) {
@@ -357,7 +362,10 @@ void RND_Renderer::EndFrame() {
 
     m_lastFrameWorkTimeMs = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - m_frameStartTime).count();
 
-    // benchmark logging: rolling averages so before/after runs can be compared from the log.
+    // Benchmark logging is deliberately gated to stable gameplay. Menu/title frames run at
+    // the runtime cadence and would otherwise contaminate the first in-game window, while
+    // fades can include transition-only stalls. Require 90 stable in-game frames
+    // before arming, and reset the window whenever stability is lost.
     // "frame" is the delta between OpenXR predicted display times (the game/present cadence),
     // "work" is host time spent inside the frame, "xrWait" is time blocked in xrWaitFrame
     // (headroom left before the headset cadence throttles the game).
@@ -368,12 +376,43 @@ void RND_Renderer::EndFrame() {
         static double s_benchXrEndAccum = 0.0;
         static double s_benchVkPresentAccum = 0.0;
         static uint32_t s_benchSamples = 0;
-        s_benchFrameAccum += m_lastFrameTimeMs;
-        s_benchWorkAccum += m_lastFrameWorkTimeMs;
-        s_benchWaitAccum += m_lastWaitTimeMs;
-        s_benchXrEndAccum += s_lastXrEndFrameMs;
-        s_benchVkPresentAccum += g_lastVkPresentMs.load(std::memory_order_relaxed);
-        if (++s_benchSamples >= 600) {
+        static uint32_t s_stableGameplayFrames = 0;
+        static bool s_benchmarkArmed = false;
+        bool sampledThisFrame = false;
+
+        const auto resetWindow = [&]() {
+            s_benchFrameAccum = 0.0;
+            s_benchWorkAccum = 0.0;
+            s_benchWaitAccum = 0.0;
+            s_benchXrEndAccum = 0.0;
+            s_benchVkPresentAccum = 0.0;
+            s_benchSamples = 0;
+        };
+
+        const bool stableGameplay = CemuHooks::IsInGame() && !CemuHooks::IsAnyFadeScreenVisible();
+        if (!stableGameplay) {
+            s_stableGameplayFrames = 0;
+            s_benchmarkArmed = false;
+            resetWindow();
+        }
+        else if (!s_benchmarkArmed) {
+            constexpr uint32_t kGameplayWarmupFrames = 90;
+            if (++s_stableGameplayFrames >= kGameplayWarmupFrames) {
+                s_benchmarkArmed = true;
+                resetWindow();
+                Log::print<INFO>("[bench] armed after {} stable in-game frames", kGameplayWarmupFrames);
+            }
+        }
+        else {
+            s_benchFrameAccum += m_lastFrameTimeMs;
+            s_benchWorkAccum += m_lastFrameWorkTimeMs;
+            s_benchWaitAccum += m_lastWaitTimeMs;
+            s_benchXrEndAccum += s_lastXrEndFrameMs;
+            s_benchVkPresentAccum += g_lastVkPresentMs.load(std::memory_order_relaxed);
+            sampledThisFrame = true;
+        }
+
+        if (sampledThisFrame && ++s_benchSamples >= 600) {
             const double invSamples = 1.0 / (double)s_benchSamples;
             const double avgFrameMs = s_benchFrameAccum * invSamples;
             const auto telemetryL = EyeTelemetry::instance().GetStats(OpenXR::EyeSide::LEFT);
@@ -387,8 +426,7 @@ void RND_Renderer::EndFrame() {
                 CemuHooks::GetEffectiveRenderSkipMask(),
                 telemetryL.whiteFrames, telemetryR.whiteFrames,
                 EyeTelemetry::StateName(telemetryL.state), EyeTelemetry::StateName(telemetryR.state));
-            s_benchFrameAccum = s_benchWorkAccum = s_benchWaitAccum = s_benchXrEndAccum = s_benchVkPresentAccum = 0.0;
-            s_benchSamples = 0;
+            resetWindow();
         }
     }
 
@@ -533,6 +571,7 @@ void RND_Renderer::PromoteStable3D(long frameIdx) {
     m_stable3D.synthesizedRight = frame.synthesizedRight;
     m_stable3D.synthInfo.hasMatrix = frame.synthReprojMtx.has_value();
     m_stable3D.synthInfo.reprojMtx = frame.synthReprojMtx.value_or(glm::fmat4(1.0f));
+    m_stable3D.synthInfo.sourceSide = frame.synthSourceSide;
 }
 
 RND_Renderer::Layer3D::Layer3D(VkExtent2D inputRes, VkExtent2D outputRes) {
@@ -655,10 +694,11 @@ void RND_Renderer::Layer3D::RecordRender(RND_D3D12::CommandContext<false>* conte
 
     checkAssert(context != nullptr, "Layer3D render context is missing!");
 
-    // for a synthesized right eye the game never rendered right-eye textures, so bind the
-    // left eye's color+depth and let the present shader reproject them into this view
-    const bool synthesizeThisEye = synthRightEye != nullptr && side == OpenXR::EyeSide::RIGHT;
-    const OpenXR::EyeSide sourceSide = synthesizeThisEye ? OpenXR::EyeSide::LEFT : side;
+    // In single-pass mode the game renders one source eye. The other output is a
+    // mirror unless the frame carries an explicitly validated reprojection matrix.
+    const bool synthMode = synthRightEye != nullptr;
+    const OpenXR::EyeSide sourceSide = synthMode ? synthRightEye->sourceSide : side;
+    const bool synthesizeThisEye = synthMode && side != sourceSide;
 
     auto& texture = m_textures[sourceSide][frameIdx];
     auto& depthTexture = m_depthTextures[sourceSide][frameIdx];
@@ -672,7 +712,7 @@ void RND_Renderer::Layer3D::RecordRender(RND_D3D12::CommandContext<false>* conte
 
     // the left-eye pass in this same command context already waits on and signals the left
     // textures; adding a second wait/signal pair would desync the Vulkan<->D3D12 fence protocol
-    if (!synthesizeThisEye) {
+    if (!synthMode || side == OpenXR::EyeSide::LEFT) {
         context->WaitFor(texture.get(), texture->GetD3D12WaitValue());
         context->WaitFor(depthTexture.get(), depthTexture->GetD3D12WaitValue());
     }
@@ -700,7 +740,7 @@ void RND_Renderer::Layer3D::RecordRender(RND_D3D12::CommandContext<false>* conte
     }
 
     // no transition needed here as OpenXR requires the swapchain to be returned in RENDER_TARGET/DEPTH_WRITE too
-    if (!synthesizeThisEye) {
+    if (!synthMode || side == OpenXR::EyeSide::RIGHT) {
         context->Signal(texture.get(), texture->GetD3D12SignalValue());
         context->Signal(depthTexture.get(), depthTexture->GetD3D12SignalValue());
     }

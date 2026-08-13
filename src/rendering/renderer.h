@@ -43,17 +43,19 @@ public:
         Stereo3D,
     };
 
-    // set on frames whose right eye is synthesized on the GPU from the left eye's
-    // color+depth instead of being rendered by the game (see SynthesizedRightEye setting)
+    // set on experimental one-eye frames. The right output is currently mirrored
+    // unless a separately validated reprojection matrix is explicitly attached.
     struct SynthRightEyeInfo {
         bool hasMatrix = false;
         glm::fmat4 reprojMtx = glm::fmat4(1.0f);
+        OpenXR::EyeSide sourceSide = OpenXR::EyeSide::LEFT;
     };
 
     struct RenderFrame {
         std::optional<std::array<XrView, 2>> views;
         std::optional<glm::fmat4> cameraReferenceMtx;
         bool synthesizedRight = false;
+        OpenXR::EyeSide synthSourceSide = OpenXR::EyeSide::LEFT;
         std::optional<glm::fmat4> synthReprojMtx;
         CaptureRecordKind recordKind = CaptureRecordKind::None;
         uint64_t activeStereoGeneration = 0;
@@ -85,7 +87,10 @@ public:
                 return false;
             }
             if (synthesizedRight) {
-                return HasAcceptedCapture(CaptureMask_ColorLeft | CaptureMask_DepthLeft);
+                const uint32_t monoMask = synthSourceSide == OpenXR::EyeSide::LEFT
+                    ? (CaptureMask_ColorLeft | CaptureMask_DepthLeft)
+                    : (CaptureMask_ColorRight | CaptureMask_DepthRight);
+                return HasAcceptedCapture(monoMask);
             }
             return HasAcceptedCapture(CaptureMask_ColorLeft | CaptureMask_ColorRight | CaptureMask_DepthLeft | CaptureMask_DepthRight);
         }
@@ -130,6 +135,7 @@ public:
             views = std::nullopt;
             cameraReferenceMtx = std::nullopt;
             synthesizedRight = false;
+            synthSourceSide = OpenXR::EyeSide::LEFT;
             synthReprojMtx = std::nullopt;
             recordKind = CaptureRecordKind::None;
             activeStereoGeneration = 0;
@@ -261,6 +267,7 @@ public:
         auto& GetDepthSharedTextures() { return m_depthTextures; }
         ID3D12Resource* GetFinalColor(OpenXR::EyeSide side) const { return m_swapchains[side]->GetTexture(); }
         ID3D12Resource* GetFinalDepth(OpenXR::EyeSide side) const { return m_depthSwapchains[side]->GetTexture(); }
+        ID3D12Resource* GetSharedColor(OpenXR::EyeSide side, long frameIdx) const { return m_textures[side][frameIdx]->d3d12GetTexture(); }
 
     private:
         std::array<std::unique_ptr<Swapchain<DXGI_FORMAT_R8G8B8A8_UNORM_SRGB>>, 2> m_swapchains;

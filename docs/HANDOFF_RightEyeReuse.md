@@ -124,10 +124,10 @@ Rules learned: flip masks **in-game only** (load transitions with masks active h
 ## 6. Key file inventory (mod changes, all uncommitted)
 
 - `resources/BreathOfTheWild_BetterVR/patch_RND_StereoRendering_Optimizations.asm` — **the main experiment file**: DRC skip (bit 0), rskip entry hooks (bits 3–12; bits 1/2 whole-skips disabled), the type-filtered `invoke` gate (bits 1/2), bit-13 clearQueue do-nothing + Mgr reduced loop (destroy deferral), calcFrame_ call-site gates (requestDraw/occlusion/contextClear enabled; prep/updateGPU deliberately NOT gated — comments explain why), 'BVRC' counter block + event ring, frame tick in the swap-buffers hook. Densely commented with every root cause.
-- `patch_RND_StereoRendering.asm` — pipelined frame loop (`custom_sead_GameFramework_procFrame`), per-eye sections, mono mode, `currentEyeSide`/`currentFrameIsMono` cave vars, GX2 full-drain (do NOT re-introduce the bounded-lag drain — GPU command-buffer corruption when uncapped).
+- `patch_RND_StereoRendering.asm` — pipelined frame loop (`custom_sead_GameFramework_procFrame`), per-eye sections, mono mode, and `currentEyeSide`/`currentFrameIsMono` cave vars. Stereo still uses the proven GX2 drain. Mono keeps the normal one-generation `procDraw -> calcDraw` pipeline and does **not** wait on the timestamp it just submitted; that same-frame wait serialized the CPU behind the GPU and prevented 90 Hz.
 - `src/rendering/telemetry.{h,cpp}`, `src/utils/ipc_control.{h,cpp}` — the framework (§3). Registered in `src/CMakeLists.txt`.
 - `src/rendering/renderer.cpp` — telemetry sampling in the render lambda, IPC tick in `StartFrame`, dump handling, `[bench]` extensions. `src/rendering/d3d12.h` — fence getters.
-- `src/hooking/framebuffer.cpp` — capture handling, present throttle. `src/hooking/camera.cpp` — `GetEffectiveRenderSkipMask()` (masks to bit 0 during fades/cutscenes/not-in-game; has a known 1-frame race), synth-eye gating, reprojection matrix. `src/hooking/settings.cpp` — flag pushes, actor-job routing. `src/utils/mod_settings.h` — `RightEyeCalcSkipMask` (default 0), `SkipDrcRendering` (default on), `SynthesizedRightEye` (default off).
+- `src/hooking/framebuffer.cpp` — capture handling, present throttle. `src/hooking/camera.cpp` — `GetEffectiveRenderSkipMask()` (masks to bit 0 during fades/cutscenes/not-in-game; has a known 1-frame race), synth-eye gating, reprojection matrix. `src/hooking/settings.cpp` — flag pushes, actor-job routing. `src/utils/mod_settings.h` — `RightEyeCalcSkipMask` (default 0), `SkipDrcRendering` (default on), `SynthesizedRightEye` (default off; the current one-eye path is monoscopic).
 - Memory files (Claude): `C:\Users\ellio\.claude\projects\E--BOTW-Decompile\memory\` — `bettervr-debug-framework.md`, `bettervr-perf-work-status.md`, `bettervr-build-and-test-setup.md`.
 
 ---
@@ -171,7 +171,7 @@ The framework above has been hardened so unattended runs fail closed instead of 
 
 ### Boundary-safe guest control
 
-- `BVRC` legacy counters are followed by a versioned `BVR2` ABI (`version=2`, `size=0x160`). The host validates magic/version/size and reads changing fields with an odd/even seqlock.
+- `BVRC` legacy counters are followed by a versioned `BVR2` ABI (`version=2`, `size=0x170`). The host validates magic/version/size and reads changing fields with an odd/even seqlock. The last four words contain the live `clearQueue` caller-state telemetry used to diagnose mono queue poisoning.
 - The fixed settings word is now only the **desired** mask. PPC hooks read `_bvrActiveMask`, which changes after the outstanding right draw and before the next left calculation generation.
 - Bits `0x1000` (skip UpdateModelJobQueue) and `0x2000` (preserve the right queue) are an invariant pair. A half-enabled request is cleared and exported as a fault instead of corrupting the double-buffer protocol.
 - State exports desired/active masks, mask epoch, activation frame, eye phase, faults, and `controlConverged`. IPC acknowledgement requires exact sequence equality, a matching process session, a fresh advancing state sequence, and guest convergence.
@@ -251,3 +251,24 @@ UI-specific status is atomically published to `%LOCALAPPDATA%\OpenXR-Simulator\u
 The MCP tools are `get_ui_flicker_status(include_images, max_frames)` and `capture_ui_flicker_window(timeout, max_frames)`. `analyze_openxr_flicker.py` recognizes `captureSource=openxr-simulator-ui-quad`; a runtime continuity trigger yields `FLICKER_DETECTED` even if a mostly-transparent UI changes too few whole-frame pixels for image thresholds.
 
 Post-fix optimized live acceptance: 1,176 projection refreshes, 382 fresh compositions, 794 cached recompositions (exactly one composition per refresh), **0 missing UI frames**, **0 composition failures**, and **0 automatic UI anomalies**. A forced 22-frame UI-only packet also returned `NO_FLICKER_DETECTED`; its incident count is manual evidence collection, not an anomaly. Twelve sampled BetterVR state intervals averaged about 17.0 ms host work, so persistent UI recomposition did not add the multi-megapixel conversion cost to cached frames.
+
+---
+
+## 9. Experimental mono throughput result (2026-08-13; not stereoscopic)
+
+`SynthesizedRightEye=true`, `SkipDrcRendering=true`, and raw `RightEyeCalcSkipMask=0` render one left-eye game pass. The compositor currently mirrors that color/depth source into both OpenXR views: `frame.synthReprojMtx` is deliberately set to `std::nullopt` in `framebuffer.cpp`, and the acceptance dump produced byte-identical left/right final images. This is **monoscopic throughput evidence, not completion of the right-eye CPU-reuse goal**. The option remains default-off, and `rightEyeReuse=1` continues to select the two-pass queue-reuse laboratory mask.
+
+Two fixes were required in the game-side pipeline:
+
+1. A mono generation calls `gsys::ModelScene::clearQueue` twice, and both original calls arrived with `shouldRequest=0`. The first call destroyed the prior list before `changeRequestFlag` could clear each model's `DO_DRAW` bit, so all later `requestDraw` calls early-outed and the world stayed fog-white. The original callers provide a stable discriminator in `r5`: the pre-calc caller passes 1 and the `ModelMgr::calcFrame` caller passes 0. For mono only, the hook forces `r4=1` on the pre-calc call, restoring the required flag-walk/clear pair.
+2. The mono tail called `GX2WaitTimeStamp(GX2GetLastSubmittedTimeStamp())` after every `procDraw`. This forced the next CPU `calcDraw` to wait for the whole scene render. Keeping the timestamp but removing that immediate wait restored CPU/GPU overlap while preserving the one-generation pipeline and backend fence ordering.
+
+The automated run used the OpenXR simulator at 1280x1424 per eye with the OBS, ReShade, and FSR OpenXR API layers explicitly disabled. The in-game gate armed only after 90 stable gameplay frames. It establishes the amount of performance available if the second emulated game pass can be removed, but it does not establish stereo correctness:
+
+- warm-up windows: **9.88 ms / 101.2 FPS** and **9.64 ms / 103.8 FPS**;
+- steady runtime-paced windows: repeated **11.10-11.12 ms / 89.9-90.1 FPS**;
+- steady component averages: game work about **7.1-7.2 ms**, `xrWaitFrame` about **1.7-1.9 ms**, `xrEndFrame` about **2.0-2.2 ms**, and Vulkan present about **0.10 ms**;
+- more than 8,000 in-game frames in the first soak with both mirrored final eyes classified `NORMAL`, zero white frames, zero compositor omissions, and zero GPU command-buffer errors;
+- simulator UI detector: **0 missing-after-projection**, **0 composition failures**, and **0 anomalies**; general simulator detector: **0 anomalies**.
+
+The manually launched follow-up never reached gameplay because it was started without the harness's menu input, so it is not additional visual proof. The old synchronous `calcDraw -> procDraw` same-generation experiment is also invalid because it wedges Cemu's Vulkan submission path. Useful findings to carry back into the real task are the corrected mono `clearQueue` pairing and the cost of the same-frame GPU completion wait; neither substitutes for a distinct right-eye image.

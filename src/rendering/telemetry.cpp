@@ -323,15 +323,16 @@ static void WriteBmp24(const std::filesystem::path& path, uint32_t width, uint32
     fclose(file);
 }
 
-int EyeTelemetry::DumpEyeTextures(RND_D3D12* d3d12, ID3D12Resource* colorL, ID3D12Resource* colorR, uint32_t frameNo) {
+int EyeTelemetry::DumpEyeTextures(RND_D3D12* d3d12, ID3D12Resource* colorL, ID3D12Resource* colorR,
+    uint32_t frameNo, D3D12_RESOURCE_STATES initialState, const char* namePrefix) {
     const std::filesystem::path dumpDirectory = std::filesystem::path("BetterVR_dumps") /
         std::format("session_{}", GetCurrentProcessId());
     std::error_code ec;
     std::filesystem::create_directories(dumpDirectory, ec);
 
     int written = 0;
-    const std::pair<ID3D12Resource*, const char*> textures[] = {
-        { colorL, "color_L" }, { colorR, "color_R" }
+    const std::pair<ID3D12Resource*, std::string> textures[] = {
+        { colorL, std::format("{}_L", namePrefix) }, { colorR, std::format("{}_R", namePrefix) }
     };
 
     for (const auto& [texture, name] : textures) {
@@ -376,7 +377,7 @@ int EyeTelemetry::DumpEyeTextures(RND_D3D12* d3d12, ID3D12Resource* colorL, ID3D
                 transition.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
                 transition.Transition.pResource = texture;
                 transition.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-                transition.Transition.StateBefore = isDepth ? D3D12_RESOURCE_STATE_DEPTH_WRITE : D3D12_RESOURCE_STATE_RENDER_TARGET;
+                transition.Transition.StateBefore = initialState;
                 transition.Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_SOURCE;
                 context->GetRecordList()->ResourceBarrier(1, &transition);
 

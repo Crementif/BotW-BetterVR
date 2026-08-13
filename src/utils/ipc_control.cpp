@@ -52,9 +52,13 @@ namespace {
     constexpr uint64_t kOffFaultFlags = 0x154;
     constexpr uint64_t kOffTelemetryLevel = 0x158;
     constexpr uint64_t kOffLastControlEvent = 0x15C;
+    constexpr uint64_t kOffClearShouldRequest = 0x160;
+    constexpr uint64_t kOffClearFlagsBefore = 0x164;
+    constexpr uint64_t kOffClearStagingBefore = 0x168;
+    constexpr uint64_t kOffClearFillBefore = 0x16C;
     constexpr uint32_t kAbiMagic = 0x42565232; // 'BVR2'
     constexpr uint32_t kAbiVersion = 2;
-    constexpr uint32_t kAbiSize = 0x160;
+    constexpr uint32_t kAbiSize = 0x170;
 
     struct PpcSnapshot {
         bool abiValid = false;
@@ -70,6 +74,10 @@ namespace {
         uint32_t faultFlags = 0;
         uint32_t telemetryLevel = 0;
         uint32_t lastControlEvent = 0;
+        uint32_t clearShouldRequest = 0;
+        uint32_t clearFlagsBefore = 0;
+        uint32_t clearStagingBefore = 0;
+        uint32_t clearFillBefore = 0;
     };
 
     uint32_t ReadPpcU32(uint64_t address) {
@@ -124,6 +132,10 @@ namespace {
             result.faultFlags = ReadPpcU32(base + kOffFaultFlags);
             result.telemetryLevel = ReadPpcU32(base + kOffTelemetryLevel);
             result.lastControlEvent = ReadPpcU32(base + kOffLastControlEvent);
+            result.clearShouldRequest = ReadPpcU32(base + kOffClearShouldRequest);
+            result.clearFlagsBefore = ReadPpcU32(base + kOffClearFlagsBefore);
+            result.clearStagingBefore = ReadPpcU32(base + kOffClearStagingBefore);
+            result.clearFillBefore = ReadPpcU32(base + kOffClearFillBefore);
             const uint32_t after = ReadPpcU32(base + kOffSnapshotSeq);
             if (before == after && (after & 1u) == 0) {
                 result.snapshotSeq = after;
@@ -172,6 +184,7 @@ namespace {
             case 7: return "calcModel-skip";
             case 8: return "procFrame";
             case 9: return "invokeType3-skip";
+            case 10: return "mono-clearQueue-state";
             default: return "?";
         }
     }
@@ -301,7 +314,9 @@ void IpcControl::ApplyCommand(uint32_t frameNo) {
     }
     if (command.rightEyeReuse.has_value()) {
         // The model-job update and queue preservation hooks are one invariant.
-        // 0x0002/0x0004 are the two proven calc reuse candidates.
+        // 0x0002/0x0004 are the two proven calc reuse candidates. This remains
+        // laboratory-only until the preserved right-eye draw list is correct.
+        GetSettings().synthesizedRightEye = false;
         GetSettings().rightEyeCalcSkipMask = *command.rightEyeReuse ? 0x3006u : 0u;
     }
     if (command.traceEvents.has_value()) {
@@ -417,6 +432,8 @@ void IpcControl::WriteStateFile(uint32_t frameNo) {
          << ", \"activeMask\": " << ppc.activeMask << ", \"desiredMask\": " << ppc.desiredMask << ", \"maskEpoch\": " << ppc.maskEpoch
          << ", \"activationFrame\": " << ppc.activationFrame << ", \"eyePhase\": " << ppc.eyePhase << ", \"faultFlags\": " << ppc.faultFlags
          << ", \"telemetryLevel\": " << ppc.telemetryLevel << ", \"lastControlEvent\": " << ppc.lastControlEvent
+         << ", \"clearShouldRequest\": " << ppc.clearShouldRequest << ", \"clearFlagsBefore\": " << ppc.clearFlagsBefore
+         << ", \"clearStagingBefore\": " << ppc.clearStagingBefore << ", \"clearFillBefore\": " << ppc.clearFillBefore
          << ", \"controlConverged\": " << (controlConverged ? "true" : "false")
          << ", \"frame\": " << ReadCounter(kOffFrame) << ", \"requestDraw\": " << ReadCounter(kOffRequestDraw)
          << ", \"swapCursor\": " << ReadCounter(kOffLastSwapCursor) << ", \"swapCount\": " << ReadCounter(kOffSwapCount)

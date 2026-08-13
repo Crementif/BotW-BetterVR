@@ -106,6 +106,8 @@ void VkDeviceOverrides::CmdClearColorImage(const vkroots::VkCommandBufferDispatc
         const long frameIdx = pColor->float32[3] < 0.5f ? 0 : 1;
         checkAssert(captureIdx == 0 || captureIdx == 1 || captureIdx == 2, "Invalid capture index!");
         const bool isSynthStereoCapture = captureIdx == 1;
+        const bool synthesizeQueueReuseLeft = captureIdx == 0 && side == OpenXR::EyeSide::LEFT &&
+            CemuHooks::ShouldSynthesizeRightEyeFromQueueReuse();
 
         Log::print<RENDERING>("[{}] Clearing color image for {} layer for {} side", frameIdx, captureIdx == 2 ? "2D" : (isSynthStereoCapture ? "3D-mono" : "3D"), side == OpenXR::EyeSide::LEFT ? "left" : "right");
 
@@ -230,6 +232,14 @@ void VkDeviceOverrides::CmdClearColorImage(const vkroots::VkCommandBufferDispatc
                 return skip3DColorCapture(!renderer->IsRendering3D(frameIdx));
             }
 
+            // A queue-reuse generation intentionally produces a disposable right game
+            // pass. The valid left pass was copied into its own shared texture before
+            // that pass began, so never let the right clear overwrite the capture slot.
+            if (frame.synthesizedRight && side != frame.synthSourceSide) {
+                Log::print<RENDERING>("[{}] Ignoring disposable queue-reuse right-eye color capture", frameIdx);
+                return skip3DColorCapture(false);
+            }
+
             const uint32_t colorMask = side == EyeSide::LEFT ? RND_Renderer::CaptureMask_ColorLeft : RND_Renderer::CaptureMask_ColorRight;
             if (!frame.TryAcceptCapture(colorMask, image, frame.acceptedColorImages[side], frameIdx, side == EyeSide::LEFT ? "left-eye 3D color" : "right-eye 3D color")) {
                 renderer->NoteDuplicateCaptureDropped();
@@ -243,9 +253,13 @@ void VkDeviceOverrides::CmdClearColorImage(const vkroots::VkCommandBufferDispatc
 
             // a mono capture is the only 3D capture of its frame: mark the frame so the
             // compositor synthesizes the right eye by reprojecting this left-eye capture
-            if (isSynthStereoCapture && side == EyeSide::LEFT) {
+            if (isSynthStereoCapture || synthesizeQueueReuseLeft) {
                 frame.synthesizedRight = true;
-                frame.synthReprojMtx = CemuHooks::GetSynthReprojectionMatrix();
+                frame.synthSourceSide = side;
+                // First establish a valid one-pass stereo submission by mirroring the
+                // source eye. Depth reprojection is re-enabled only after its matrix path
+                // passes final-eye telemetry; a bad warp must never whiten both eyes.
+                frame.synthReprojMtx = std::nullopt;
             }
 
             if (useMonoCapture) {
@@ -255,7 +269,7 @@ void VkDeviceOverrides::CmdClearColorImage(const vkroots::VkCommandBufferDispatc
 
             // imgui needs only one eye to render Cemu's 2D output, so use right side since it looks better
             // (in synthesized-right-eye mode the left capture is the only one, so mirror from it)
-            if (side == EyeSide::RIGHT || (isSynthStereoCapture && side == EyeSide::LEFT)) {
+            if (side == EyeSide::RIGHT || isSynthStereoCapture) {
                 // note: Uses vkCmdCopyImage to copy the (right-eye-only) image to the imgui overlay's texture
                 float desktopAspectRatio = layer3D->GetAspectRatio(side);
                 const RenderUtils::UvTransform& desktopUvTransform = layer3D->GetPresentUvTransform(side);
@@ -396,6 +410,13 @@ void VkDeviceOverrides::CmdClearDepthStencilImage(const vkroots::VkCommandBuffer
 
             if (frame.HasFatalIssue()) {
                 Log::print<RENDERING>("[{}] Ignoring 3D depth capture because the stereo slot is already invalid", frameCounter);
+                returnToLayout();
+                return;
+            }
+
+
+            if (frame.synthesizedRight && side != frame.synthSourceSide) {
+                Log::print<RENDERING>("[{}] Ignoring disposable queue-reuse right-eye depth capture", frameCounter);
                 returnToLayout();
                 return;
             }

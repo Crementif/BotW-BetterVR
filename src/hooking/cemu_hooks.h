@@ -155,10 +155,15 @@ public:
         return s_isRiding > 0 || s_isRidingSandSeal > 0;
     }
     static bool UseMonoFrameBufferTemporarilyDuringMenusOrPictures();
-    // synthesized-right-eye mode: the game renders one (left) eye and the compositor
-    // reprojects it into the right view using the captured depth buffer
+    // experimental mono-throughput mode: the game renders one (left) eye and the
+    // compositor currently mirrors it; depth reprojection is not yet validated
     static bool ShouldUseSynthesizedRightEye();
-    static std::optional<glm::fmat4> GetSynthReprojectionMatrix();
+    // Right-eye queue reuse keeps the game's two-pass housekeeping cadence, but the
+    // right pass intentionally does not rebuild model draw lists. The compositor must
+    // therefore submit the already-copied left eye for both OpenXR views.
+    static bool ShouldSynthesizeRightEyeFromQueueReuse();
+    static bool ShouldCaptureSynthStereoMatrices();
+    static std::optional<glm::fmat4> GetSynthReprojectionMatrix(bool sourceIsRight = false);
     // the render-skip bitmask with load/cutscene safety gating applied
     static uint32_t GetEffectiveRenderSkipMask();
 

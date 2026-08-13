@@ -725,7 +725,7 @@ _bvrAbiMagic:
 _bvrAbiVersion:
 .int 2
 _bvrAbiSize:
-.int 0x00000160
+.int 0x00000170
 _bvrSnapshotSeq:
 .int 0
 _bvrActiveMask:
@@ -743,6 +743,14 @@ _bvrFaultFlags:
 _bvrTelemetryLevel:
 .int 1 ; 0=minimal, 1=counters, 2=counters+event ring
 _bvrLastControlEvent:
+.int 0
+_bvrClearShouldRequest:
+.int 0
+_bvrClearFlagsBefore:
+.int 0
+_bvrClearStagingBefore:
+.int 0
+_bvrClearFillBefore:
 .int 0
 
 ; counter hook: gsys::Model::requestDraw call count (hot path - counter only, no event)
@@ -797,17 +805,154 @@ bctr
 0x03A24088 = ba hook_cnt_swapDrawList
 
 0x039A8D58 = rskip_clearQueue_cont:
+0x03A2406C = bvr_ModelJobQueue_clear:
 0x03A24088 = gsys__ModelJobQueue__swapDrawList:
+0x03A240A4 = bvr_ModelJobQueue_changeRequestFlag:
 
 hook_rskip_clearQueue:
+; Mono queue diagnosis: encode the two clearQueue calls that replace a stereo pair.
+; event 10 payload: bit25 shouldRequest, bit24 flags3.bit0, bit23 flags3.bit8,
+; bits12..22 staging count, bits0..11 fill cursor. This stays out of normal runs.
+lis r12, currentFrameIsMono@ha
+lwz r12, currentFrameIsMono@l(r12)
+cmpwi r12, 0
+beq bvr_monoClearTrace_done
+li r9, 10
+slwi r9, r9, 26
+cmpwi r4, 0
+beq bvr_monoClearTrace_noRequest
+oris r9, r9, 0x0200
+bvr_monoClearTrace_noRequest:
+lwz r11, 0x46DC(r3)
+andi. r12, r11, 0x0001
+beq bvr_monoClearTrace_noFlag0
+oris r9, r9, 0x0100
+bvr_monoClearTrace_noFlag0:
+andi. r12, r11, 0x0100
+beq bvr_monoClearTrace_noGate
+oris r9, r9, 0x0080
+bvr_monoClearTrace_noGate:
+lwz r10, 0x416C(r3)
+clrlwi r10, r10, 21
+slwi r10, r10, 12
+or r9, r9, r10
+lwz r10, 0x4184(r3)
+clrlwi r10, r10, 20
+or r9, r9, r10
+lis r11, _cEvtWriteIdx@ha
+lwz r12, _cEvtWriteIdx@l(r11)
+rlwinm r12, r12, 2, 24, 29
+lis r10, _bvrEvtRing@ha
+addi r10, r10, _bvrEvtRing@l
+add r12, r12, r10
+stw r9, 0(r12)
+lwz r12, _cEvtWriteIdx@l(r11)
+addi r12, r12, 1
+stw r12, _cEvtWriteIdx@l(r11)
+bvr_monoClearTrace_done:
+
+; A single-pass generation still invokes clearQueue twice. In the stereo loop the
+; prior right side leaves a queue that the next pre-calc call must walk to clear
+; DO_DRAW before the later render-side call is allowed to clear/swap it. Both mono
+; calls otherwise arrive with shouldRequest=0, so the old list is destroyed before
+; changeRequestFlag can visit it and all models remain permanently flagged.
+;
+; r5 is the stable discriminator supplied by the original callers: pre-calc passes
+; a3=1; ModelMgr::calcFrame passes a3=0. Force only pre-calc into the flag branch.
+; This also pairs correctly when ModelMgr owns more than one ModelScene.
+lis r12, currentFrameIsMono@ha
+lwz r12, currentFrameIsMono@l(r12)
+cmpwi r12, 0
+beq bvr_monoClearPair_done
+cmpwi r5, 0
+beq bvr_monoClearPair_done
+li r4, 1
+bvr_monoClearPair_done:
+
 lis r12, currentEyeSide@ha
 lwz r12, currentEyeSide@l(r12)
 cmpwi r12, 1
 bne rskip_clearQueue_run
+lis r12, _bvrClearShouldRequest@ha
+stw r4, _bvrClearShouldRequest@l(r12)
+lwz r11, 0x46DC(r3)
+lis r12, _bvrClearFlagsBefore@ha
+stw r11, _bvrClearFlagsBefore@l(r12)
+lwz r11, 0x416C(r3)
+lis r12, _bvrClearStagingBefore@ha
+stw r11, _bvrClearStagingBefore@l(r12)
+lwz r11, 0x4184(r3)
+lis r12, _bvrClearFillBefore@ha
+stw r11, _bvrClearFillBefore@l(r12)
 lis r12, _bvrActiveMask@ha
-lwz r12, _bvrActiveMask@l(r12)
-andi. r12, r12, 0x2000
+lwz r11, _bvrActiveMask@l(r12)
+andi. r12, r11, 0x1000
+beq rskip_clearQueue_checkPreserve
+andi. r12, r11, 0x2000
+bne rskip_clearQueue_preserve
+
+; Bit 12 without bit 13 is the queue-reuse mode. UpdateModelJobQueue normally
+; clears DO_DRAW (bit 1 at model+0x7D) on every staged model as it consumes the
+; array. Reproduce that side effect with a linear walk before discarding the
+; right-eye staging list. Do NOT call changeRequestFlag here: it erase/shifts
+; entries before clearing the bit, which is quadratic and can leave erased models
+; permanently flagged so they never stage again on a later left pass.
+stwu r1, -0x20(r1)
+mflr r0
+stw r0, 0x24(r1)
+stw r30, 0x18(r1)
+mr r30, r3
+
+addi r7, r30, 0x40C0
+lwz r8, 180(r7)
+lwz r9, 172(r7)
+cmpwi r9, 0
+beq bvr_clearRightStaging_done
+mtctr r9
+bvr_clearRightStaging_loop:
+lwz r10, 0(r8)
+lbz r11, 125(r10)
+li r12, 2
+andc r11, r11, r12
+stb r11, 125(r10)
+addi r8, r8, 4
+bdnz bvr_clearRightStaging_loop
+bvr_clearRightStaging_done:
+
+addi r3, r30, 0x40C0
+lis r12, bvr_ModelJobQueue_clear@ha
+addi r12, r12, bvr_ModelJobQueue_clear@l
+mtctr r12
+bctrl
+
+lwz r11, 0x46DC(r30)
+li r12, 0x0102
+andc r11, r11, r12
+ori r11, r11, 0x0100
+stw r11, 0x46DC(r30)
+
+addi r3, r30, 0x40C0
+lis r12, gsys__ModelJobQueue__swapDrawList@ha
+addi r12, r12, gsys__ModelJobQueue__swapDrawList@l
+mtctr r12
+bctrl
+
+lis r11, _cClearQReduced@ha
+lwz r12, _cClearQReduced@l(r11)
+addi r12, r12, 1
+stw r12, _cClearQReduced@l(r11)
+
+lwz r30, 0x18(r1)
+lwz r0, 0x24(r1)
+addi r1, r1, 0x20
+mtlr r0
+li r3, 0
+blr
+
+rskip_clearQueue_checkPreserve:
+andi. r12, r11, 0x2000
 beq rskip_clearQueue_run
+rskip_clearQueue_preserve:
 
 ; reduced body: do NOTHING. Telemetry proved swapDrawList must not run here: its
 ; cursor is the FILL cursor of a double-buffered list, so swapping on right frames

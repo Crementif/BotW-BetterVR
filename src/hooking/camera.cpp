@@ -738,6 +738,12 @@ bool CemuHooks::ShouldUseSynthesizedRightEye() {
     if (renderer == nullptr || !renderer->IsInitialized()) {
         return false;
     }
+    // Never arm the one-pass game loop while booting or loading. Fade detection
+    // can briefly clear between load phases before the world is actually ready;
+    // that transient gap used to enter mono mode and strand the load handshake.
+    if (!IsInGame()) {
+        return false;
+    }
     // the game's own photo/save mono captures and cutscene black bars need the regular stereo path
     if (UseMonoFrameBufferTemporarilyDuringMenusOrPictures()) {
         return false;
@@ -757,14 +763,29 @@ bool CemuHooks::ShouldUseSynthesizedRightEye() {
     return true;
 }
 
-std::optional<glm::fmat4> CemuHooks::GetSynthReprojectionMatrix() {
+bool CemuHooks::ShouldSynthesizeRightEyeFromQueueReuse() {
+    // Bit 12 suppresses the expensive right-eye ModelJobQueue rebuild. We deliberately
+    // leave the normal clear/swap protocol (bit 13 off) running so the following left
+    // pass receives a fresh staging list. The right image is disposable; the left
+    // color+depth copy is complete and safe for the compositor.
+    constexpr uint32_t kSkipRightModelJobQueue = 0x1000u;
+    return (GetEffectiveRenderSkipMask() & kSkipRightModelJobQueue) != 0;
+}
+
+bool CemuHooks::ShouldCaptureSynthStereoMatrices() {
+    return GetSettings().UseSynthesizedRightEye() || ShouldSynthesizeRightEyeFromQueueReuse();
+}
+
+std::optional<glm::fmat4> CemuHooks::GetSynthReprojectionMatrix(bool sourceIsRight) {
     std::lock_guard lk(s_synthStereo.lock);
     if (!s_synthStereo.viewValid || !s_synthStereo.projValid) {
         return std::nullopt;
     }
-    const glm::fmat4 leftClip = s_synthStereo.proj[OpenXR::EyeSide::LEFT] * s_synthStereo.view[OpenXR::EyeSide::LEFT];
-    const glm::fmat4 rightClip = s_synthStereo.proj[OpenXR::EyeSide::RIGHT] * s_synthStereo.view[OpenXR::EyeSide::RIGHT];
-    return rightClip * glm::inverse(leftClip);
+    const OpenXR::EyeSide sourceSide = sourceIsRight ? OpenXR::EyeSide::RIGHT : OpenXR::EyeSide::LEFT;
+    const OpenXR::EyeSide targetSide = sourceIsRight ? OpenXR::EyeSide::LEFT : OpenXR::EyeSide::RIGHT;
+    const glm::fmat4 sourceClip = s_synthStereo.proj[sourceSide] * s_synthStereo.view[sourceSide];
+    const glm::fmat4 targetClip = s_synthStereo.proj[targetSide] * s_synthStereo.view[targetSide];
+    return targetClip * glm::inverse(sourceClip);
 }
 
 // s_lastCameraMtx is still the previous frame's anchor while the actor calc jobs run, so anything
@@ -797,7 +818,7 @@ void CemuHooks::hook_GetRenderCamera(PPCInterpreter_t* hCPU) {
     glm::mat4 newViewVR = glm::inverse(newWorldVR);
     DebugDraw::instance().UpdateEyeView(side, newViewVR);
 
-    if (side == EyeSide::LEFT && GetSettings().UseSynthesizedRightEye()) {
+    if (side == EyeSide::LEFT && ShouldCaptureSynthStereoMatrices()) {
         auto [rightPos, rightRot] = BuildGameplayCameraPose(gameplayPos, gameplayRot, EyeSide::RIGHT);
         glm::mat4 rightWorld = glm::translate(glm::mat4(1.0f), rightPos) * glm::mat4_cast(rightRot);
         std::lock_guard lk(s_synthStereo.lock);
@@ -887,7 +908,7 @@ void CemuHooks::hook_GetRenderProjection(PPCInterpreter_t* hCPU) {
     newDeviceMatrix[2][2] = (newDeviceMatrix[2][2] + newDeviceMatrix[3][2] * zOffset) * zScale;
     newDeviceMatrix[2][3] = newDeviceMatrix[2][3] * zScale + newDeviceMatrix[3][3] * zOffset;
 
-    if (side == EyeSide::LEFT && GetSettings().UseSynthesizedRightEye()) {
+    if (side == EyeSide::LEFT && ShouldCaptureSynthStereoMatrices()) {
         auto rightFovOpt = GetGameProjectionFOV(EyeSide::RIGHT, perspectiveProjection);
         if (rightFovOpt.has_value()) {
             glm::fmat4 rightDeviceMatrix = RenderUtils::CalculateProjectionMatrix(perspectiveProjection.zNear.getLE(), perspectiveProjection.zFar.getLE(), rightFovOpt.value());
