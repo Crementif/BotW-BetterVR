@@ -560,6 +560,10 @@ struct ModSettings {
     // depth reprojection is deliberately disabled until its final-eye output passes
     // stereo validation, so this must not be presented as stereoscopic rendering.
     BoolSetting synthesizedRightEye{ "SynthesizedRightEye", false };
+    // True stereo record-once/issue-twice path. The request is harmless on stock
+    // Cemu: BetterVR keeps the game's proven two-pass loop until a compatible fork
+    // acknowledges the same session and generation as active.
+    BoolSetting stereoInstancing{ "StereoInstancing", false };
     // bits 1-12 of the PPC-side VR_RENDER_SKIP_MASK: skip per-frame render preparation on
     // the right eye pass (see the bit table in patch_RND_StereoRendering_Optimizations.asm);
     // bit 0 is owned by skipDrcRendering. DEFAULT OFF: in the pipelined frame loop the
@@ -685,6 +689,7 @@ struct ModSettings {
 
     bool ShouldSkipDrcRendering() const { return skipDrcRendering; }
     bool UseSynthesizedRightEye() const { return synthesizedRightEye; }
+    bool UseStereoInstancing() const { return stereoInstancing; }
     uint32_t GetRenderSkipMask() const { return (rightEyeCalcSkipMask & 0x3FFEu) | (skipDrcRendering ? 1u : 0u); }
 
     bool IsDebuggingToolsEnabled() const;

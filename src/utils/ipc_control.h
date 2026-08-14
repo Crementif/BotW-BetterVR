@@ -16,6 +16,10 @@ public:
     // frame's flag push so a new mask takes effect on the same frame)
     void Tick(uint32_t frameNo);
 
+    // True only after the fork has acknowledged this process's exact request
+    // generation as active. All stale/missing/unsupported states fail closed.
+    bool IsStereoInstancingActive() const { return m_stereoInstancingActive; }
+
     // true while an incident burst still has frames to dump; caller consumes one
     // frame at a safe point so consecutive compositor outputs are preserved.
     bool ConsumeDumpRequest() {
@@ -29,6 +33,7 @@ private:
     void ApplyCommand(uint32_t frameNo);
     void WriteStateFile(uint32_t frameNo);
     void DrainEventRing();
+    void PublishStereoInstancingRequest(uint32_t frameNo);
 
     // parsed command values (only applied when seq changes)
     struct Command {
@@ -36,6 +41,7 @@ private:
         std::optional<uint32_t> skipMask;
         std::optional<bool> skipDrc;
         std::optional<bool> synthRightEye;
+        std::optional<bool> stereoInstancing;
         std::optional<bool> rightEyeReuse;
         uint32_t dumpFrames = 0;
         std::optional<bool> traceEvents;
@@ -64,4 +70,9 @@ private:
     uint32_t m_lastAutoIncidentHostFrame = 0;
     std::string m_marker;
     std::string m_sessionId;
+    uint32_t m_stereoRequestNonce = 0;
+    uint32_t m_stereoRequestGeneration = 0;
+    uint32_t m_lastStereoRequestMode = UINT32_MAX;
+    uint32_t m_stereoMatrixSeq = 0;
+    bool m_stereoInstancingActive = false;
 };

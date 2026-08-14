@@ -41,6 +41,14 @@ def atomic_json_write(path: Path, payload: dict[str, Any]) -> None:
     os.replace(temp_path, path)
 
 
+def atomic_text_write(path: Path, payload: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile("w", encoding="ascii", dir=path.parent, delete=False) as handle:
+        handle.write(payload)
+        temp_path = Path(handle.name)
+    os.replace(temp_path, path)
+
+
 def read_json(path: Path) -> dict[str, Any] | None:
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
@@ -449,6 +457,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--launcher-dir", type=Path, default=DEFAULT_LAUNCHER_DIR)
     parser.add_argument("--cemu-source", type=Path, default=None)
     parser.add_argument("--bettervr-launcher-source", type=Path, default=DEFAULT_BETTERVR_LAUNCHER)
+    parser.add_argument("--bvr-stereo", action=argparse.BooleanOptionalAction, default=True,
+                        help="forward --bvr-stereo to the Cemu fork (use --no-bvr-stereo for fail-closed tests)")
+    parser.add_argument("--request-stereo-instancing", action="store_true",
+                        help="enable StereoInstancing through the session-bound BetterVR command channel after gameplay gating")
     parser.add_argument("--simulator-manifest", type=Path, default=DEFAULT_SIMULATOR_MANIFEST)
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--gameplay-timeout", type=float, default=180.0)
@@ -492,8 +504,11 @@ def main() -> int:
     environment = os.environ.copy()
     environment["XR_RUNTIME_JSON"] = str(args.simulator_manifest.resolve())
     creation_flags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+    cemu_args = [str(launcher), "--enable-mcp"]
+    if args.bvr_stereo:
+        cemu_args.append("--bvr-stereo")
     process = subprocess.Popen(
-        [str(launcher), "--enable-mcp"],
+        cemu_args,
         cwd=launcher_dir,
         env=environment,
         stdin=subprocess.PIPE,
@@ -514,6 +529,7 @@ def main() -> int:
         "launcherPid": process.pid,
         "cemuSha256": sha256(cemu),
         "launcherSha256": sha256(launcher),
+        "bvrStereoCommandLine": args.bvr_stereo,
         "simulatorManifest": str(args.simulator_manifest.resolve()),
         "simulatorManifestSha256": sha256(args.simulator_manifest),
         "traceConfig": {
@@ -545,6 +561,26 @@ def main() -> int:
 
         gate_state = wait_for_gameplay(state_path, simulator_command, args.gameplay_timeout, args.stable_frames)
         packet["gameplayGate"] = gate_state
+        if args.request_stereo_instancing:
+            command_seq = int(gate_state.get("appliedSeq", 0)) + 1001
+            command_path = launcher_dir / "BetterVR_cmd.ini"
+            atomic_text_write(command_path,
+                              f"seq={command_seq}\nsession={gate_state.get('sessionId', '')}\nstereoInstancing=1\nsynthRightEye=0\n")
+            deadline = time.monotonic() + 10.0
+            handshake_state: dict[str, Any] | None = None
+            while time.monotonic() < deadline:
+                candidate = read_json(state_path)
+                if candidate is not None and int(candidate.get("appliedSeq", 0)) == command_seq:
+                    handshake_state = candidate
+                    break
+                time.sleep(0.1)
+            if handshake_state is None:
+                raise TimeoutError("BetterVR did not apply the stereo-instancing request")
+            packet["stereoHandshake"] = {
+                key: handshake_state.get(key)
+                for key in ("stereoInstancingRequested", "stereoInstancingActive", "synthRightEye", "inGame")
+            }
+            packet["stereoHandshake"]["ppc"] = handshake_state.get("ppc", {})
         owned_cemu_pid = int(gate_state.get("pid", 0)) or None
         packet["debuggerDisassembly"] = {
             "asmMtxInverse": client.call_tool("disassemble", {"address": 0x03C6FF74, "count": 32}),

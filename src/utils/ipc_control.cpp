@@ -56,9 +56,32 @@ namespace {
     constexpr uint64_t kOffClearFlagsBefore = 0x164;
     constexpr uint64_t kOffClearStagingBefore = 0x168;
     constexpr uint64_t kOffClearFillBefore = 0x16C;
+    constexpr uint64_t kOffStereoRequestMode = 0x170;
+    constexpr uint64_t kOffStereoRequestNonce = 0x174;
+    constexpr uint64_t kOffStereoRequestGeneration = 0x178;
+    constexpr uint64_t kOffStereoRequestFlags = 0x17C;
+    constexpr uint64_t kOffStereoMatrixSeq = 0x180;
+    constexpr uint64_t kOffStereoRequestFrame = 0x184;
+    constexpr uint64_t kOffStereoForkMagic = 0x190;
+    constexpr uint64_t kOffStereoForkVersion = 0x194;
+    constexpr uint64_t kOffStereoCapabilities = 0x198;
+    constexpr uint64_t kOffStereoAckNonce = 0x19C;
+    constexpr uint64_t kOffStereoAckGeneration = 0x1A0;
+    constexpr uint64_t kOffStereoState = 0x1A4;
+    constexpr uint64_t kOffStereoCompletedGeneration = 0x1A8;
+    constexpr uint64_t kOffStereoFallbackReason = 0x1AC;
+    constexpr uint64_t kOffStereoStickyFaults = 0x1B0;
+    constexpr uint64_t kOffStereoMatrices = 0x1E0;
+    constexpr uint64_t kOffStereoRightCamera = 0x320;
+    constexpr uint64_t kOffStereoRightProjection = 0x378;
     constexpr uint32_t kAbiMagic = 0x42565232; // 'BVR2'
-    constexpr uint32_t kAbiVersion = 2;
-    constexpr uint32_t kAbiSize = 0x170;
+    constexpr uint32_t kAbiVersion = 3;
+    constexpr uint32_t kAbiSize = 0x430;
+    constexpr uint32_t kForkMagic = 0x42565349; // 'BVSI'
+    constexpr uint32_t kForkVersion = 1;
+    constexpr uint32_t kStereoModeTwinIssue = 2;
+    constexpr uint32_t kStereoStateActive = 2;
+    constexpr uint32_t kCapabilityTwinIssue = 1u << 5;
 
     struct PpcSnapshot {
         bool abiValid = false;
@@ -78,6 +101,15 @@ namespace {
         uint32_t clearFlagsBefore = 0;
         uint32_t clearStagingBefore = 0;
         uint32_t clearFillBefore = 0;
+        uint32_t stereoForkMagic = 0;
+        uint32_t stereoForkVersion = 0;
+        uint32_t stereoCapabilities = 0;
+        uint32_t stereoAckNonce = 0;
+        uint32_t stereoAckGeneration = 0;
+        uint32_t stereoState = 0;
+        uint32_t stereoCompletedGeneration = 0;
+        uint32_t stereoFallbackReason = 0;
+        uint32_t stereoStickyFaults = 0;
     };
 
     uint32_t ReadPpcU32(uint64_t address) {
@@ -143,7 +175,24 @@ namespace {
                 break;
             }
         }
+        result.stereoForkMagic = ReadPpcU32(base + kOffStereoForkMagic);
+        result.stereoForkVersion = ReadPpcU32(base + kOffStereoForkVersion);
+        result.stereoCapabilities = ReadPpcU32(base + kOffStereoCapabilities);
+        result.stereoAckNonce = ReadPpcU32(base + kOffStereoAckNonce);
+        result.stereoAckGeneration = ReadPpcU32(base + kOffStereoAckGeneration);
+        result.stereoState = ReadPpcU32(base + kOffStereoState);
+        result.stereoCompletedGeneration = ReadPpcU32(base + kOffStereoCompletedGeneration);
+        result.stereoFallbackReason = ReadPpcU32(base + kOffStereoFallbackReason);
+        result.stereoStickyFaults = ReadPpcU32(base + kOffStereoStickyFaults);
         return result;
+    }
+
+    uint32_t HashSessionNonce(std::string_view value) {
+        uint32_t hash = 2166136261u;
+        for (const unsigned char ch : value) {
+            hash = (hash ^ ch) * 16777619u;
+        }
+        return hash != 0 ? hash : 1u;
     }
 
     uint64_t FileTimeToU64(const FILETIME& value) {
@@ -222,6 +271,7 @@ void IpcControl::Tick(uint32_t frameNo) {
     if (frameNo % kPollInterval == 0) {
         PollCommandFile(frameNo);
     }
+    PublishStereoInstancingRequest(frameNo);
     if (m_traceEvents) {
         DrainEventRing();
     }
@@ -247,6 +297,77 @@ void IpcControl::Tick(uint32_t frameNo) {
     if (frameNo % kStateInterval == 0) {
         WriteStateFile(frameNo);
     }
+}
+
+void IpcControl::PublishStereoInstancingRequest(uint32_t frameNo) {
+    const uint64_t base = GetCounterBlockBase();
+    if (base == 0 || ReadPpcU32(base + kOffAbiMagic) != kAbiMagic ||
+        ReadPpcU32(base + kOffAbiVersion) != kAbiVersion || ReadPpcU32(base + kOffAbiSize) < kAbiSize) {
+        m_stereoInstancingActive = false;
+        return;
+    }
+
+    if (m_stereoRequestNonce == 0) {
+        m_stereoRequestNonce = HashSessionNonce(m_sessionId);
+    }
+
+    std::array<glm::fmat4, 5> matrices{};
+    BESeadLookAtCamera rightCamera{};
+    BESeadPerspectiveProjection rightProjection{};
+    const bool payloadValid = CemuHooks::GetStereoInstancingPayload(matrices, rightCamera, rightProjection);
+    const bool gameplaySafe = CemuHooks::ShouldRequestStereoInstancing();
+    const uint32_t requestedMode = gameplaySafe && payloadValid ? kStereoModeTwinIssue : 0u;
+    if (requestedMode != m_lastStereoRequestMode) {
+        ++m_stereoRequestGeneration;
+        if (m_stereoRequestGeneration == 0) ++m_stereoRequestGeneration;
+        m_lastStereoRequestMode = requestedMode;
+        m_stereoInstancingActive = false;
+    }
+
+    // Disable first, so neither side can observe a newly unsafe payload as armed.
+    if (requestedMode == 0) {
+        CemuHooks::setMemory<uint32_t>(base + kOffStereoRequestMode, 0);
+        CemuHooks::setMemory<uint32_t>(base + kOffStereoRequestFlags, 0);
+    }
+
+    uint32_t matrixSeq = (m_stereoMatrixSeq + 1u) | 1u;
+    CemuHooks::setMemory<uint32_t>(base + kOffStereoMatrixSeq, matrixSeq);
+    CemuHooks::setMemory<uint32_t>(base + kOffStereoRequestFrame, frameNo);
+    if (payloadValid) {
+        uint64_t address = base + kOffStereoMatrices;
+        for (const auto& matrix : matrices) {
+            for (uint32_t column = 0; column < 4; ++column) {
+                for (uint32_t row = 0; row < 4; ++row) {
+                    CemuHooks::setMemory<float>(address, matrix[column][row]);
+                    address += sizeof(float);
+                }
+            }
+        }
+        CemuHooks::writeMemory(base + kOffStereoRightCamera, &rightCamera);
+        CemuHooks::writeMemory(base + kOffStereoRightProjection, &rightProjection);
+    }
+    m_stereoMatrixSeq = matrixSeq + 1u;
+    CemuHooks::setMemory<uint32_t>(base + kOffStereoMatrixSeq, m_stereoMatrixSeq);
+    CemuHooks::setMemory<uint32_t>(base + kOffStereoRequestNonce, m_stereoRequestNonce);
+    CemuHooks::setMemory<uint32_t>(base + kOffStereoRequestGeneration, m_stereoRequestGeneration);
+    CemuHooks::setMemory<uint32_t>(base + kOffStereoRequestMode, requestedMode);
+
+    const PpcSnapshot fork = ReadPpcSnapshot();
+    const bool active = requestedMode == kStereoModeTwinIssue &&
+        fork.stereoForkMagic == kForkMagic && fork.stereoForkVersion == kForkVersion &&
+        (fork.stereoCapabilities & kCapabilityTwinIssue) != 0 &&
+        fork.stereoAckNonce == m_stereoRequestNonce &&
+        fork.stereoAckGeneration == m_stereoRequestGeneration &&
+        fork.stereoState == kStereoStateActive && fork.stereoStickyFaults == 0;
+    if (active != m_stereoInstancingActive) {
+        Log::print<INFO>("[stereo-instancing] {} nonce={:08X} generation={} forkState={} caps={:08X} fallback={} faults={:08X}",
+            active ? "active" : "inactive", m_stereoRequestNonce, m_stereoRequestGeneration,
+            fork.stereoState, fork.stereoCapabilities, fork.stereoFallbackReason, fork.stereoStickyFaults);
+    }
+    m_stereoInstancingActive = active;
+    uint32_t requestFlags = (payloadValid ? 1u : 0u) | (gameplaySafe ? 4u : 0u);
+    if (active) requestFlags |= 2u;
+    CemuHooks::setMemory<uint32_t>(base + kOffStereoRequestFlags, requestFlags);
 }
 
 void IpcControl::PollCommandFile(uint32_t frameNo) {
@@ -279,6 +400,7 @@ void IpcControl::PollCommandFile(uint32_t frameNo) {
         else if (key == "skipMask") command.skipMask = number;
         else if (key == "skipDrc") command.skipDrc = number != 0;
         else if (key == "synthRightEye") command.synthRightEye = number != 0;
+        else if (key == "stereoInstancing") command.stereoInstancing = number != 0;
         else if (key == "rightEyeReuse") command.rightEyeReuse = number != 0;
         else if (key == "dumpEyes" && number != 0) command.dumpFrames = std::max(command.dumpFrames, 1u);
         else if (key == "dumpFrames") command.dumpFrames = std::min(number, 120u);
@@ -311,6 +433,10 @@ void IpcControl::ApplyCommand(uint32_t frameNo) {
     }
     if (command.synthRightEye.has_value()) {
         GetSettings().synthesizedRightEye = *command.synthRightEye;
+    }
+    if (command.stereoInstancing.has_value()) {
+        GetSettings().stereoInstancing = *command.stereoInstancing;
+        if (*command.stereoInstancing) GetSettings().synthesizedRightEye = false;
     }
     if (command.rightEyeReuse.has_value()) {
         // The model-job update and queue preservation hooks are one invariant.
@@ -345,12 +471,13 @@ void IpcControl::ApplyCommand(uint32_t frameNo) {
     if (!command.marker.empty()) m_marker = command.marker;
     m_appliedHostFrame = frameNo;
 
-    Log::print<INFO>("[ipc] applied seq={} at frame {}: skipMask={} reuse={} skipDrc={} synth={} dumpFrames={} traceEvents={} epoch={} marker='{}'",
+    Log::print<INFO>("[ipc] applied seq={} at frame {}: skipMask={} reuse={} skipDrc={} synth={} stereoInstancing={} dumpFrames={} traceEvents={} epoch={} marker='{}'",
         command.seq, frameNo,
         command.skipMask.has_value() ? std::to_string(*command.skipMask) : "-",
         command.rightEyeReuse.has_value() ? (*command.rightEyeReuse ? "1" : "0") : "-",
         command.skipDrc.has_value() ? (*command.skipDrc ? "1" : "0") : "-",
         command.synthRightEye.has_value() ? (*command.synthRightEye ? "1" : "0") : "-",
+        command.stereoInstancing.has_value() ? (*command.stereoInstancing ? "1" : "0") : "-",
         command.dumpFrames,
         command.traceEvents.has_value() ? (*command.traceEvents ? "1" : "0") : "-",
         command.epoch.has_value() ? std::to_string(*command.epoch) : "-", command.marker);
@@ -391,12 +518,14 @@ void IpcControl::WriteStateFile(uint32_t frameNo) {
              << ", \"flickerEvents\": " << s.flickerEvents << ", \"frozenFrames\": " << s.frozenFrames
              << ", \"lastTransitionFrame\": " << s.lastTransitionFrame << ", \"lastSampleFrame\": " << s.lastSampleFrame << " }";
     };
-    json << "{\n  \"schemaVersion\": 2,\n  \"sessionId\": \"" << JsonEscape(m_sessionId) << "\",\n"
+    json << "{\n  \"schemaVersion\": 3,\n  \"sessionId\": \"" << JsonEscape(m_sessionId) << "\",\n"
          << "  \"pid\": " << GetCurrentProcessId() << ",\n  \"stateSeq\": " << ++m_stateSeq << ",\n"
          << "  \"timestampUnixMs\": " << UnixTimeMs() << ",\n  \"frame\": " << frameNo << ",\n"
          << "  \"appliedSeq\": " << m_lastAppliedSeq << ",\n  \"appliedAtHostFrame\": " << m_appliedHostFrame << ",\n"
          << "  \"marker\": \"" << JsonEscape(m_marker) << "\",\n  \"settingMask\": " << (uint32_t)GetSettings().GetRenderSkipMask() << ",\n"
          << "  \"effectiveMask\": " << effectiveMask << ",\n  \"synthRightEye\": " << (CemuHooks::ShouldUseSynthesizedRightEye() ? 1 : 0) << ",\n"
+         << "  \"stereoInstancingRequested\": " << (CemuHooks::ShouldRequestStereoInstancing() ? 1 : 0) << ",\n"
+         << "  \"stereoInstancingActive\": " << (m_stereoInstancingActive ? 1 : 0) << ",\n"
          << "  \"inGame\": " << (CemuHooks::IsInGame() ? 1 : 0) << ",\n  \"fadeVisible\": " << (CemuHooks::IsAnyFadeScreenVisible() ? 1 : 0) << ",\n"
          << "  \"frameMs\": " << frameMs << ",\n  \"workMs\": " << workMs << ",\n"
          << "  \"dumpFramesPending\": " << m_dumpFramesPending << ",\n  \"traceEvents\": " << (m_traceEvents ? "true" : "false") << ",\n";
@@ -434,6 +563,11 @@ void IpcControl::WriteStateFile(uint32_t frameNo) {
          << ", \"telemetryLevel\": " << ppc.telemetryLevel << ", \"lastControlEvent\": " << ppc.lastControlEvent
          << ", \"clearShouldRequest\": " << ppc.clearShouldRequest << ", \"clearFlagsBefore\": " << ppc.clearFlagsBefore
          << ", \"clearStagingBefore\": " << ppc.clearStagingBefore << ", \"clearFillBefore\": " << ppc.clearFillBefore
+         << ", \"stereoForkMagic\": " << ppc.stereoForkMagic << ", \"stereoForkVersion\": " << ppc.stereoForkVersion
+         << ", \"stereoCapabilities\": " << ppc.stereoCapabilities << ", \"stereoAckNonce\": " << ppc.stereoAckNonce
+         << ", \"stereoAckGeneration\": " << ppc.stereoAckGeneration << ", \"stereoState\": " << ppc.stereoState
+         << ", \"stereoCompletedGeneration\": " << ppc.stereoCompletedGeneration
+         << ", \"stereoFallbackReason\": " << ppc.stereoFallbackReason << ", \"stereoStickyFaults\": " << ppc.stereoStickyFaults
          << ", \"controlConverged\": " << (controlConverged ? "true" : "false")
          << ", \"frame\": " << ReadCounter(kOffFrame) << ", \"requestDraw\": " << ReadCounter(kOffRequestDraw)
          << ", \"swapCursor\": " << ReadCounter(kOffLastSwapCursor) << ", \"swapCount\": " << ReadCounter(kOffSwapCount)

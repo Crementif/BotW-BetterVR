@@ -723,9 +723,9 @@ _bvrEvtRing:
 _bvrAbiMagic:
 .int 0x42565232 ; 'BVR2'
 _bvrAbiVersion:
-.int 2
+.int 3
 _bvrAbiSize:
-.int 0x00000170
+.int 0x00000430
 _bvrSnapshotSeq:
 .int 0
 _bvrActiveMask:
@@ -752,6 +752,133 @@ _bvrClearStagingBefore:
 .int 0
 _bvrClearFillBefore:
 .int 0
+
+; Stereo-instancing ABI v3. The BetterVR host owns the request/matrix half and
+; the Cemu fork owns the acknowledgement/statistics half. requestGeneration is
+; stable across frames and changes only when the requested mode changes;
+; matrixSeq is a separate odd/even seqlock for the per-frame payload.
+_bvrStereoRequestMode:
+.int 0 ; 0=off, 1=trace, 2=twin issue, 3=Vulkan multiview
+_bvrStereoRequestNonce:
+.int 0
+_bvrStereoRequestGeneration:
+.int 0
+_bvrStereoRequestFlags:
+.int 0 ; bit0=payload valid, bit1=guest view-1 bake armed, bit2=gameplay safe
+_bvrStereoMatrixSeq:
+.int 0
+_bvrStereoRequestFrame:
+.int 0
+_bvrStereoReserved0:
+.int 0, 0
+
+_bvrStereoForkMagic:
+.int 0 ; 'BVSI' when a compatible fork is present
+_bvrStereoForkVersion:
+.int 0
+_bvrStereoCapabilities:
+.int 0
+_bvrStereoAckNonce:
+.int 0
+_bvrStereoAckGeneration:
+.int 0
+_bvrStereoState:
+.int 0 ; 0=idle, 1=ready, 2=active, 3=fallback, 4=faulted
+_bvrStereoCompletedGeneration:
+.int 0
+_bvrStereoFallbackReason:
+.int 0
+_bvrStereoStickyFaults:
+.int 0
+_bvrStereoLeftIssues:
+.int 0
+_bvrStereoRightIssues:
+.int 0
+_bvrStereoClears:
+.int 0
+_bvrStereoCopies:
+.int 0
+_bvrStereoSkippedOperations:
+.int 0
+_bvrStereoTargetPairs:
+.int 0
+_bvrStereoUboSubstitutions:
+.int 0
+_bvrStereoTraceTimeUs:
+.int 0
+_bvrStereoLeftIssueTimeUs:
+.int 0
+_bvrStereoRightIssueTimeUs:
+.int 0
+_bvrStereoTargetSwitchTimeUs:
+.int 0
+
+; Five column-major 4x4 matrices, each element stored as a guest big-endian
+; float: left view, right view, left projection, right projection, then
+; P_right * V_right * inverse(P_left * V_left).
+_bvrStereoMatrices:
+.int 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+.int 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+.int 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+.int 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+.int 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+
+; Guest-native view-1 source objects. The host copies complete right-eye sead
+; camera/projection objects here, retaining their original vtables. The PPC hook
+; below feeds these to BOTW's own updateRenderingMatricesUsingCamera path.
+_bvrStereoRightCamera:
+.int 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+_bvrStereoRightProjection:
+.int 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+.int 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+.int 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+
+0x0399BCF0 = bvr_updateRenderingMatricesUsingCamera:
+0x03A24214 = bvr_buildModelJobQueueRecord:
+
+; The main ModelSceneContext already allocates 26 native view slots. Immediately
+; before BOTW builds its job-queue record, populate dormant view 1 through the
+; same path used by view 0 and the snapshot camera. This remains completely
+; dormant until the fork has acknowledged the request and BetterVR arms bit 1.
+hook_bvrBuildNativeRightView:
+mflr r0
+stwu r1, -0x30(r1)
+stw r0, 0x34(r1)
+stw r3, 0x0C(r1)
+stw r4, 0x10(r1)
+stw r5, 0x14(r1)
+
+lis r12, _bvrStereoRequestFlags@ha
+lwz r12, _bvrStereoRequestFlags@l(r12)
+andi. r12, r12, 0x0002
+beq bvr_buildOriginalJobQueueRecord
+
+mr r3, r5
+li r4, 1
+lis r5, _bvrStereoRightCamera@ha
+addi r5, r5, _bvrStereoRightCamera@l
+lis r6, _bvrStereoRightProjection@ha
+addi r6, r6, _bvrStereoRightProjection@l
+mr r7, r5
+lis r12, bvr_updateRenderingMatricesUsingCamera@ha
+addi r12, r12, bvr_updateRenderingMatricesUsingCamera@l
+mtctr r12
+bctrl
+
+bvr_buildOriginalJobQueueRecord:
+lwz r3, 0x0C(r1)
+lwz r4, 0x10(r1)
+lwz r5, 0x14(r1)
+lis r12, bvr_buildModelJobQueueRecord@ha
+addi r12, r12, bvr_buildModelJobQueueRecord@l
+mtctr r12
+bctrl
+lwz r0, 0x34(r1)
+mtlr r0
+addi r1, r1, 0x30
+blr
+
+0x039A9524 = bla hook_bvrBuildNativeRightView
 
 ; counter hook: gsys::Model::requestDraw call count (hot path - counter only, no event)
 0x039859E8 = cnt_requestDraw_cont:

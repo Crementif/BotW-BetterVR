@@ -4,6 +4,7 @@
 #include "imgui_internal.h"
 #include "instance.h"
 #include "hooking/entity_debugger.h"
+#include "utils/ipc_control.h"
 #include "utils/mod_settings.h"
 
 ModSettings g_settings = {};
@@ -156,7 +157,8 @@ void CemuHooks::hook_UpdateSettings(PPCInterpreter_t* hCPU) {
     // push the host-controlled performance flags into the PPC-visible flag block
     // (same repurposed bytes as DISABLE_PPC_LOGGING_GET/recordingOutputMode above)
     setMemory<uint32_t>(0x10416BF8, GetEffectiveRenderSkipMask());
-    setMemory<uint32_t>(0x10416BFC, ShouldUseSynthesizedRightEye() ? 1u : 0u);
+    setMemory<uint32_t>(0x10416BFC,
+        (ShouldUseSynthesizedRightEye() || IpcControl::instance().IsStereoInstancingActive()) ? 1u : 0u);
     
     if (GetSettings().IsDebuggingToolsEnabled()) {
         VRManager::instance().Hooks->m_entityDebugger->UpdateEntityMemory();

@@ -878,6 +878,10 @@ void RND_Renderer::ImGuiOverlay::DrawSettingsTab(const ImVec2& windowWidth, bool
             settings.synthesizedRightEye.AddToGUI(changed);
         });
 
+        DrawSettingRow(windowWidth, "True Stereo Instancing (Fork Required)", [&]() {
+            settings.stereoInstancing.AddToGUI(changed);
+        });
+
         DrawSettingRow(windowWidth, "Right-Eye Calc Skips (Experimental Bitmask)", [&]() {
             uint32_t mask = settings.rightEyeCalcSkipMask;
             bool maskChanged = false;

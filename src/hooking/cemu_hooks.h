@@ -158,12 +158,18 @@ public:
     // experimental mono-throughput mode: the game renders one (left) eye and the
     // compositor currently mirrors it; depth reprojection is not yet validated
     static bool ShouldUseSynthesizedRightEye();
+    // Requests the forked Cemu record-once/issue-twice path. This is the safety
+    // predicate only; entering the mono guest loop additionally requires a fresh
+    // ABI acknowledgement checked by IpcControl.
+    static bool ShouldRequestStereoInstancing();
     // Right-eye queue reuse keeps the game's two-pass housekeeping cadence, but the
     // right pass intentionally does not rebuild model draw lists. The compositor must
     // therefore submit the already-copied left eye for both OpenXR views.
     static bool ShouldSynthesizeRightEyeFromQueueReuse();
     static bool ShouldCaptureSynthStereoMatrices();
     static std::optional<glm::fmat4> GetSynthReprojectionMatrix(bool sourceIsRight = false);
+    static bool GetStereoInstancingPayload(std::array<glm::fmat4, 5>& matrices,
+        BESeadLookAtCamera& rightCamera, BESeadPerspectiveProjection& rightProjection);
     // the render-skip bitmask with load/cutscene safety gating applied
     static uint32_t GetEffectiveRenderSkipMask();
 

@@ -712,8 +712,12 @@ namespace {
         std::mutex lock;
         std::array<glm::fmat4, 2> view = { glm::fmat4(1.0f), glm::fmat4(1.0f) };
         std::array<glm::fmat4, 2> proj = { glm::fmat4(1.0f), glm::fmat4(1.0f) };
+        BESeadLookAtCamera rightCamera = {};
+        BESeadPerspectiveProjection rightProjection = {};
         bool viewValid = false;
         bool projValid = false;
+        bool rightCameraValid = false;
+        bool rightProjectionValid = false;
     };
     SynthStereoMatrices s_synthStereo;
 }
@@ -763,6 +767,24 @@ bool CemuHooks::ShouldUseSynthesizedRightEye() {
     return true;
 }
 
+bool CemuHooks::ShouldRequestStereoInstancing() {
+    if (!GetSettings().UseStereoInstancing()) {
+        return false;
+    }
+    auto* xr = VRManager::instance().XR.get();
+    auto* renderer = xr != nullptr ? xr->GetRenderer() : nullptr;
+    if (renderer == nullptr || !renderer->IsInitialized() || !IsInGame()) {
+        return false;
+    }
+    if (UseMonoFrameBufferTemporarilyDuringMenusOrPictures() || UseBlackBarsDuringEvents()) {
+        return false;
+    }
+    if (HasActiveCutscene() || IsAnyFadeScreenVisible()) {
+        return false;
+    }
+    return true;
+}
+
 bool CemuHooks::ShouldSynthesizeRightEyeFromQueueReuse() {
     // Bit 12 suppresses the expensive right-eye ModelJobQueue rebuild. We deliberately
     // leave the normal clear/swap protocol (bit 13 off) running so the following left
@@ -773,7 +795,8 @@ bool CemuHooks::ShouldSynthesizeRightEyeFromQueueReuse() {
 }
 
 bool CemuHooks::ShouldCaptureSynthStereoMatrices() {
-    return GetSettings().UseSynthesizedRightEye() || ShouldSynthesizeRightEyeFromQueueReuse();
+    return GetSettings().UseSynthesizedRightEye() || GetSettings().UseStereoInstancing() ||
+        ShouldSynthesizeRightEyeFromQueueReuse();
 }
 
 std::optional<glm::fmat4> CemuHooks::GetSynthReprojectionMatrix(bool sourceIsRight) {
@@ -786,6 +809,23 @@ std::optional<glm::fmat4> CemuHooks::GetSynthReprojectionMatrix(bool sourceIsRig
     const glm::fmat4 sourceClip = s_synthStereo.proj[sourceSide] * s_synthStereo.view[sourceSide];
     const glm::fmat4 targetClip = s_synthStereo.proj[targetSide] * s_synthStereo.view[targetSide];
     return targetClip * glm::inverse(sourceClip);
+}
+
+bool CemuHooks::GetStereoInstancingPayload(std::array<glm::fmat4, 5>& matrices,
+    BESeadLookAtCamera& rightCamera, BESeadPerspectiveProjection& rightProjection) {
+    std::lock_guard lk(s_synthStereo.lock);
+    if (!s_synthStereo.viewValid || !s_synthStereo.projValid ||
+        !s_synthStereo.rightCameraValid || !s_synthStereo.rightProjectionValid) {
+        return false;
+    }
+    matrices[0] = s_synthStereo.view[EyeSide::LEFT];
+    matrices[1] = s_synthStereo.view[EyeSide::RIGHT];
+    matrices[2] = s_synthStereo.proj[EyeSide::LEFT];
+    matrices[3] = s_synthStereo.proj[EyeSide::RIGHT];
+    matrices[4] = matrices[3] * matrices[1] * glm::inverse(matrices[2] * matrices[0]);
+    rightCamera = s_synthStereo.rightCamera;
+    rightProjection = s_synthStereo.rightProjection;
+    return true;
 }
 
 // s_lastCameraMtx is still the previous frame's anchor while the actor calc jobs run, so anything
@@ -821,10 +861,18 @@ void CemuHooks::hook_GetRenderCamera(PPCInterpreter_t* hCPU) {
     if (side == EyeSide::LEFT && ShouldCaptureSynthStereoMatrices()) {
         auto [rightPos, rightRot] = BuildGameplayCameraPose(gameplayPos, gameplayRot, EyeSide::RIGHT);
         glm::mat4 rightWorld = glm::translate(glm::mat4(1.0f), rightPos) * glm::mat4_cast(rightRot);
+        const glm::mat4 rightView = glm::inverse(rightWorld);
+        BESeadLookAtCamera rightCamera = camera;
+        rightCamera.mtx.setLEMatrix(rightView);
+        rightCamera.pos = rightPos;
+        rightCamera.at = rightPos - glm::vec3(rightView[2]);
+        rightCamera.up = glm::vec3(rightView[1]);
         std::lock_guard lk(s_synthStereo.lock);
         s_synthStereo.view[EyeSide::LEFT] = newViewVR;
-        s_synthStereo.view[EyeSide::RIGHT] = glm::inverse(rightWorld);
+        s_synthStereo.view[EyeSide::RIGHT] = rightView;
+        s_synthStereo.rightCamera = rightCamera;
         s_synthStereo.viewValid = true;
+        s_synthStereo.rightCameraValid = true;
     }
 
     camera.mtx.setLEMatrix(newViewVR);
@@ -917,10 +965,28 @@ void CemuHooks::hook_GetRenderProjection(PPCInterpreter_t* hCPU) {
             rightDeviceMatrix[2][2] = (rightDeviceMatrix[2][2] + rightDeviceMatrix[3][2] * zOffset) * zScale;
             rightDeviceMatrix[2][3] = rightDeviceMatrix[2][3] * zScale + rightDeviceMatrix[3][3] * zOffset;
 
+            BESeadPerspectiveProjection rightProjection = perspectiveProjection;
+            const auto rightProjectionParams = RenderUtils::CalculateFOVAndOffset(rightFovOpt.value());
+            rightProjection.aspect = rightProjectionParams.aspectRatio;
+            rightProjection.fovYRadiansOrAngle = rightProjectionParams.fovY;
+            const float rightHalfAngle = rightProjectionParams.fovY.getLE() * 0.5f;
+            rightProjection.fovySin = sinf(rightHalfAngle);
+            rightProjection.fovyCos = cosf(rightHalfAngle);
+            rightProjection.fovyTan = tanf(rightHalfAngle);
+            rightProjection.offset.x = rightProjectionParams.offsetX;
+            rightProjection.offset.y = rightProjectionParams.offsetY;
+            rightProjection.matrix = RenderUtils::CalculateProjectionMatrix(
+                perspectiveProjection.zNear.getLE(), perspectiveProjection.zFar.getLE(), rightFovOpt.value());
+            rightProjection.deviceMatrix = rightDeviceMatrix;
+            rightProjection.dirty = false;
+            rightProjection.deviceDirty = false;
+
             std::lock_guard lk(s_synthStereo.lock);
             s_synthStereo.proj[EyeSide::LEFT] = newDeviceMatrix;
             s_synthStereo.proj[EyeSide::RIGHT] = rightDeviceMatrix;
+            s_synthStereo.rightProjection = rightProjection;
             s_synthStereo.projValid = true;
+            s_synthStereo.rightProjectionValid = true;
         }
     }
 

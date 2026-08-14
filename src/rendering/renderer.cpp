@@ -124,7 +124,9 @@ void RND_Renderer::StartFrame() {
     // only from hook_UpdateSettings) so they reliably reach the game on every screen,
     // including menus/title screens where parts of the game's frame loop don't run
     CemuHooks::setMemory<uint32_t>(0x10416BF8, CemuHooks::GetEffectiveRenderSkipMask());
-    CemuHooks::setMemory<uint32_t>(0x10416BFC, CemuHooks::ShouldUseSynthesizedRightEye() ? 1u : 0u);
+    const bool useSingleGuestPass = CemuHooks::ShouldUseSynthesizedRightEye() ||
+        IpcControl::instance().IsStereoInstancingActive();
+    CemuHooks::setMemory<uint32_t>(0x10416BFC, useSingleGuestPass ? 1u : 0u);
 
     XrFrameWaitInfo waitFrameInfo = { XR_TYPE_FRAME_WAIT_INFO };
     auto waitStart = std::chrono::high_resolution_clock::now();
