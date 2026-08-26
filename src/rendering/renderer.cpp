@@ -56,7 +56,8 @@ bool RND_Renderer::IsStable3DReuseAllowed(const RenderFrame& frame) const {
         return false;
     }
     const bool isMonoFallbackFrame = (frame.issueFlags & CaptureIssue_MonoCapture) != 0;
-    if (!isMonoFallbackFrame && !CemuHooks::IsInGame()) {
+    const bool isDpadMenuOpen = VRManager::instance().XR->m_gameState.load().dpad_menu_open_requested;
+    if (!isMonoFallbackFrame && !CemuHooks::IsInGame() && !isDpadMenuOpen) {
         return false;
     }
     if (CemuHooks::UseBlackBarsDuringEvents()) {
@@ -286,6 +287,12 @@ void RND_Renderer::EndFrame() {
     m_isFadeActive.store(isFadeVisible, std::memory_order_relaxed);
     SetCustomFadeColor(glm::fvec3(0.0f));
     SetCustomFadeAmount(std::max(roomscaleFade, snapTurnFade));
+
+    // the dpad quick-menu's darkening backdrop is baked into the HUD capture as opaque black
+    // (correct in flatscreen where it draws into the same buffer as the 3D scene, but it would
+    // fully occlude our separately-composited HUD layer), so cap its alpha instead of letting it through
+    const bool isDpadMenuOpenForHud = VRManager::instance().XR->m_gameState.load().dpad_menu_open_requested;
+    SetHudMaxAlpha(isDpadMenuOpenForHud ? 0.55f : 1.0f);
 
     bool reusedStable3D = false;
     long presented3DFrameIdx = -1;

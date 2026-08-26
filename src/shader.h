@@ -28,6 +28,7 @@ cbuffer g_settings : register(b1) {
     float customFadeColorG;
     float customFadeColorB;
     float isFadeActive;
+    float hudMaxAlpha;
 };
 
 Texture2D g_colorTexture : register(t0);
@@ -101,6 +102,7 @@ cbuffer g_settings : register(b1) {
     float customFadeColorG;
     float customFadeColorB;
     float isFadeActive;
+    float hudMaxAlpha;
 };
 
 Texture2D g_colorTexture : register(t0);
@@ -121,9 +123,12 @@ PSOutput PSMain(PSInput input) {
 
     float4 colorTexture = g_colorTexture.Sample(g_sampler, samplePosition);
 
+    // the dpad quick-menu's darkening backdrop is baked into the HUD capture as opaque black
+    // (correct in flatscreen where it draws into the same buffer as the 3D scene, but it would
+    // fully occlude our separately-composited HUD layer), so cap its alpha instead of letting it through
     PSOutput output;
 	//output.Color = float4(0.0f, 0.0f, 0.0f, 0.0f);
-    output.Color = float4(colorTexture.x, colorTexture.y, colorTexture.z, colorTexture.w);
+    output.Color = float4(colorTexture.x, colorTexture.y, colorTexture.z, min(colorTexture.w, hudMaxAlpha));
     return output;
 }
 )hlsl";
@@ -194,6 +199,7 @@ struct presentSettings {
     float customFadeColorG;
     float customFadeColorB;
     float isFadeActive;
+    float hudMaxAlpha;
 };
 
 struct debugDrawLineSettings {

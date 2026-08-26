@@ -326,6 +326,7 @@ void RND_D3D12::PresentPipeline<depth>::UpdateSettingsBuffer(ID3D12Resource* swa
         .customFadeColorG = 0.0f,
         .customFadeColorB = 0.0f,
         .isFadeActive = 0.0f,
+        .hudMaxAlpha = 1.0f,
     };
 
     if constexpr (depth) {
@@ -335,6 +336,9 @@ void RND_D3D12::PresentPipeline<depth>::UpdateSettingsBuffer(ID3D12Resource* swa
         settings.customFadeColorG = fade.color.y;
         settings.customFadeColorB = fade.color.z;
         settings.isFadeActive = m_renderer != nullptr && m_renderer->IsFadeActive() ? 1.0f : 0.0f;
+    }
+    else {
+        settings.hudMaxAlpha = m_renderer != nullptr ? m_renderer->GetHudMaxAlpha() : 1.0f;
     }
 
     void* data = nullptr;

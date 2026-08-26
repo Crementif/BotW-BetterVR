@@ -385,6 +385,12 @@ public:
 
     bool IsFadeActive() const { return m_isFadeActive.load(std::memory_order_relaxed); }
 
+    void SetHudMaxAlpha(float maxAlpha) {
+        m_hudMaxAlpha.store(glm::clamp(maxAlpha, 0.0f, 1.0f), std::memory_order_relaxed);
+    }
+
+    float GetHudMaxAlpha() const { return m_hudMaxAlpha.load(std::memory_order_relaxed); }
+
 private:
     bool IsCurrent3DPresentationAllowed(const RenderFrame& frame) const;
     bool IsStable3DReuseAllowed(const RenderFrame& frame) const;
@@ -423,6 +429,7 @@ protected:
     std::atomic<float> m_customFadeColorR = 0.0f;
     std::atomic<float> m_customFadeColorG = 0.0f;
     std::atomic<float> m_customFadeColorB = 0.0f;
+    std::atomic<float> m_hudMaxAlpha = 1.0f;
 
     // Full-frame timing derived from OpenXR timestamps (XrTime is in nanoseconds)
     XrTime m_lastPredictedDisplayTime = 0;
