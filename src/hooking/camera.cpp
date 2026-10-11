@@ -29,7 +29,10 @@ void CemuHooks::hook_BeginCameraSide(PPCInterpreter_t* hCPU) {
 }
 
 bool CemuHooks::UseMonoFrameBufferTemporarilyDuringMenusOrPictures() {
-    return !IsAnyFadeScreenVisible() && (IsFlatCameraModeActive() || IsScreenOpen(ScreenId::PauseMenuInfo_00) || VRManager::instance().XR->GetRenderer()->IsGameCapturing3DFrameBuffer());
+    // the renderer is absent while a session is being rebuilt, the game keeps running through that
+    auto* renderer = VRManager::instance().XR->GetRenderer();
+    return !IsAnyFadeScreenVisible() && (IsFlatCameraModeActive() || IsScreenOpen(ScreenId::PauseMenuInfo_00)
+        || (renderer != nullptr && renderer->IsGameCapturing3DFrameBuffer()));
 }
 
 // Write a frustum into a sead::PerspectiveProjection: the scalars the game reads back, the
@@ -564,9 +567,16 @@ void CemuHooks::hook_UpdateCameraForGameplay(PPCInterpreter_t* hCPU) {
     UpdateDebugEyeViewsFromGameplayPose(s_wsCameraPosition, s_wsCameraRotation);
 
     // current VR headset camera matrix
-    auto viewsOpt = VRManager::instance().XR->GetRenderer()->GetMiddlePose();
+    auto viewsOpt = VRManager::instance().XR->GetMiddlePose();
     if (!viewsOpt) {
-        Log::print<ERROR>("hook_UpdateCameraForGameplay: No views available for the middle pose.");
+        // this happens while the session is stopped or the runtime has no views yet, which is up to
+        // hundreds of calls per second, so only report the start of such a phase
+        static std::atomic<long long> s_lastLogMs = 0;
+        const long long nowMs = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+        if (nowMs - s_lastLogMs.load(std::memory_order_relaxed) > 1000) {
+            s_lastLogMs.store(nowMs, std::memory_order_relaxed);
+            Log::print<ERROR>("hook_UpdateCameraForGameplay: No views available for the middle pose.");
+        }
         return;
     }
     glm::mat4 views = GetAppliedHeadsetPose(viewsOpt.value());

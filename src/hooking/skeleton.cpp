@@ -791,7 +791,7 @@ void CemuHooks::hook_ModifyBoneMatrix(PPCInterpreter_t* hCPU) {
 
     // override the root transform so the body aligns with the headset yaw
     if (boneName == "Skl_Root") {
-        auto headsetPose = VRManager::instance().XR->GetRenderer()->GetMiddlePose();
+        auto headsetPose = VRManager::instance().XR->GetMiddlePose();
         glm::mat4 headsetMtx = headsetPose.value_or(ToMat4(glm::fvec3(0)));
 
         // calculate eye offset from eyeball bones (once)

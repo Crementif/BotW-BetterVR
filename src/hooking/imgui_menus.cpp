@@ -1214,7 +1214,12 @@ void RND_Renderer::ImGuiOverlay::DrawSystemPage(bool* changed) {
     // the read-only diagnostics go last so that every widget on the page sits in one uninterrupted run for the cursor
     if (settings.performanceOverlay != PerformanceOverlayMode::DISABLE) {
         DrawSectionCaption("Live Frame Timings");
-        DrawFPSOverlayContent(VRManager::instance().XR->GetRenderer(), true, OverlayProfilerMode::NONE);
+        if (auto* renderer = VRManager::instance().XR->GetRenderer(); renderer != nullptr) {
+            DrawFPSOverlayContent(renderer, true, OverlayProfilerMode::NONE);
+        }
+        else {
+            ImGui::Text("No VR session right now, the headset timings are unavailable");
+        }
         DrawNavScrollStop("##AfterFrameTimings");
     }
 

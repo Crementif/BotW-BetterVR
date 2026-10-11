@@ -904,6 +904,13 @@ void processInputPrevention(OpenXR::GameState& gameState, std::chrono::steady_cl
 
 void processModMenuInput(std::atomic_bool& isMenuOpen, OpenXR::InputState& inputs, VPADStatus& vpadInputs, RND_Renderer::ImGuiOverlay* imguiOverlay, XrActionStateVector2f& leftStickSource, XrActionStateVector2f& rightStickSource)
 {
+    // The ImGui context only exists while an overlay owns one, and this runs on the thread the game
+    // calls the HLE hooks from. ImGui::GetIO() on a process without a context reads from a null
+    // pointer, so the menu simply stays unreachable until an overlay is back.
+    if (ImGui::GetCurrentContext() == nullptr) {
+        return;
+    }
+
     if (inputs.shared.modMenuState.lastEvent == ButtonState::Event::LongPress && inputs.shared.modMenuState.longFired_actedUpon) {
         isMenuOpen = !isMenuOpen;
         inputs.shared.modMenuState.longFired_actedUpon = false;
@@ -1035,6 +1042,11 @@ void CemuHooks::hook_InjectXRInput(PPCInterpreter_t* hCPU) {
     auto& xr = VRManager::instance().XR;
     auto* renderer = xr->GetRenderer();
     if (!renderer) {
+        return;
+    }
+    if (!xr->IsSessionRunning()) {
+        // the headset is asleep and the session is stopped: leave whatever Cemu wrote to VPADStatus
+        // alone, otherwise the last pose we sampled would keep its buttons held down forever
         return;
     }
     renderer->EnsureFrameInputLatched();

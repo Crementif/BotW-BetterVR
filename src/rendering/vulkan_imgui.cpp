@@ -57,7 +57,7 @@ static void FillCustomGlyphRect(ImFontAtlas* atlas, int rectIndex, const unsigne
     }
 }
 
-RND_Renderer::ImGuiOverlay::ImGuiOverlay(VkCommandBuffer cb, VkExtent2D fbRes, VkFormat fbFormat): m_outputRes(fbRes) {
+RND_Renderer::ImGuiOverlay::ImGuiOverlay(RND_Renderer* owner, VkCommandBuffer cb, VkExtent2D fbRes, VkFormat fbFormat): m_outputRes(fbRes) {
     ImGui::CreateContext();
     ImGui::GetPlatformIO().Platform_OpenInShellFn = &OpenLinkInShell;
     Log::print<INFO>("Installed the ImGui link handler, links in the mod menu can open a browser");
@@ -227,7 +227,7 @@ RND_Renderer::ImGuiOverlay::ImGuiOverlay(VkCommandBuffer cb, VkExtent2D fbRes, V
     };
     checkAssert(ImGui_ImplVulkan_Init(&init_info), "Failed to initialize ImGui");
 
-    auto* renderer = VRManager::instance().XR->GetRenderer();
+    auto* renderer = owner;
     for (int i = 0; i < 2; ++i) {
         renderer->GetFrame(i).imguiFramebuffer = std::make_unique<VulkanFramebuffer>(fbRes.width, fbRes.height, fbFormat, m_renderPass);
     }
@@ -307,22 +307,26 @@ RND_Renderer::ImGuiOverlay::ImGuiOverlay(VkCommandBuffer cb, VkExtent2D fbRes, V
 
 RND_Renderer::ImGuiOverlay::~ImGuiOverlay() {
     auto* renderer = VRManager::instance().XR->GetRenderer();
-    for (int i = 0; i < 2; ++i) {
-        auto& frame = renderer->GetFrame(i);
-        if (frame.mainFramebufferDS != VK_NULL_HANDLE)
-            ImGui_ImplVulkan_RemoveTexture(frame.mainFramebufferDS);
-        if (frame.mainFramebuffer != nullptr)
-            frame.mainFramebuffer.reset();
-        if (frame.hudFramebufferDS != VK_NULL_HANDLE)
-            ImGui_ImplVulkan_RemoveTexture(frame.hudFramebufferDS);
-        if (frame.hudFramebuffer != nullptr)
-            frame.hudFramebuffer.reset();
-        if (frame.hudWithoutAlphaFramebufferDS != VK_NULL_HANDLE)
-            ImGui_ImplVulkan_RemoveTexture(frame.hudWithoutAlphaFramebufferDS);
-        if (frame.hudWithoutAlphaFramebuffer != nullptr)
-            frame.hudWithoutAlphaFramebuffer.reset();
-        if (frame.imguiFramebuffer != nullptr)
-            frame.imguiFramebuffer.reset();
+    // the frame objects belong to the renderer that owns this overlay: without one they are already
+    // gone, only the process wide ImGui and Vulkan state is left to tear down
+    if (renderer != nullptr) {
+        for (int i = 0; i < 2; ++i) {
+            auto& frame = renderer->GetFrame(i);
+            if (frame.mainFramebufferDS != VK_NULL_HANDLE)
+                ImGui_ImplVulkan_RemoveTexture(frame.mainFramebufferDS);
+            if (frame.mainFramebuffer != nullptr)
+                frame.mainFramebuffer.reset();
+            if (frame.hudFramebufferDS != VK_NULL_HANDLE)
+                ImGui_ImplVulkan_RemoveTexture(frame.hudFramebufferDS);
+            if (frame.hudFramebuffer != nullptr)
+                frame.hudFramebuffer.reset();
+            if (frame.hudWithoutAlphaFramebufferDS != VK_NULL_HANDLE)
+                ImGui_ImplVulkan_RemoveTexture(frame.hudWithoutAlphaFramebufferDS);
+            if (frame.hudWithoutAlphaFramebuffer != nullptr)
+                frame.hudWithoutAlphaFramebuffer.reset();
+            if (frame.imguiFramebuffer != nullptr)
+                frame.imguiFramebuffer.reset();
+        }
     }
 
     for (auto& helpImage : m_helpImages) {
@@ -445,6 +449,10 @@ void RND_Renderer::ImGuiOverlay::Render(long frameIdx, bool renderBackground, bo
     BetterVRProfiler::Scope profile(BetterVRProfiler::Section::ImGuiRender);
 
     auto* renderer = VRManager::instance().XR->GetRenderer();
+    if (renderer == nullptr) {
+        // the renderer is absent while a session is being rebuilt
+        return;
+    }
     auto& frame = renderer->GetFrame(frameIdx);
 
     const bool shouldHideGameUIInDesktopView = isDesktopView && CemuHooks::s_recordingOutputMode.load(std::memory_order_relaxed) == 2;
@@ -492,7 +500,7 @@ void RND_Renderer::ImGuiOverlay::Render(long frameIdx, bool renderBackground, bo
     };
 
     if (renderBackground || CemuHooks::UseBlackBarsDuringEvents()) {
-        bool shouldRender3DBackground = VRManager::instance().XR->GetRenderer()->IsRendering3D(frameIdx) || CemuHooks::UseBlackBarsDuringEvents();
+        bool shouldRender3DBackground = renderer->IsRendering3D(frameIdx) || CemuHooks::UseBlackBarsDuringEvents();
         bool shouldRenderHUDWithAlpha = shouldRender3DBackground && !CemuHooks::UseBlackBarsDuringEvents();
 
         if (shouldRender3DBackground) {
@@ -505,7 +513,7 @@ void RND_Renderer::ImGuiOverlay::Render(long frameIdx, bool renderBackground, bo
         }
     }
     else {
-        renderHUDBackground(VRManager::instance().XR->GetRenderer()->IsRendering3D(frameIdx), false);
+        renderHUDBackground(renderer->IsRendering3D(frameIdx), false);
     }
 
     ImGuiMenus::DrawWeaponSensitivityOverlays();
@@ -662,7 +670,14 @@ void RND_Renderer::ImGuiOverlay::ProcessInputs(OpenXR::InputState& inputs, const
 }
 
 void RND_Renderer::ImGuiOverlay::Draw3DLayerAsBackground(VkCommandBuffer cb, VkImage srcImage, float aspectRatio, const RenderUtils::UvTransform& uvTransform, long frameIdx) {
-    auto& frame = VRManager::instance().XR->GetRenderer()->GetFrame(frameIdx);
+    auto* renderer = VRManager::instance().XR->GetRenderer();
+    if (renderer == nullptr) {
+        return;
+    }
+    auto& frame = renderer->GetFrame(frameIdx);
+    if (frame.mainFramebuffer == nullptr) {
+        return;
+    }
 
     frame.mainFramebuffer->vkCopyFromImage(cb, srcImage);
     frame.mainFramebufferAspectRatio = aspectRatio;
@@ -670,7 +685,14 @@ void RND_Renderer::ImGuiOverlay::Draw3DLayerAsBackground(VkCommandBuffer cb, VkI
 }
 
 void RND_Renderer::ImGuiOverlay::DrawHUDLayerAsBackground(VkCommandBuffer cb, VkImage srcImage, long frameIdx) {
-    auto& frame = VRManager::instance().XR->GetRenderer()->GetFrame(frameIdx);
+    auto* renderer = VRManager::instance().XR->GetRenderer();
+    if (renderer == nullptr) {
+        return;
+    }
+    auto& frame = renderer->GetFrame(frameIdx);
+    if (frame.hudFramebuffer == nullptr || frame.hudWithoutAlphaFramebuffer == nullptr) {
+        return;
+    }
 
     frame.hudFramebuffer->vkCopyFromImage(cb, srcImage);
     frame.hudWithoutAlphaFramebuffer->vkCopyFromImage(cb, srcImage);
@@ -701,7 +723,19 @@ void RND_Renderer::ImGuiOverlay::DrawAndCopyToImage(VkCommandBuffer cb, VkImage 
 
     auto* dispatch = VRManager::instance().VK->GetDeviceDispatch();
     auto* renderer = VRManager::instance().XR->GetRenderer();
+    if (renderer == nullptr) {
+        // no renderer to take the frame from, but the ImGui frame still has to stay balanced
+        ImGui_ImplVulkan_NewFrame();
+        ImGui::NewFrame();
+        return;
+    }
     auto& frame = renderer->GetFrame(frameIdx);
+    if (frame.imguiFramebuffer == nullptr) {
+        // no frame to draw into, but the ImGui frame still has to stay balanced
+        ImGui_ImplVulkan_NewFrame();
+        ImGui::NewFrame();
+        return;
+    }
 
     frame.imguiFramebuffer->vkClear(cb, { 0.0f, 0.0f, 0.0f, 0.0f });
 

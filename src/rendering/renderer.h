@@ -1,6 +1,7 @@
 #pragma once
 
 #include "pch.h"
+#include <memory>
 #include "d3d12.h"
 #include "openxr.h"
 #include "swapchain.h"
@@ -9,12 +10,43 @@
 
 class SharedTexture;
 
+// Milliseconds on a monotonic clock, used to time how long the frame pump has been stuck.
+inline long long SteadyNowMs() {
+    return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+}
+
 class RND_Renderer {
 public:
     explicit RND_Renderer(XrSession xrSession);
     ~RND_Renderer();
 
+    // Begins the OpenXR session. Also used to resume a session the runtime stopped,
+    // which is what happens when the headset goes to sleep and wakes up again.
+    bool BeginSession();
     void EndSession();
+    bool IsSessionRunning() const {
+        return m_sessionRunning.load(std::memory_order_acquire);
+    }
+
+    // Set by the frame pump once the runtime refuses to produce frames for a session it claims
+    // is running; OpenXR responds by rebuilding the session.
+    void RequestSessionRestart() { m_needsSessionRestart.store(true, std::memory_order_release); }
+    bool NeedsSessionRestart() const { return m_needsSessionRestart.load(std::memory_order_acquire); }
+    // Throws the session away without talking to the runtime, which is what a session that is about
+    // to be destroyed needs. The frame pump is retired the same way the stuck-pump path retires it,
+    // so a thread still blocked inside xrWaitFrame cannot come back at this renderer.
+    void AbandonSession() {
+        m_sessionRunning.store(false, std::memory_order_release);
+        ++m_framePumpToken->generation;
+        {
+            std::lock_guard<std::mutex> lock(m_framePumpMutex);
+            m_framePumpStopRequested = true;
+        }
+        m_framePumpCv.notify_all();
+    }
+    // True while xrWaitFrame keeps coming back with a usable frame, used to decide whether a
+    // rebuilt session has been healthy long enough to earn another set of attempts.
+    bool ProducedFrameRecently() const { return SteadyNowMs() - m_lastSuccessfulWaitMs.load(std::memory_order_relaxed) < 5000; }
 
     enum CaptureMaskBits : uint32_t {
         CaptureMask_None = 0,
@@ -224,7 +256,7 @@ public:
 
     class Layer3D {
     public:
-        explicit Layer3D(VkExtent2D inputRes, VkExtent2D outputRes);
+        explicit Layer3D(RND_Renderer* owner, VkExtent2D inputRes, VkExtent2D outputRes);
         ~Layer3D();
 
         SharedTexture* CopyColorToLayer(OpenXR::EyeSide side, VkCommandBuffer copyCmdBuffer, VkImage image, long frameIdx);
@@ -241,7 +273,21 @@ public:
         auto& GetSharedTextures() { return m_textures; }
         auto& GetDepthSharedTextures() { return m_depthTextures; }
 
+        // Called when the session these swapchains were made from is about to be destroyed, which
+        // destroys the swapchains themselves along with it.
+        void AbandonSwapchains() {
+            for (auto& swapchain : m_swapchains) {
+                if (swapchain) swapchain->AbandonHandle();
+            }
+            for (auto& swapchain : m_depthSwapchains) {
+                if (swapchain) swapchain->AbandonHandle();
+            }
+        }
+
     private:
+        // the renderer this layer was built by: while a session is being rebuilt the manager has no
+        // renderer at all, so the layer cannot look its owner up there
+        RND_Renderer* m_owner;
         std::array<std::unique_ptr<Swapchain<DXGI_FORMAT_R8G8B8A8_UNORM_SRGB>>, 2> m_swapchains;
         std::array<std::unique_ptr<Swapchain<DXGI_FORMAT_D32_FLOAT>>, 2> m_depthSwapchains;
         std::array<std::unique_ptr<RND_D3D12::PresentPipeline<true>>, 2> m_presentPipelines;
@@ -259,7 +305,7 @@ public:
 
     class Layer2D {
     public:
-        explicit Layer2D(VkExtent2D inputRes, VkExtent2D outputRes);
+        explicit Layer2D(RND_Renderer* owner, VkExtent2D inputRes, VkExtent2D outputRes);
         ~Layer2D();
 
         SharedTexture* CopyColorToLayer(VkCommandBuffer copyCmdBuffer, VkImage image, long frameIdx);
@@ -279,8 +325,16 @@ public:
         static void SetBowAimingActive(bool isActive) { s_isBowAimingActive = isActive; }
         static bool IsBowAimingActive() { return s_isBowAimingActive; }
 
+        // Called when the session this swapchain was made from is about to be destroyed, which
+        // destroys the swapchain itself along with it.
+        void AbandonSwapchains() {
+            if (m_swapchain) m_swapchain->AbandonHandle();
+        }
+
     private:
         static std::atomic_bool s_isBowAimingActive;
+        // the renderer this layer was built by, see Layer3D::m_owner
+        RND_Renderer* m_owner;
         std::unique_ptr<Swapchain<DXGI_FORMAT_R8G8B8A8_UNORM_SRGB>> m_swapchain;
         std::unique_ptr<RND_D3D12::PresentPipeline<false>> m_presentPipeline;
         std::array<std::unique_ptr<SharedTexture>, 2> m_textures;
@@ -296,7 +350,9 @@ public:
 
     class ImGuiOverlay {
     public:
-        explicit ImGuiOverlay(VkCommandBuffer cb,VkExtent2D fbRes, VkFormat framebufferFormat);
+        // the overlay is built for one renderer but can be handed to its replacement, so the owner is
+        // only used while building: everything after that looks the current renderer up
+        explicit ImGuiOverlay(RND_Renderer* owner, VkCommandBuffer cb, VkExtent2D fbRes, VkFormat framebufferFormat);
         ~ImGuiOverlay();
 
         bool ShouldBlockGameInput() { return ImGui::GetIO().WantCaptureKeyboard; }
@@ -336,6 +392,29 @@ public:
     std::unique_ptr<Layer3D> m_layer3D;
     std::unique_ptr<Layer2D> m_layer2D;
     std::unique_ptr<ImGuiOverlay> m_imguiOverlay;
+
+    // ImGui, ImGui_ImplVulkan and ImPlot each keep exactly one context per process, so a renderer
+    // must never build an overlay next to one that is still alive: CreateContext() does not make a
+    // second context the current one, and the older overlay's destructor then destroys the context
+    // every ImGui call since uses, which shows up as a null pointer dereference in ImGui::GetIO().
+    // The overlay is built from Cemu's game framebuffer and has nothing to do with the OpenXR
+    // session, so a renderer that gets replaced hands it to its replacement instead of owning it.
+    std::unique_ptr<ImGuiOverlay> ReleaseImGuiOverlay() { return std::move(m_imguiOverlay); }
+    void SetImGuiOverlay(std::unique_ptr<ImGuiOverlay> overlay) { m_imguiOverlay = std::move(overlay); }
+
+    // The overlay builds its framebuffers, textures and descriptor sets onto the frames of the
+    // renderer it was created for, so those have to travel with the overlay to its replacement:
+    // they are plain Vulkan objects of Cemu's device and outlive the OpenXR session.
+    void TakeImGuiFrameStateFrom(RND_Renderer& other);
+
+    // The layers own the OpenXR swapchains, and a session that is destroyed takes them with it: a
+    // renderer whose session is about to go away has to say goodbye to those handles first, or the
+    // swapchain destructors would hand handles of a dead session back to the runtime.
+    void AbandonSessionSwapchains() {
+        if (m_layer3D) m_layer3D->AbandonSwapchains();
+        if (m_layer2D) m_layer2D->AbandonSwapchains();
+    }
+
     float m_gameRenderAspectRatio = 16.0f / 9.0f;
 
     bool IsRendering3D(long frameIdx) {
@@ -391,16 +470,30 @@ private:
     long SelectNewestHudReadyFrame() const;
 
 protected:
-    void FramePumpLoop();
+    // A pump that is stuck inside a blocked xrWaitFrame can neither be joined nor be allowed to keep
+    // calling xrWaitFrame next to its replacement, so it is detached and asked to leave through the
+    // generation counter. The token is shared with the retired thread, which keeps the check valid
+    // even if the renderer itself is already gone by the time the blocked call finally returns.
+    struct FramePumpToken {
+        std::atomic<uint32_t> generation = 0;
+    };
+
+    void FramePumpLoop(std::shared_ptr<FramePumpToken> token, uint32_t generation);
     void StopFramePump();
 
     XrSession m_session;
-    bool m_sessionRunning = false;
+    std::atomic_bool m_sessionRunning = false;
     XrFrameState m_frameState = { XR_TYPE_FRAME_STATE };
     std::chrono::steady_clock::time_point m_frameStateReceivedAt = {};
     XrTime m_lastInputSampleTime = 0;
 
     std::thread m_framePumpThread;
+    std::shared_ptr<FramePumpToken> m_framePumpToken = std::make_shared<FramePumpToken>();
+    std::atomic<long long> m_lastPumpActivityMs = 0;
+    std::atomic<unsigned long> m_pumpReplacements = 0;
+    std::atomic<unsigned long> m_waitFailures = 0;
+    std::atomic_bool m_needsSessionRestart = false;
+    std::atomic<long long> m_lastSuccessfulWaitMs = 0;
     std::mutex m_framePumpMutex;
     std::condition_variable m_framePumpCv;
     XrFrameState m_pumpedFrameState = { XR_TYPE_FRAME_STATE };
@@ -408,6 +501,12 @@ protected:
     bool m_framePumpSlotReady = false;
     bool m_framePumpWaitRequested = false;
     bool m_framePumpStopRequested = false;
+    std::atomic_bool m_framePumpThreadAlive = false;
+    static constexpr long long kFramePumpStuckMs = 1000;
+    // A session that was begun but fails this many waits in a row is not going to recover on its own
+    static constexpr unsigned long kMaxWaitFailures = 8;
+    // ... and so does this many pumps replaced without a single frame coming back
+    static constexpr unsigned long kMaxPumpReplacements = 4;
     bool m_xrFrameActive = false;
     uint64_t m_skippedXrFrameCount = 0;
     mutable std::optional<std::array<XrView, 2>> m_currViews;

@@ -82,20 +82,102 @@ long RND_Renderer::SelectNewestHudReadyFrame() const {
 }
 
 RND_Renderer::RND_Renderer(XrSession xrSession): m_session(xrSession) {
-    XrSessionBeginInfo m_sessionCreateInfo = { XR_TYPE_SESSION_BEGIN_INFO };
-    m_sessionCreateInfo.primaryViewConfigurationType = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
-    checkXRResult(xrBeginSession(m_session, &m_sessionCreateInfo), "Failed to begin OpenXR session!");
-    m_sessionRunning = true;
+    if (!BeginSession()) {
+        throw std::runtime_error("Failed to begin OpenXR session!");
+    }
+}
+
+bool RND_Renderer::BeginSession() {
+    if (m_session == XR_NULL_HANDLE) {
+        Log::print<ERROR>("Cannot begin an OpenXR session that does not exist!");
+        return false;
+    }
+
+    XrSessionBeginInfo sessionCreateInfo = { XR_TYPE_SESSION_BEGIN_INFO };
+    sessionCreateInfo.primaryViewConfigurationType = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
+    const XrResult result = xrBeginSession(m_session, &sessionCreateInfo);
+    if (result == XR_ERROR_SESSION_RUNNING) {
+        // Not every runtime announces that it stopped the session: the Meta Quest Link runtime just
+        // hands it back through READY, so our own idea of the session still running can be wrong or
+        // right on its own. The runtime decides, never our cached state.
+        Log::print<INFO>("xrBeginSession reports the session is still running, carrying on!");
+        m_sessionRunning.store(true, std::memory_order_release);
+        m_waitFailures.store(0, std::memory_order_relaxed);
+        m_pumpReplacements.store(0, std::memory_order_relaxed);
+        m_needsSessionRestart.store(false, std::memory_order_release);
+        m_lastPumpActivityMs.store(SteadyNowMs(), std::memory_order_release);
+        m_framePumpCv.notify_all();
+        return true;
+    }
+    if (XR_FAILED(result)) {
+        Log::print<ERROR>("Failed to begin OpenXR session (result {})!", (int)result);
+        // whatever we believed about the session was wrong, keep off it until it is handed back
+        m_sessionRunning.store(false, std::memory_order_release);
+        return false;
+    }
+
+    Log::print<INFO>("OpenXR session begun!");
+
+    // Everything frame related belongs to the previous run of the session: reusing the old
+    // predicted display time would extrapolate input from a timestamp the runtime forgot about.
+    {
+        std::lock_guard<std::mutex> lock(m_framePumpMutex);
+        m_frameState = { XR_TYPE_FRAME_STATE };
+        m_pumpedFrameState = { XR_TYPE_FRAME_STATE };
+        m_pumpedFrameStateReceivedAt = {};
+        m_framePumpSlotReady = false;
+        m_framePumpWaitRequested = false;
+    }
+    m_frameStateReceivedAt = {};
+    m_lastInputSampleTime = 0;
+    m_lastPredictedDisplayTime = 0;
+    m_frameInputLatched = false;
+    m_frameViewsPending = false;
+    m_frameViewLatchFailed = false;
+    m_xrFrameActive = false;
+    m_currViews.reset();
+
+    m_sessionRunning.store(true, std::memory_order_release);
+    m_waitFailures.store(0, std::memory_order_relaxed);
+    m_pumpReplacements.store(0, std::memory_order_relaxed);
+    m_needsSessionRestart.store(false, std::memory_order_release);
+    m_lastPumpActivityMs.store(SteadyNowMs(), std::memory_order_release);
+    m_framePumpCv.notify_all();
+
+    if (auto* rumbleManager = VRManager::instance().XR->GetRumbleManager(); rumbleManager != nullptr) {
+        rumbleManager->SetSessionActive(true);
+    }
+    return true;
 }
 
 void RND_Renderer::EndSession() {
     if (!m_sessionRunning || m_session == XR_NULL_HANDLE) {
         return;
     }
-    m_sessionRunning = false;
+    m_sessionRunning.store(false, std::memory_order_release);
     StopFramePump();
-    if (XrResult result = xrEndSession(m_session); XR_FAILED(result)) {
-        Log::print<ERROR>("Failed to end OpenXR session (result {})!", (int)result);
+
+    // stop touching the session until it is begun again: no frames, no input sampling, no haptics
+    m_xrFrameActive = false;
+    m_frameInputLatched = false;
+    m_frameViewsPending = false;
+    m_frameViewLatchFailed = false;
+    m_frameState = { XR_TYPE_FRAME_STATE };
+    m_lastInputSampleTime = 0;
+    m_lastPredictedDisplayTime = 0;
+
+    if (auto* rumbleManager = VRManager::instance().XR->GetRumbleManager(); rumbleManager != nullptr) {
+        rumbleManager->SetSessionActive(false);
+    }
+
+    if (const XrResult result = xrEndSession(m_session); XR_FAILED(result)) {
+        if (result == XR_ERROR_SESSION_NOT_STOPPING) {
+            // the runtime ended the session on its own (headset sleep) before we got to it
+            Log::print<INFO>("The OpenXR session was already ended by the runtime!");
+        }
+        else {
+            Log::print<ERROR>("Failed to end OpenXR session (result {})!", (int)result);
+        }
     }
 }
 
@@ -112,6 +194,29 @@ RND_Renderer::~RND_Renderer() {
     }
     if (m_layer2D) {
         m_layer2D.reset();
+    }
+}
+
+void RND_Renderer::TakeImGuiFrameStateFrom(RND_Renderer& other) {
+    for (int i = 0; i < 2; ++i) {
+        auto& frame = m_renderFrames[i];
+        auto& oldFrame = other.m_renderFrames[i];
+
+        frame.mainFramebuffer = std::move(oldFrame.mainFramebuffer);
+        frame.hudFramebuffer = std::move(oldFrame.hudFramebuffer);
+        frame.hudWithoutAlphaFramebuffer = std::move(oldFrame.hudWithoutAlphaFramebuffer);
+        frame.imguiFramebuffer = std::move(oldFrame.imguiFramebuffer);
+
+        // the descriptor sets come from the overlay's pool, which moves along with the overlay
+        frame.mainFramebufferDS = oldFrame.mainFramebufferDS;
+        frame.hudFramebufferDS = oldFrame.hudFramebufferDS;
+        frame.hudWithoutAlphaFramebufferDS = oldFrame.hudWithoutAlphaFramebufferDS;
+        oldFrame.mainFramebufferDS = VK_NULL_HANDLE;
+        oldFrame.hudFramebufferDS = VK_NULL_HANDLE;
+        oldFrame.hudWithoutAlphaFramebufferDS = VK_NULL_HANDLE;
+
+        frame.mainFramebufferAspectRatio = oldFrame.mainFramebufferAspectRatio;
+        frame.mainFramebufferUvTransform = oldFrame.mainFramebufferUvTransform;
     }
 }
 
@@ -145,14 +250,54 @@ void RND_Renderer::StartFrame() {
 
     m_isInitialized = true;
 
+    // While the session is stopped (headset asleep) there is nothing to wait on or present, and
+    // asking the runtime for a frame would fail for every single Cemu frame. Same once the session
+    // has been written off: pumping waits out of a dead session only piles up blocked threads.
+    if (!m_sessionRunning.load(std::memory_order_acquire) || NeedsSessionRestart()) {
+        m_xrFrameActive = false;
+        m_frameInputLatched = false;
+        ++m_skippedXrFrameCount;
+        return;
+    }
+
+    // the pump can die on its own if the runtime drops the session out from under it
+    if (m_framePumpThread.joinable() && !m_framePumpThreadAlive.load(std::memory_order_acquire)) {
+        m_framePumpThread.join();
+    }
+    // ... or it can be stuck inside a blocked xrWaitFrame: a runtime that stops the session without
+    // announcing it leaves that call hanging for tens of seconds, during which not a single frame
+    // arrives. Such a thread cannot be joined, so it gets retired and replaced by a fresh one.
+    else if (m_framePumpThread.joinable()) {
+        const long long stuckFor = SteadyNowMs() - m_lastPumpActivityMs.load(std::memory_order_acquire);
+        if (stuckFor > kFramePumpStuckMs) {
+            const unsigned long replacements = m_pumpReplacements.fetch_add(1, std::memory_order_relaxed) + 1;
+            if (replacements >= kMaxPumpReplacements) {
+                // replaced often enough and still not one frame: the session itself is the problem
+                Log::print<ERROR>("The frame pump has been replaced {} times without a single frame, the session needs to be rebuilt!", replacements);
+                RequestSessionRestart();
+                return;
+            }
+            Log::print<WARNING>("The frame pump has not come back from xrWaitFrame for {}ms, replacing it!", stuckFor);
+            ++m_framePumpToken->generation;
+            m_framePumpThread.detach();
+            m_framePumpThread = {};
+            // give the replacement the full grace period before another replacement is considered
+            m_lastPumpActivityMs.store(SteadyNowMs(), std::memory_order_release);
+        }
+    }
+
     auto waitStart = std::chrono::high_resolution_clock::now();
     if (!m_framePumpThread.joinable()) {
         {
             std::lock_guard<std::mutex> lock(m_framePumpMutex);
             m_framePumpWaitRequested = true;
         }
-        m_framePumpThread = std::thread(&RND_Renderer::FramePumpLoop, this);
-        m_framePumpCv.notify_one();
+        // mark it before spawning, otherwise a slow thread start would look like a dead pump
+        m_framePumpThreadAlive.store(true, std::memory_order_release);
+        m_lastPumpActivityMs.store(SteadyNowMs(), std::memory_order_release);
+        const uint32_t generation = ++m_framePumpToken->generation;
+        m_framePumpThread = std::thread(&RND_Renderer::FramePumpLoop, this, m_framePumpToken, generation);
+        m_framePumpCv.notify_all();
     }
 
     bool xrSlotReady = false;
@@ -209,24 +354,74 @@ void RND_Renderer::StartFrame() {
     m_framePumpCv.notify_one();
 }
 
-void RND_Renderer::FramePumpLoop() {
+void RND_Renderer::FramePumpLoop(std::shared_ptr<FramePumpToken> token, uint32_t generation) {
     while (true) {
+        // a retired pump must never compete with the pump that replaced it
+        if (token->generation.load(std::memory_order_acquire) != generation) {
+            return;
+        }
+
         {
             std::unique_lock<std::mutex> lock(m_framePumpMutex);
-            m_framePumpCv.wait(lock, [this] { return m_framePumpWaitRequested || m_framePumpStopRequested; });
+            // stay parked while the session is not running instead of spinning on failing xrWaitFrame calls
+            m_framePumpCv.wait(lock, [this] {
+                return m_framePumpStopRequested || (m_sessionRunning.load(std::memory_order_acquire) && m_framePumpWaitRequested);
+            });
             if (m_framePumpStopRequested) {
+                if (token->generation.load(std::memory_order_acquire) == generation) {
+                    m_framePumpThreadAlive.store(false, std::memory_order_release);
+                }
                 return;
             }
             m_framePumpWaitRequested = false;
         }
 
-        XrFrameWaitInfo waitFrameInfo = { XR_TYPE_FRAME_WAIT_INFO };
-        XrFrameState frameState = { XR_TYPE_FRAME_STATE };
-        XrResult result = xrWaitFrame(m_session, &waitFrameInfo, &frameState);
-        if (XR_FAILED(result)) {
-            Log::print<ERROR>("xrWaitFrame failed with result {}, stopping frame pump", (int)result);
+        if (token->generation.load(std::memory_order_acquire) != generation) {
             return;
         }
+
+        XrFrameWaitInfo waitFrameInfo = { XR_TYPE_FRAME_WAIT_INFO };
+        XrFrameState frameState = { XR_TYPE_FRAME_STATE };
+        // the handle is read before the call so a thread that wakes up very late never has to look
+        // at renderer state that may already be gone by then
+        const XrSession session = m_session;
+        const XrResult result = xrWaitFrame(session, &waitFrameInfo, &frameState);
+
+        // A retired pump can come back from a blocked wait long after the renderer that owns it
+        // has been replaced, so from here on it touches nothing but the token it shares with its
+        // replacement.
+        if (token->generation.load(std::memory_order_acquire) != generation) {
+            return;
+        }
+
+        m_lastPumpActivityMs.store(SteadyNowMs(), std::memory_order_release);
+        if (XR_FAILED(result)) {
+            if (result == XR_ERROR_SESSION_NOT_RUNNING || result == XR_ERROR_RUNTIME_FAILURE || result == XR_ERROR_SESSION_LOST || result == XR_ERROR_INSTANCE_LOST || result == XR_ERROR_FORM_FACTOR_UNAVAILABLE) {
+                // the session is stopped or the runtime is going away: the session state events and
+                // BeginSession bring it back, so just keep off the runtime for a moment and retry
+                const unsigned long failures = m_waitFailures.fetch_add(1, std::memory_order_relaxed) + 1;
+                if (failures == 1 || failures % 20 == 0) {
+                    Log::print<INFO>("xrWaitFrame failed with result {}, waiting for the session to become usable again ({} attempts)", (int)result, failures);
+                }
+                if (failures >= kMaxWaitFailures) {
+                    // a session the runtime began but never delivers a frame for is not coming back
+                    // on its own, only a newly created one does, so hand that decision to OpenXR
+                    Log::print<ERROR>("xrWaitFrame has failed {} times in a row, the session needs to be rebuilt!", failures);
+                    RequestSessionRestart();
+                    return;
+                }
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                continue;
+            }
+            Log::print<ERROR>("xrWaitFrame failed with result {}, stopping frame pump", (int)result);
+            if (token->generation.load(std::memory_order_acquire) == generation) {
+                m_framePumpThreadAlive.store(false, std::memory_order_release);
+            }
+            return;
+        }
+        m_waitFailures.store(0, std::memory_order_relaxed);
+        m_pumpReplacements.store(0, std::memory_order_relaxed);
+        m_lastSuccessfulWaitMs.store(SteadyNowMs(), std::memory_order_relaxed);
 
         const auto waitEnd = std::chrono::steady_clock::now();
 
@@ -554,7 +749,7 @@ void RND_Renderer::PromoteStable3D(long frameIdx) {
     m_stable3D.views = frame.views.value();
 }
 
-RND_Renderer::Layer3D::Layer3D(VkExtent2D inputRes, VkExtent2D outputRes) {
+RND_Renderer::Layer3D::Layer3D(RND_Renderer* owner, VkExtent2D inputRes, VkExtent2D outputRes): m_owner(owner) {
     auto viewConfs = VRManager::instance().XR->GetViewConfigurations();
 
     const float inputAspectRatio = (float)inputRes.width / (float)inputRes.height;
@@ -562,12 +757,12 @@ RND_Renderer::Layer3D::Layer3D(VkExtent2D inputRes, VkExtent2D outputRes) {
     this->m_recommendedAspectRatios[OpenXR::EyeSide::RIGHT] = inputAspectRatio;
 
     for (int side = 0; side < 2; ++side) {
-        std::optional<XrFovf> rawFov = VRManager::instance().XR->GetRenderer()->GetFOV((OpenXR::EyeSide)side);
+        std::optional<XrFovf> rawFov = m_owner->GetFOV((OpenXR::EyeSide)side);
         m_presentUvTransforms[side] = RenderUtils::GetPresentationUvTransform(rawFov, inputAspectRatio);
     }
 
-    this->m_presentPipelines[OpenXR::EyeSide::LEFT] = std::make_unique<RND_D3D12::PresentPipeline<true>>(VRManager::instance().XR->GetRenderer());
-    this->m_presentPipelines[OpenXR::EyeSide::RIGHT] = std::make_unique<RND_D3D12::PresentPipeline<true>>(VRManager::instance().XR->GetRenderer());
+    this->m_presentPipelines[OpenXR::EyeSide::LEFT] = std::make_unique<RND_D3D12::PresentPipeline<true>>(m_owner);
+    this->m_presentPipelines[OpenXR::EyeSide::RIGHT] = std::make_unique<RND_D3D12::PresentPipeline<true>>(m_owner);
     this->m_debugDrawPipeline = std::make_unique<RND_D3D12::DebugDrawPipeline>();
 
     this->m_swapchains[OpenXR::EyeSide::LEFT] = std::make_unique<Swapchain<DXGI_FORMAT_R8G8B8A8_UNORM_SRGB>>(outputRes.width, outputRes.height, viewConfs[0].recommendedSwapchainSampleCount);
@@ -634,6 +829,10 @@ void RND_Renderer::Layer3D::PrepareRendering(OpenXR::EyeSide side) {
 std::optional<std::array<XrView, 2>> RND_Renderer::UpdateViews(XrTime predictedDisplayTime) {
     BetterVRProfiler::Scope profile(BetterVRProfiler::Section::XRLocateViews);
 
+    if (!m_sessionRunning.load(std::memory_order_acquire)) {
+        return std::nullopt;
+    }
+
     std::array newViews = { XrView{ XR_TYPE_VIEW }, XrView{ XR_TYPE_VIEW } };
     XrViewLocateInfo viewLocateInfo = { XR_TYPE_VIEW_LOCATE_INFO };
     viewLocateInfo.viewConfigurationType = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
@@ -641,7 +840,18 @@ std::optional<std::array<XrView, 2>> RND_Renderer::UpdateViews(XrTime predictedD
     viewLocateInfo.space = VRManager::instance().XR->m_stageSpace; // locate the rendering views relative to the room, not the headset center
     XrViewState viewState = { XR_TYPE_VIEW_STATE };
     uint32_t viewCount = (uint32_t)newViews.size();
-    checkXRResult(xrLocateViews(VRManager::instance().XR->m_session, &viewLocateInfo, &viewState, viewCount, &viewCount, newViews.data()), "Failed to get view information!");
+    const XrResult result = xrLocateViews(VRManager::instance().XR->m_session, &viewLocateInfo, &viewState, viewCount, &viewCount, newViews.data());
+    if (XR_FAILED(result)) {
+        // throwing here would take down whatever game thread asked for the views: views are optional
+        // and the callers keep working from the last pose they latched
+        static std::atomic<long long> s_lastLogMs = 0;
+        const long long nowMs = SteadyNowMs();
+        if (nowMs - s_lastLogMs.load(std::memory_order_relaxed) > 1000) {
+            s_lastLogMs.store(nowMs, std::memory_order_relaxed);
+            Log::print<WARNING>("Failed to get view information (result {})!", (int)result);
+        }
+        return std::nullopt;
+    }
     if ((viewState.viewStateFlags & XR_VIEW_STATE_ORIENTATION_VALID_BIT) == 0)
         return std::nullopt; // what should occur when the orientation is invalid? keep rendering using old values?
 
@@ -680,7 +890,7 @@ void RND_Renderer::Layer3D::RecordRender(RND_D3D12::CommandContext<false>* conte
 
     m_presentPipelines[side]->SetUvTransform(RenderUtils::GetPresentationUvTransform(
         views[side].fov,
-        VRManager::instance().XR->GetRenderer()->m_gameRenderAspectRatio
+        m_owner->m_gameRenderAspectRatio
     ));
 
     context->WaitFor(texture.get(), texture->GetD3D12WaitValue());
@@ -792,10 +1002,10 @@ const std::array<XrCompositionLayerProjectionView, 2>& RND_Renderer::Layer3D::Fi
 }
 
 
-RND_Renderer::Layer2D::Layer2D(VkExtent2D inputRes, VkExtent2D outputRes) {
+RND_Renderer::Layer2D::Layer2D(RND_Renderer* owner, VkExtent2D inputRes, VkExtent2D outputRes): m_owner(owner) {
     auto viewConfs = VRManager::instance().XR->GetViewConfigurations();
 
-    this->m_presentPipeline = std::make_unique<RND_D3D12::PresentPipeline<false>>(VRManager::instance().XR->GetRenderer());
+    this->m_presentPipeline = std::make_unique<RND_D3D12::PresentPipeline<false>>(m_owner);
 
     this->m_swapchain = std::make_unique<Swapchain<DXGI_FORMAT_R8G8B8A8_UNORM_SRGB>>(inputRes.width, inputRes.height, viewConfs[0].recommendedSwapchainSampleCount);
 
@@ -870,7 +1080,7 @@ static glm::fvec3 GetHorizontalGazeDirection(const glm::quat& headOrientation) {
 std::vector<XrCompositionLayerQuad> RND_Renderer::Layer2D::FinishRendering(XrTime predictedDisplayTime, long frameIdx) {
     this->m_swapchain->FinishRendering();
 
-    auto poses = VRManager::instance().XR->GetRenderer()->GetPoses(frameIdx);
+    auto poses = VRManager::instance().XR->GetPoses(frameIdx);
     if (!poses.has_value()) {
         return {};
     }

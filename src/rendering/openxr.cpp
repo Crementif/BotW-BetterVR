@@ -234,14 +234,24 @@ std::array<XrViewConfigurationView, 2> OpenXR::GetViewConfigurations() {
     return xrViewConf;
 }
 
-void OpenXR::CreateSession(const XrGraphicsBindingD3D12KHR& d3d12Binding) {
+bool OpenXR::CreateSession(const XrGraphicsBindingD3D12KHR& d3d12Binding, bool fatal) {
     Log::print<INFO>("Creating the OpenXR session...");
 
     XrSessionCreateInfo sessionCreateInfo = { XR_TYPE_SESSION_CREATE_INFO };
     sessionCreateInfo.systemId = m_systemId;
     sessionCreateInfo.next = &d3d12Binding;
     sessionCreateInfo.createFlags = 0;
-    checkXRResult(xrCreateSession(m_instance, &sessionCreateInfo, &m_session), "Failed to create Vulkan-based OpenXR session!");
+    XrResult result = xrCreateSession(m_instance, &sessionCreateInfo, &m_session);
+    if (XR_FAILED(result)) {
+        if (fatal) {
+            checkXRResult(result, "Failed to create Vulkan-based OpenXR session!");
+        }
+        else {
+            Log::print<ERROR>("Failed to create the OpenXR session (result {})! The runtime is probably gone.", (int)result);
+            m_session = XR_NULL_HANDLE;
+            return false;
+        }
+    }
 
     Log::print<INFO>("Creating the OpenXR spaces...");
     m_hasSeatedHeightCalibration = false;
@@ -252,7 +262,28 @@ void OpenXR::CreateSession(const XrGraphicsBindingD3D12KHR& d3d12Binding) {
     XrReferenceSpaceCreateInfo headSpaceCreateInfo = { XR_TYPE_REFERENCE_SPACE_CREATE_INFO };
     headSpaceCreateInfo.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_VIEW;
     headSpaceCreateInfo.poseInReferenceSpace = s_xrIdentityPose;
-    checkXRResult(xrCreateReferenceSpace(m_session, &headSpaceCreateInfo, &m_headSpace), "Failed to create reference space for head!");
+    result = xrCreateReferenceSpace(m_session, &headSpaceCreateInfo, &m_headSpace);
+    if (XR_FAILED(result)) {
+        if (fatal) {
+            checkXRResult(result, "Failed to create reference space for head!");
+        }
+        else {
+            Log::print<ERROR>("Failed to create the reference space for the head (result {})!", (int)result);
+            return false;
+        }
+    }
+
+    return true;
+}
+
+// Every call on a dead instance answers with an error, which makes this a cheap way to tell a
+// runtime that retired one session from a runtime that is gone entirely.
+bool OpenXR::InstanceIsAlive() const {
+    if (m_instance == XR_NULL_HANDLE) {
+        return false;
+    }
+    XrInstanceProperties properties = { XR_TYPE_INSTANCE_PROPERTIES };
+    return XR_SUCCEEDED(xrGetInstanceProperties(m_instance, &properties));
 }
 
 // floorOffset is where the space's origin sits above the runtime's floor, so every located pose shifts together
@@ -396,6 +427,8 @@ void OpenXR::CreateActions() {
         createAction(m_menuActionSet, "inmenu_modmenu", "Mod Menu", XR_ACTION_TYPE_BOOLEAN_INPUT, m_inMenu_modMenuAction);
     }
 
+    // Suggested bindings are instance wide and the runtime refuses them once any of the action
+    // sets has been attached to a session, so they are given once for the process, not per session.
     {
         ControllerActionBindings bindings;
         bindings.inGameGripPoseAction = m_inGameGripPoseAction;
@@ -430,11 +463,25 @@ void OpenXR::CreateActions() {
         SuggestControllerBindings(m_instance, bindings, m_capabilities.supportsPicoController, m_capabilities.supportsPicoUltraController, m_capabilities.supportsCosmosController, m_capabilities.supportsHPMixedRealityController);
     }
 
+    AttachActionsToSession();
+}
+
+// Attaching the action sets, creating their action spaces and the rumble manager all belongs to a
+// session, so a recreated session needs this run again. The action sets and the actions themselves
+// live on the instance and are only ever created once.
+void OpenXR::AttachActionsToSession() {
     XrSessionActionSetsAttachInfo attachInfo = { XR_TYPE_SESSION_ACTION_SETS_ATTACH_INFO };
     std::array actionSets = { m_gameplayActionSet, m_menuActionSet };
     attachInfo.countActionSets = (uint32_t)actionSets.size();
     attachInfo.actionSets = actionSets.data();
-    checkXRResult(xrAttachSessionActionSets(m_session, &attachInfo), "Failed to attach action sets to session!");
+    // A recreated session gets attached to the very same action sets, which is allowed, but a
+    // runtime that refuses it must not take Cemu down: input stays off until it works again.
+    const XrResult attachResult = xrAttachSessionActionSets(m_session, &attachInfo);
+    m_actionsAttached = XR_SUCCEEDED(attachResult);
+    if (!m_actionsAttached) {
+        Log::print<ERROR>("Failed to attach the action sets to the OpenXR session (result {})! Controller input stays off until the session is rebuilt again.", (int)attachResult);
+        return;
+    }
 
     for (EyeSide side : { EyeSide::LEFT, EyeSide::RIGHT }) {
         XrActionSpaceCreateInfo createInfo = { XR_TYPE_ACTION_SPACE_CREATE_INFO };
@@ -511,6 +558,16 @@ void CheckButtonState(bool buttonPressed, ButtonState& buttonState) {
 
 std::optional<OpenXR::InputState> OpenXR::UpdateActions(XrTime predictedFrameTime, glm::fquat controllerRotation, bool inMenu) {
     BetterVRProfiler::Scope profile(BetterVRProfiler::Section::XRUpdateActions);
+
+    // reading action state while the session is stopped is illegal and would fail every call
+    if (!IsSessionRunning()) {
+        return std::nullopt;
+    }
+
+    // syncing actions that were never attached to the session fails every single frame
+    if (!m_actionsAttached) {
+        return std::nullopt;
+    }
 
     XrActiveActionSet activeActionSet = { (inMenu ? m_menuActionSet : m_gameplayActionSet), XR_NULL_PATH };
 
@@ -767,6 +824,10 @@ std::optional<OpenXR::InputState> OpenXR::UpdateActions(XrTime predictedFrameTim
 std::optional<XrSpaceLocation> OpenXR::UpdateSpaces(XrTime predictedDisplayTime) {
     BetterVRProfiler::Scope profile(BetterVRProfiler::Section::XRUpdateSpaces);
 
+    if (!IsSessionRunning()) {
+        return std::nullopt;
+    }
+
     XrSpaceLocation spaceLocation = { XR_TYPE_SPACE_LOCATION };
     if (XrResult result = xrLocateSpace(m_headSpace, m_stageSpace, predictedDisplayTime, &spaceLocation); XR_SUCCEEDED(result)) {
         if (result != XR_ERROR_TIME_INVALID) {
@@ -780,50 +841,130 @@ std::optional<XrSpaceLocation> OpenXR::UpdateSpaces(XrTime predictedDisplayTime)
     return spaceLocation;
 }
 
+bool OpenXR::IsSessionRunning() const {
+    return m_renderer && m_renderer->IsSessionRunning();
+}
+
+std::optional<std::array<XrView, 2>> OpenXR::GetPoses(long frameIdx) const {
+    return m_renderer ? m_renderer->GetPoses(frameIdx) : std::nullopt;
+}
+
+std::optional<glm::fmat4> OpenXR::GetMiddlePose(long frameIdx) const {
+    return m_renderer ? m_renderer->GetMiddlePose(frameIdx) : std::nullopt;
+}
+
 void OpenXR::ProcessEvents() {
     auto processSessionStateChangedEvent = [this](XrEventDataSessionStateChanged* stateChangedEvent) {
+        // a session that was already replaced can still have events in the queue and acting on those
+        // would tear down the session that is current now
+        if (stateChangedEvent->session != m_session) {
+            Log::print<INFO>("OpenXR reported a session state change for a session that was already replaced, ignoring it!");
+            return;
+        }
+
         switch (stateChangedEvent->state) {
             case XR_SESSION_STATE_IDLE:
-                Log::print<VERBOSE>("OpenXR has indicated that the session is idle!");
+                Log::print<INFO>("OpenXR has indicated that the session is idle!");
+                m_sessionGraceDeadlineMs.store(0, std::memory_order_relaxed);
                 break;
             case XR_SESSION_STATE_READY: {
-                Log::print<VERBOSE>("OpenXR has indicated that the session is ready!");
-                if (m_renderer) {
-                    Log::print<WARNING>("OpenXR has indicated that the session is ready, but we already have a renderer!");
+                Log::print<INFO>("OpenXR has indicated that the session is ready!");
+                m_sessionGraceDeadlineMs.store(0, std::memory_order_relaxed);
+                if (m_sessionExitRequested) {
+                    // the runtime asked this application to exit, so a session is not ours to take
+                    Log::print<WARNING>("The runtime retired this application, the session is not begun!");
+                }
+                else if (m_renderer) {
+                    // The runtime stopped the session before (headset asleep, focus lost, ...) and now
+                    // hands it back: without beginning it again no frame is ever waited on, so neither
+                    // the headset image nor the controller input comes back.
+                    Log::print<INFO>("OpenXR has handed the session back, re-beginning it!");
+                    if (!m_renderer->BeginSession()) {
+                        Log::print<WARNING>("Failed to re-begin the OpenXR session! BetterVR stays paused until the runtime offers the session again.");
+                    }
                 }
                 else {
-                    m_renderer = std::make_unique<RND_Renderer>(m_session);
+                    // The constructor begins the session and throws if that fails, and this runs on
+                    // the thread presenting Cemu's frames, so the throw has to stop here.
+                    try {
+                        m_renderer = std::make_unique<RND_Renderer>(m_session);
+                        // The renderer of the replaced session is only kept around because its frame
+                        // pump may still be blocked inside xrWaitFrame; its ImGui overlay belongs to
+                        // Cemu's framebuffer rather than to the session, so it moves over to the new
+                        // renderer. Two overlays would mean two ImGui contexts in one process, and
+                        // the moment the retired renderer dies the context every hook uses is gone.
+                        if (m_retiredRenderer) {
+                            if (auto overlay = m_retiredRenderer->ReleaseImGuiOverlay(); overlay != nullptr) {
+                                m_renderer->SetImGuiOverlay(std::move(overlay));
+                                m_renderer->TakeImGuiFrameStateFrom(*m_retiredRenderer);
+                                Log::print<INFO>("The ImGui overlay of the replaced session was carried over to the new one!");
+                            }
+                        }
+                    }
+                    catch (const std::exception& e) {
+                        Log::print<ERROR>("Failed to create the renderer for the OpenXR session: {}", e.what());
+                        m_sessionGraceDeadlineMs.store(SteadyNowMs() + kLostSessionGraceMs, std::memory_order_relaxed);
+                    }
                 }
                 break;
             }
             case XR_SESSION_STATE_SYNCHRONIZED:
-                Log::print<VERBOSE>("OpenXR has indicated that the session is synchronized!");
+                Log::print<INFO>("OpenXR has indicated that the session is synchronized!");
                 break;
             case XR_SESSION_STATE_FOCUSED:
-                Log::print<VERBOSE>("OpenXR has indicated that the session is focused!");
+                Log::print<INFO>("OpenXR has indicated that the session is focused!");
                 break;
             case XR_SESSION_STATE_VISIBLE:
-                Log::print<VERBOSE>("OpenXR has indicated that the session should be visible!");
+                Log::print<INFO>("OpenXR has indicated that the session should be visible!");
                 break;
             case XR_SESSION_STATE_STOPPING:
-                Log::print<VERBOSE>("OpenXR has indicated that the session should be ended!");
+                Log::print<INFO>("OpenXR has indicated that the session should be ended!");
                 if (m_renderer) {
                     m_renderer->EndSession();
                 }
+                if (m_rumbleManager) {
+                    m_rumbleManager->SetSessionActive(false);
+                }
                 break;
             case XR_SESSION_STATE_EXITING:
-                Log::print<VERBOSE>("OpenXR has indicated that the session should be destroyed!");
+                Log::print<INFO>("OpenXR has indicated that the session should be destroyed!");
+                // This is the state that tells the application to exit: a session that reached it can
+                // never be begun again. The runtime walks the app through it when the app is closed in
+                // the headset, and a freshly created session is retired again after a few seconds,
+                // which keeps the app alive in the headset instead of closing it. Sleeping never sends
+                // this state, a sleeping headset only sends STOPPING and hands the session back later,
+                // so there is nothing to recover here and Cemu has to follow the runtime.
+                m_sessionExitRequested.store(true, std::memory_order_relaxed);
+                m_sessionGraceDeadlineMs.store(0, std::memory_order_relaxed);
+                if (m_renderer) {
+                    m_renderer->EndSession();
+                }
+                if (m_rumbleManager) {
+                    m_rumbleManager->SetSessionActive(false);
+                }
+                Log::print<WARNING>("The runtime retired the OpenXR session, closing Cemu!");
                 // an exception is thrown here instead of using exit() to allow Cemu to ideally gracefully shutdown
-                //throw std::runtime_error("BetterVR mod has been requested to exit by OpenXR!");
-                //this->m_renderer.reset();
                 PostMessage(CemuHooks::m_cemuTopWindow, WM_CLOSE, 0, 0);
                 break;
+            // note: the OpenXR headers this project builds against stop at XR_SESSION_STATE_EXITING,
+            // the later ENDING / DESTROYED states land in the default branch below and are only ever
+            // reached after one of the paths above already let go of the session
             case XR_SESSION_STATE_LOSS_PENDING:
-                Log::print<VERBOSE>("OpenXR has indicated that the session is going to be lost!");
-                // todo: implement being able to continuously check if xrGetSystem returns and then reinitialize the session
+                Log::print<INFO>("OpenXR has indicated that the session is going to be lost!");
+                // stop using the session that is about to disappear; the runtime is expected to walk
+                // the session through IDLE -> READY again, at which point it gets begun once more
+                if (m_renderer) {
+                    m_renderer->EndSession();
+                }
+                if (m_rumbleManager) {
+                    m_rumbleManager->SetSessionActive(false);
+                }
+                // the runtime is not obliged to hand a usable session back after this, so start the
+                // clock on rebuilding the session ourselves
+                m_sessionGraceDeadlineMs.store(SteadyNowMs() + kLostSessionGraceMs, std::memory_order_relaxed);
                 break;
             default:
-                Log::print<VERBOSE>("OpenXR has indicated that an unknown session state has occurred!");
+                Log::print<INFO>("OpenXR has indicated that an unknown session state has occurred!");
                 break;
         }
     };
@@ -860,5 +1001,115 @@ void OpenXR::ProcessEvents() {
 
         eventData = { XR_TYPE_EVENT_DATA_BUFFER };
         result = xrPollEvent(m_instance, &eventData);
+    }
+
+    // the pumps of a replaced session outlive it by the length of their blocked wait
+    if (m_retiredRenderer && SteadyNowMs() > m_retiredRendererDestroyAfterMs) {
+        m_retiredRenderer.reset();
+    }
+
+    // A session the runtime refuses to produce frames for is beyond repair once the headset has
+    // been asleep for a while, and waiting for the runtime to hand a working one back has not
+    // worked out either, so rebuild the session from scratch in that case.
+    const bool framesStopped = m_renderer && m_renderer->NeedsSessionRestart();
+    const long long graceDeadline = m_sessionGraceDeadlineMs.load(std::memory_order_relaxed);
+    const bool lostAndNotComingBack = graceDeadline != 0 && SteadyNowMs() > graceDeadline;
+    if (m_sessionExitRequested) {
+        // the runtime closed this application, rebuilding a session would only put it back into the
+        // headset; Cemu is already being closed by the state handler above
+        m_sessionGraceDeadlineMs.store(0, std::memory_order_relaxed);
+    }
+    else if (framesStopped || lostAndNotComingBack) {
+        if (m_sessionRestarts >= kMaxSessionRestarts) {
+            static long long s_lastGiveUpLogMs = 0;
+            if (SteadyNowMs() - s_lastGiveUpLogMs > 30000) {
+                s_lastGiveUpLogMs = SteadyNowMs();
+                Log::print<ERROR>("Giving up on recreating the OpenXR session after {} attempts, the headset display stays off until Cemu is restarted!", m_sessionRestarts);
+            }
+            m_sessionGraceDeadlineMs.store(0, std::memory_order_relaxed);
+            // an instance that is gone cannot ever hand a display back, so the game is not worth
+            // keeping open in that case
+            if (!InstanceIsAlive()) {
+                Log::print<WARNING>("The OpenXR instance is gone, closing Cemu!");
+                PostMessage(CemuHooks::m_cemuTopWindow, WM_CLOSE, 0, 0);
+            }
+        }
+        else {
+            Log::print<WARNING>("Rebuilding the OpenXR session (attempt {}) because {}!", m_sessionRestarts + 1,
+                framesStopped ? "the runtime stopped producing frames for it" : "the runtime lost it and did not hand it back");
+            ++m_sessionRestarts;
+            m_lastSessionRestartMs = SteadyNowMs();
+            m_sessionGraceDeadlineMs.store(0, std::memory_order_relaxed);
+            RecreateSession();
+        }
+    }
+
+    // a session that has been running happily for a while earns another set of attempts
+    if (m_sessionRestarts > 0 && m_lastSessionRestartMs != 0 && SteadyNowMs() - m_lastSessionRestartMs > 60000 &&
+        m_renderer && m_renderer->ProducedFrameRecently()) {
+        m_sessionRestarts = 0;
+    }
+}
+
+void OpenXR::RecreateSession() {
+    if (m_sessionExitRequested) {
+        Log::print<WARNING>("The runtime retired this application, the OpenXR session is not recreated!");
+        return;
+    }
+
+    Log::print<WARNING>("Recreating the OpenXR session...");
+
+    // This runs on the thread that presents Cemu's frames and the creation calls below throw on
+    // failure, so a runtime that refuses a new session must not take the emulator down with it.
+    try {
+        if (m_rumbleManager) {
+            m_rumbleManager->SetSessionActive(false);
+            m_rumbleManager.reset();
+        }
+
+        // A replaced renderer cannot be destroyed right away: one of its frame pumps may still be
+        // blocked inside xrWaitFrame on the dying session and would wake up on freed memory. It
+        // gets retired here and destroyed once that wait has certainly returned.
+        if (m_renderer) {
+            m_renderer->AbandonSession();
+            // The layers of the renderer hold the swapchains this session owns, and destroying the
+            // session destroys those handles: the layers have to let go of them before that happens.
+            m_renderer->AbandonSessionSwapchains();
+            m_retiredRenderer = std::move(m_renderer);
+            m_retiredRendererDestroyAfterMs = SteadyNowMs() + kRetiredRendererGraceMs;
+        }
+
+        if (m_session != XR_NULL_HANDLE) {
+            xrDestroySession(m_session);
+            m_session = XR_NULL_HANDLE;
+        }
+
+        // every space below belongs to the session that just went away, so it went with it
+        m_headSpace = XR_NULL_HANDLE;
+        m_stageSpace = XR_NULL_HANDLE;
+        m_retiredStageSpaces.clear();
+        for (XrSpace& space : m_inGameHandSpaces) space = XR_NULL_HANDLE;
+        for (XrSpace& space : m_inGameAimSpaces) space = XR_NULL_HANDLE;
+        for (XrSpace& space : m_inMenuHandSpaces) space = XR_NULL_HANDLE;
+        for (XrSpace& space : m_inMenuAimSpaces) space = XR_NULL_HANDLE;
+
+        XrGraphicsBindingD3D12KHR d3d12Binding = { XR_TYPE_GRAPHICS_BINDING_D3D12_KHR };
+        d3d12Binding.device = VRManager::instance().D3D12->GetDevice();
+        d3d12Binding.queue = VRManager::instance().D3D12->GetCommandQueue();
+
+        CreateSession(d3d12Binding, false);
+        if (m_session == XR_NULL_HANDLE) {
+            // no session to attach anything to; the clock below fires another attempt
+            m_sessionGraceDeadlineMs.store(SteadyNowMs() + kNewSessionGraceMs, std::memory_order_relaxed);
+            return;
+        }
+        AttachActionsToSession();
+
+        // The runtime walks the new session through READY on its own, which is where the renderer
+        // and the layers get picked back up; if it never does, the clock above fires another rebuild.
+        m_sessionGraceDeadlineMs.store(SteadyNowMs() + kNewSessionGraceMs, std::memory_order_relaxed);
+    }
+    catch (const std::exception& e) {
+        Log::print<ERROR>("Rebuilding the OpenXR session failed: {}", e.what());
     }
 }

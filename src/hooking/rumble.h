@@ -22,6 +22,24 @@ public:
         m_startTime = std::chrono::steady_clock::now();
     }
 
+    // Haptics must not be sent while the OpenXR session is stopped (headset asleep): the runtime
+    // rejects the calls, and a thrown error here would take Cemu down with it.
+    void SetSessionActive(bool active)
+    {
+        m_session_active.store(active, std::memory_order_release);
+        if (!active) {
+            std::scoped_lock lock(m_rumble_mutex);
+            m_current_rumbling = false;
+            m_haptic_active = false;
+            while (!m_rumble_queue.empty()) {
+                m_rumble_queue.pop();
+            }
+            m_parser = 0;
+        }
+    }
+
+    bool IsSessionActive() const { return m_session_active.load(std::memory_order_acquire); }
+
     // pattern: uint8_t* rumble pattern
     // length: length in bits
     void controlMotor(uint8_t* pattern, uint8_t length) {
@@ -65,6 +83,13 @@ public:
     }
 
     void updateHaptics() {
+        if (!IsSessionActive()) {
+            while (!m_inputs_rumble_queue.empty()) {
+                m_inputs_rumble_queue.pop();
+            }
+            return;
+        }
+
         auto now = std::chrono::steady_clock::now();
 
         // Check for new commands in queue and assign them to the correct hand
@@ -262,7 +287,11 @@ void apply_haptic_infinite() {
         haptic_info.action = m_haptic_action;
         haptic_info.subactionPath = m_subaction_path;
 
-        checkXRResult(xrApplyHapticFeedback(m_session, &haptic_info, (const XrHapticBaseHeader*)&vibration), "Failed to start rumble");
+        const XrResult result = xrApplyHapticFeedback(m_session, &haptic_info, (const XrHapticBaseHeader*)&vibration);
+        if (XR_FAILED(result)) {
+            Log::print<VERBOSE>("Failed to start rumble (result {})!", (int)result);
+            return;
+        }
 
         m_haptic_start_time = std::chrono::steady_clock::now();
         m_haptic_active = true;
@@ -275,7 +304,10 @@ void apply_haptic_infinite() {
         haptic_info.action = m_haptic_action;
         haptic_info.subactionPath = m_subaction_path;
 
-        checkXRResult(xrStopHapticFeedback(m_session, &haptic_info), "Failed to stop rumble");
+        const XrResult result = xrStopHapticFeedback(m_session, &haptic_info);
+        if (XR_FAILED(result)) {
+            Log::print<VERBOSE>("Failed to stop rumble (result {})!", (int)result);
+        }
 
         if (m_haptic_active) {
             auto end_time = std::chrono::steady_clock::now();
@@ -285,6 +317,7 @@ void apply_haptic_infinite() {
         }
     }
 
+    std::atomic_bool m_session_active = true;
     XrInstance m_instance;
     XrSession m_session;
     XrAction m_haptic_action;

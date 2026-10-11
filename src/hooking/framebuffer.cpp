@@ -130,8 +130,8 @@ void VkDeviceOverrides::CmdClearColorImage(const vkroots::VkCommandBufferDispatc
                     }
 
                     renderer->m_gameRenderAspectRatio = (float)renderRes.width / (float)renderRes.height;
-                    layer3D = std::make_unique<RND_Renderer::Layer3D>(renderRes, swapchainRes);
-                    layer2D = std::make_unique<RND_Renderer::Layer2D>(renderRes, swapchainRes);
+                    layer3D = std::make_unique<RND_Renderer::Layer3D>(renderer, renderRes, swapchainRes);
+                    layer2D = std::make_unique<RND_Renderer::Layer2D>(renderer, renderRes, swapchainRes);
                     for (auto& textures : layer3D->GetSharedTextures()) {
                         for (auto& texture : textures) {
                             texture->Init(commandBuffer);
@@ -147,7 +147,10 @@ void VkDeviceOverrides::CmdClearColorImage(const vkroots::VkCommandBufferDispatc
                     }
 
                     Log::print<INFO>("Found rendering resolution {}x{} @ {} using capture #{}", renderRes.width, renderRes.height, it->second.second, captureIdx);
-                    imguiOverlay = std::make_unique<RND_Renderer::ImGuiOverlay>(commandBuffer, renderRes, VK_FORMAT_A2B10G10R10_UNORM_PACK32);
+                    // ImGui keeps one context per process, so an overlay that was carried over from a
+                    // replaced session stays: only a renderer that never had one builds a new one.
+                    if (!imguiOverlay)
+                        imguiOverlay = std::make_unique<RND_Renderer::ImGuiOverlay>(renderer, commandBuffer, renderRes, VK_FORMAT_A2B10G10R10_UNORM_PACK32);
                     VRManager::instance().Hooks->m_entityDebugger = std::make_unique<EntityDebugger>();
                 }
                 else {
@@ -157,7 +160,7 @@ void VkDeviceOverrides::CmdClearColorImage(const vkroots::VkCommandBufferDispatc
             }
         }
 
-        if (!VRManager::instance().XR->GetRenderer()->IsInitialized()) {
+        if (!renderer->IsInitialized()) {
             return;
         }
 

@@ -11,6 +11,10 @@ public:
     void FinishRendering();
 
     XrSwapchain GetHandle() const { return m_swapchain; };
+    // The session owns the swapchains made from it, so a session that is already destroyed took this
+    // handle with it and xrDestroySwapchain on it would be invalid handle usage. The wrapper still
+    // tears down everything it owns itself, it just forgets about the runtime object.
+    void AbandonHandle() { m_swapchain = XR_NULL_HANDLE; }
     ID3D12Resource* GetTexture() const { return m_swapchainTextures[m_swapchainImageIdx].Get(); };
 
     DXGI_FORMAT GetFormat() const { return m_format; };

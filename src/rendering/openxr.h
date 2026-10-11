@@ -185,8 +185,13 @@ public:
     } rumbleParameters ;
     std::atomic<RumbleParameters> m_rumbleParameters{};
 
-    void CreateSession(const XrGraphicsBindingD3D12KHR& d3d12Binding);
+    // Returns whether the session exists. With fatal set to false the calls fail softly, which is
+    // what the recovery path needs: a runtime that is going away must not pop a dialog on the
+    // thread that presents Cemu's frames.
+    bool CreateSession(const XrGraphicsBindingD3D12KHR& d3d12Binding, bool fatal = true);
+    bool InstanceIsAlive() const;
     void CreateActions();
+    void AttachActionsToSession();
     std::array<XrViewConfigurationView, 2> GetViewConfigurations();
     std::optional<XrSpaceLocation> UpdateSpaces(XrTime predictedDisplayTime);
     std::optional<InputState> UpdateActions(XrTime predictedFrameTime, glm::fquat controllerRotation, bool inMenu);
@@ -195,10 +200,17 @@ public:
     std::optional<float> GetCalibratedSeatedEyeHeight() const;
 
     void ProcessEvents();
+    bool IsSessionRunning() const;
 
     XrSession GetSession() const { return m_session; }
     RND_Renderer* GetRenderer() const { return m_renderer.get(); }
     RumbleManager* GetRumbleManager() const { return m_rumbleManager.get(); }
+
+    // While a session is being rebuilt there is no renderer at all, and the game's hooks keep
+    // running during that window: these helpers then just report that there is no pose instead of
+    // every caller having to check the renderer pointer itself.
+    std::optional<std::array<XrView, 2>> GetPoses(long frameIdx = -1) const;
+    std::optional<glm::fmat4> GetMiddlePose(long frameIdx = -1) const;
 
 private:
     XrPath GetXRPath(const char* str) const {
@@ -208,9 +220,32 @@ private:
     };
     void ReplaceStageSpace(float floorOffset);
 
+    // Thrown away and rebuilt whenever the runtime stops serving frames for it
+    void RecreateSession();
+    // Rebuilding in a loop would fight the runtime, so the attempts are capped and re-earned by uptime
+    static constexpr int kMaxSessionRestarts = 6;
+    // How long the runtime gets to hand a usable session back: a short grace after it says the
+    // session is lost, a longer one after we created a replacement of our own
+    static constexpr long long kLostSessionGraceMs = 5000;
+    static constexpr long long kNewSessionGraceMs = 20000;
+    // moment the runtime has until to hand a session back, zero when nothing is pending
+    std::atomic<long long> m_sessionGraceDeadlineMs = 0;
+    // set once the runtime retires the session for good (the app was closed in the headset): from
+    // that point on nothing may ask for another session, the emulator has to go down instead
+    std::atomic_bool m_sessionExitRequested = false;
+    // A replaced renderer is only destroyed once its last frame pump has certainly come back from
+    // a blocked xrWaitFrame, otherwise that thread would wake up on freed memory
+    static constexpr long long kRetiredRendererGraceMs = 45000;
+    std::unique_ptr<RND_Renderer> m_retiredRenderer;
+    long long m_retiredRendererDestroyAfterMs = 0;
+    int m_sessionRestarts = 0;
+    long long m_lastSessionRestartMs = 0;
+
     XrInstance m_instance = XR_NULL_HANDLE;
     XrSystemId m_systemId = XR_NULL_SYSTEM_ID;
     XrSession m_session = XR_NULL_HANDLE;
+    // Whether the action sets are attached to the current session; input is off until they are
+    bool m_actionsAttached = false;
     XrSpace m_stageSpace = XR_NULL_HANDLE;
     XrSpace m_headSpace = XR_NULL_HANDLE;
     std::vector<XrSpace> m_retiredStageSpaces;
