@@ -1,4 +1,6 @@
-name: Build BetterVR
+name: Build Cemu with BetterVR
+
+# The workspace: the Cemu fork pinned as cemu-src/, with the mod in src/ compiled in.
 
 on:
   workflow_dispatch:
@@ -7,8 +9,12 @@ on:
   pull_request:
     branches: [ "main" ]
 
+permissions:
+  contents: read
+  packages: write
+
 jobs:
-  build:
+  build-windows:
     runs-on: windows-2025-vs2026
 
     defaults:
@@ -16,109 +22,136 @@ jobs:
         shell: pwsh
 
     steps:
+      # full history, so the contract check can diff the fork against its upstream base
       - name: Checkout
         uses: actions/checkout@v6
         with:
           submodules: recursive
+          fetch-depth: 0
 
       - name: Set up MSVC dev environment
         uses: TheMrMilchmann/setup-msvc-dev@v4
         with:
           arch: x64
 
-      - name: Install Vulkan SDK (direct from LunarG)
+      - name: Bootstrap Cemu's vcpkg
+        run: ./cemu-src/dependencies/vcpkg/bootstrap-vcpkg.bat -disableMetrics
+
+      - name: Set up the vcpkg binary cache
+        shell: bash
+        run: |
+          nuget=`./cemu-src/dependencies/vcpkg/vcpkg.exe fetch nuget | tail -n 1`
+          "$nuget" sources add -source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json" -storepasswordincleartext -name "GitHub" -username "${{ github.repository_owner }}" -password "${{ secrets.GITHUB_TOKEN }}"
+          "$nuget" setapikey "${{ secrets.GITHUB_TOKEN }}" -source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json"
+          echo "VCPKG_BINARY_SOURCES=clear;nuget,GitHub,readwrite" >> $GITHUB_ENV
+
+      - name: Resolve build identity
+        id: identity
         run: |
           $ErrorActionPreference = "Stop"
+          $versionMatch = [regex]::Match((Get-Content "$env:GITHUB_WORKSPACE\CMakeLists.txt" -Raw), 'project\(BetterVR VERSION ([0-9]+(?:\.[0-9]+)*)')
+          if (!$versionMatch.Success) { throw "Could not read the project version from CMakeLists.txt." }
+          "version=$($versionMatch.Groups[1].Value)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "short_sha=$($env:GITHUB_SHA.Substring(0, 8))" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
 
-          $latest = Invoke-RestMethod "https://vulkan.lunarg.com/sdk/latest/windows.json"
-          $ver = $latest.windows
-          if (-not $ver) { throw "Failed to determine latest Vulkan SDK version." }
-          Write-Host "Latest Vulkan SDK version: $ver"
-
-          $exe = "vulkansdk-windows-X64-$ver.exe"
-          $urlNew = "https://sdk.lunarg.com/sdk/download/$ver/windows/$exe"
-          $urlOld = "https://sdk.lunarg.com/sdk/download/$ver/windows/VulkanSDK-$ver-Installer.exe"
-
-          try {
-            Write-Host "Downloading: $urlNew"
-            Invoke-WebRequest $urlNew -OutFile $exe
-          } catch {
-            Write-Host "New-name download failed; trying legacy filename..."
-            Write-Host "Downloading: $urlOld"
-            Invoke-WebRequest $urlOld -OutFile $exe
-          }
-
-          $installRoot = "C:\VulkanSDK\$ver"
-          New-Item -ItemType Directory -Force -Path $installRoot | Out-Null
-
-          & ".\$exe" --root $installRoot --accept-licenses --default-answer --confirm-command install com.lunarg.vulkan.debug copy_only=1
-
-          "VULKAN_SDK=$installRoot" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-          "VK_SDK_PATH=$installRoot" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-          "$installRoot\Bin" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
-
-          Write-Host "Installed Vulkan SDK to $installRoot"
-
-      - name: Clone vcpkg
+      - name: Configure
         run: |
-          git clone https://github.com/microsoft/vcpkg "$env:GITHUB_WORKSPACE\vcpkg"
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=release -DVCPKG_INSTALL_OPTIONS="--clean-after-build"
+          if ($LASTEXITCODE -ne 0) { throw "configure failed" }
 
-      - name: Bootstrap vcpkg
+      - name: Build
         run: |
-          & "$env:GITHUB_WORKSPACE\vcpkg\bootstrap-vcpkg.bat" -disableMetrics
+          cmake --build build --target CemuBin
+          if ($LASTEXITCODE -ne 0) { throw "build failed" }
 
-      - name: Export vcpkg environment for scripts
-        run: |
-          "VCPKG_ROOT=$env:GITHUB_WORKSPACE\vcpkg" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-          "VCPKG_DEFAULT_TRIPLET=x64-windows-static-md" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-
-      - name: Install vcpkg dependencies (manifest mode)
+      - name: Assemble the bundle
         run: |
           $ErrorActionPreference = "Stop"
-          $vcpkg = "$env:GITHUB_WORKSPACE\vcpkg\vcpkg.exe"
-
-          if (!(Test-Path "$env:GITHUB_WORKSPACE\vcpkg.json")) {
-            throw "vcpkg.json not found at repo root (expected manifest mode)."
+          $bundle = "$env:GITHUB_WORKSPACE\bundle"
+          New-Item -ItemType Directory -Force -Path "$bundle\BetterVR\packs" | Out-Null
+          Copy-Item cemu-src\bin\Cemu_release.exe "$bundle\BetterVR_Launcher.exe"
+          Copy-Item cemu-src\bin\resources, cemu-src\bin\gameProfiles "$bundle\BetterVR" -Recurse
+          foreach ($pack in @("BreathOfTheWild_BetterVR", "BreathOfTheWild_Graphics", "graphicPacks")) {
+            Copy-Item "resources\$pack" "$bundle\BetterVR\packs\$pack" -Recurse
           }
+          Get-ChildItem "$bundle\BetterVR\packs" -Recurse -File -Include "CemuPatchCompiler*", "patch_debug_*.asm" | Remove-Item
+          Remove-Item "$bundle\BetterVR\packs\BreathOfTheWild_BetterVR\src" -Recurse
 
-          & $vcpkg install `
-            --x-manifest-root "$env:GITHUB_WORKSPACE" `
-            --triplet "x64-windows-static-md"
-
-      - name: Patch CMakeUserPresets.json (set VCPKG_ROOT for all presets)
-        run: |
-          $presetPath = Join-Path $env:GITHUB_WORKSPACE "CMakeUserPresets.json"
-          if (!(Test-Path $presetPath)) { throw "CMakeUserPresets.json not found at repo root." }
-
-          $vcpkgRoot = Join-Path $env:GITHUB_WORKSPACE "vcpkg"
-          $json = Get-Content $presetPath -Raw | ConvertFrom-Json
-
-          if ($null -eq $json.configurePresets) { throw "configurePresets missing in CMakeUserPresets.json" }
-
-          foreach ($p in $json.configurePresets) {
-            if ($null -eq $p.environment) { $p | Add-Member -NotePropertyName environment -NotePropertyValue (@{}) }
-            $p.environment.VCPKG_ROOT = $vcpkgRoot
-          }
-
-          $json | ConvertTo-Json -Depth 50 | Set-Content $presetPath -Encoding UTF8
-          Write-Host "Patched VCPKG_ROOT to: $vcpkgRoot"
-
-      - name: Build and install launcher (RelWithDebInfo)
-        run: |
-          if (!(Test-Path "$env:GITHUB_WORKSPACE\build_mod.bat")) {
-            throw "build_mod.bat not found at repo root."
-          }
-          cmd /c build_mod.bat RelWithDebInfo
-
-      - name: Verify launcher outputs
-        run: |
-          if (!(Test-Path "$env:GITHUB_WORKSPACE\Cemu\BetterVR_Launcher.exe")) {
-            throw "BetterVR_Launcher.exe not found in Cemu output directory."
-          }
-
-      - name: Upload launcher exe
+      - name: Upload the bundle
         uses: actions/upload-artifact@v7
         with:
-          name: BetterVR_Launcher
-          path: Cemu/BetterVR_Launcher.exe
+          name: Cemu-BetterVR-${{ steps.identity.outputs.version }}-${{ steps.identity.outputs.short_sha }}-windows-x64
+          path: bundle/
+          if-no-files-found: error
+
+  # Cemu's own Linux toolchain and AppImage script, on the same runners Cemu uses
+  build-linux:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            arch: x64
+          - os: ubuntu-22.04-arm
+            arch: arm64
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Install system dependencies
+        run: |
+          sudo apt update -qq
+          sudo apt install -y clang-15 cmake freeglut3-dev libgcrypt20-dev libglm-dev libgtk-3-dev libpulse-dev libsecret-1-dev libsystemd-dev libudev-dev nasm ninja-build libbluetooth-dev appstream
+
+      - name: Bootstrap Cemu's vcpkg
+        run: bash ./cemu-src/dependencies/vcpkg/bootstrap-vcpkg.sh
+
+      - name: Set up the vcpkg binary cache
+        run: |
+          nuget=`./cemu-src/dependencies/vcpkg/vcpkg fetch nuget | tail -n 1`
+          mono "$nuget" sources add -source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json" -storepasswordincleartext -name "GitHub" -username "${{ github.repository_owner }}" -password "${{ secrets.GITHUB_TOKEN }}"
+          mono "$nuget" setapikey "${{ secrets.GITHUB_TOKEN }}" -source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json"
+          echo "VCPKG_BINARY_SOURCES=clear;nuget,GitHub,readwrite" >> $GITHUB_ENV
+
+      - name: Resolve build identity
+        id: identity
+        run: |
+          echo "version=$(grep -oP 'project\(BetterVR VERSION \K[0-9.]+' CMakeLists.txt)" >> $GITHUB_OUTPUT
+          echo "short_sha=${GITHUB_SHA::8}" >> $GITHUB_OUTPUT
+
+      - name: Configure
+        run: |
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=release \
+            -DCMAKE_C_COMPILER=/usr/bin/clang-15 -DCMAKE_CXX_COMPILER=/usr/bin/clang++-15 -DCMAKE_MAKE_PROGRAM=/usr/bin/ninja
+
+      - name: Build
+        run: cmake --build build --target CemuBin
+
+      # appimage.sh moves bin/* into the AppImage's share/Cemu, where the module looks for its packs
+      - name: Build the AppImage
+        working-directory: cemu-src
+        run: |
+          mkdir -p ../bundle
+          mv bin/Cemu_release bin/Cemu
+          mkdir -p bin/packs
+          cp -r ../resources/BreathOfTheWild_BetterVR ../resources/BreathOfTheWild_Graphics ../resources/graphicPacks bin/packs/
+          find bin/packs \( -name 'CemuPatchCompiler*' -o -name 'patch_debug_*.asm' \) -delete
+          rm -r bin/packs/BreathOfTheWild_BetterVR/src
+          export LD_LIBRARY_PATH="/usr/local/lib:$LD_LIBRARY_PATH"
+          export DEPLOY_GTK_VERSION=3
+          dist/linux/appimage.sh ${{ runner.arch }}
+
+      - name: Assemble the bundle
+        run: mv cemu-src/artifacts/*.AppImage bundle/
+
+      - name: Upload the bundle
+        uses: actions/upload-artifact@v7
+        with:
+          name: Cemu-BetterVR-${{ steps.identity.outputs.version }}-${{ steps.identity.outputs.short_sha }}-linux-${{ matrix.arch }}
+          path: bundle/
           if-no-files-found: error
