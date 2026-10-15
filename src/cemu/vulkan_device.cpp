@@ -1,7 +1,7 @@
 #include "pch.h"
-#include "layer.h"
+#include "vulkan_device.h"
 #include "instance.h"
-
+#include "vulkan_loader.h"
 
 static bool s_deviceFaultLoggingEnabled = false;
 
@@ -33,10 +33,14 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL VulkanDebugUtilsMessengerCallback(
 }
 #endif
 
-VkResult VRLayer::VkInstanceOverrides::CreateInstance(PFN_vkCreateInstance createInstanceFunc, const VkInstanceCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkInstance* pInstance) {
+VkResult VulkanDevice::CreateInstance(PFN_vkCreateInstance createInstanceFunc, const VkInstanceCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkInstance* pInstance) {
     if (!createInstanceFunc || !pCreateInfo || !pInstance) {
         return VK_ERROR_INITIALIZATION_FAILED;
     }
+
+    // OpenXR's graphics requirements have to be queried before the runtime creates the Vulkan instance
+    OpenXR* xr = VRManager::instance().XR.get();
+    checkAssert(xr != nullptr, "The OpenXR instance wasn't available while creating the Vulkan instance!");
 
     VkInstanceCreateInfo modifiedCreateInfo = *pCreateInfo;
     std::vector<const char*> modifiedExtensions;
@@ -44,6 +48,21 @@ VkResult VRLayer::VkInstanceOverrides::CreateInstance(PFN_vkCreateInstance creat
     if (pCreateInfo->ppEnabledExtensionNames) {
         for (uint32_t i = 0; i < pCreateInfo->enabledExtensionCount; i++) {
             modifiedExtensions.push_back(pCreateInfo->ppEnabledExtensionNames[i]);
+        }
+    }
+
+    VkApplicationInfo modifiedApplicationInfo = {};
+    if (pCreateInfo->pApplicationInfo != nullptr) {
+        modifiedApplicationInfo = *pCreateInfo->pApplicationInfo;
+        modifiedApplicationInfo.apiVersion = xr->ClampVulkanApiVersion(modifiedApplicationInfo.apiVersion);
+        modifiedCreateInfo.pApplicationInfo = &modifiedApplicationInfo;
+    }
+
+    const std::vector<std::string> runtimeExtensions = xr->UsesVulkanEnable2() ? std::vector<std::string>{} : xr->GetRequiredVulkanInstanceExtensions();
+    for (const std::string& runtimeExtension : runtimeExtensions) {
+        if (std::ranges::none_of(modifiedExtensions, [&runtimeExtension](const char* name) { return name != nullptr && runtimeExtension == name; })) {
+            modifiedExtensions.push_back(runtimeExtension.c_str());
+            Log::print<INFO>("Adding the OpenXR runtime's required instance extension {}", runtimeExtension);
         }
     }
 
@@ -81,11 +100,49 @@ VkResult VRLayer::VkInstanceOverrides::CreateInstance(PFN_vkCreateInstance creat
     modifiedCreateInfo.enabledExtensionCount = (uint32_t)modifiedExtensions.size();
     modifiedCreateInfo.ppEnabledExtensionNames = modifiedExtensions.empty() ? nullptr : modifiedExtensions.data();
 
-    VkResult result = createInstanceFunc(&modifiedCreateInfo, pAllocator, pInstance);
+    // with enable2 the runtime creates the instance itself, so vkroots needs its dispatch table built here
+    auto buildDispatchTable = [&]() {
+        PFN_vkGetInstanceProcAddr realGetInstanceProcAddr = VulkanLoader::GetInstanceProcAddr();
+        vkroots::tables::CreateDispatchTable(realGetInstanceProcAddr, realGetInstanceProcAddr, *pInstance);
+    };
+
+    auto plainCreate = [&](const VkInstanceCreateInfo& createInfo) -> VkResult {
+        static const auto realCreateInstance = (PFN_vkCreateInstance)VulkanLoader::GetInstanceProcAddr()(VK_NULL_HANDLE, "vkCreateInstance");
+        const VkResult result = realCreateInstance(&createInfo, pAllocator, pInstance);
+        if (result == VK_SUCCESS) {
+            buildDispatchTable();
+        }
+        return result;
+    };
+
+    auto terminalCreate = [&](const VkInstanceCreateInfo& createInfo) -> VkResult {
+        if (!xr->UsesVulkanEnable2()) {
+            return plainCreate(createInfo);
+        }
+
+        const VkResult xrResult = xr->CreateVulkanInstance(createInfo, pAllocator, pInstance);
+        if (xrResult == VK_SUCCESS) {
+            buildDispatchTable();
+            Log::print<INFO>("The OpenXR runtime created this Vulkan instance through xrCreateVulkanInstanceKHR");
+            return VK_SUCCESS;
+        }
+        if (xrResult == VK_ERROR_EXTENSION_NOT_PRESENT) {
+            return xrResult;
+        }
+
+        Log::print<WARNING>("The OpenXR runtime wouldn't create this Vulkan instance (error {}), creating it without the runtime instead", xrResult);
+        return plainCreate(createInfo);
+    };
+
+    VkResult result = terminalCreate(modifiedCreateInfo);
 #ifdef _DEBUG
     if (result == VK_ERROR_EXTENSION_NOT_PRESENT && addedDebugUtilsExtension) {
         debugUtilsEnabled = false;
-        result = createInstanceFunc(pCreateInfo, pAllocator, pInstance);
+        modifiedExtensions.pop_back();
+        modifiedCreateInfo.pNext = pCreateInfo->pNext;
+        modifiedCreateInfo.enabledExtensionCount = (uint32_t)modifiedExtensions.size();
+        modifiedCreateInfo.ppEnabledExtensionNames = modifiedExtensions.empty() ? nullptr : modifiedExtensions.data();
+        result = terminalCreate(modifiedCreateInfo);
     }
 #endif
     if (result != VK_SUCCESS) {
@@ -109,126 +166,18 @@ VkResult VRLayer::VkInstanceOverrides::CreateInstance(PFN_vkCreateInstance creat
     }
 #endif
 
-    VRManager::instance().vkVersion = modifiedCreateInfo.pApplicationInfo->apiVersion;
+    VRManager::instance().vkVersion = modifiedApplicationInfo.apiVersion;
 
-    Log::print<INFO>("Created Vulkan instance (using Vulkan {}.{}.{}) successfully!", VK_API_VERSION_MAJOR(modifiedCreateInfo.pApplicationInfo->apiVersion), VK_API_VERSION_MINOR(modifiedCreateInfo.pApplicationInfo->apiVersion), VK_API_VERSION_PATCH(modifiedCreateInfo.pApplicationInfo->apiVersion));
-    checkAssert(VK_VERSION_MINOR(modifiedCreateInfo.pApplicationInfo->apiVersion) != 0 || VK_VERSION_MAJOR(modifiedCreateInfo.pApplicationInfo->apiVersion) > 1, "Vulkan version needs to be v1.1 or higher!");
+    Log::print<INFO>("Created Vulkan instance (using Vulkan {}.{}.{}) successfully!", VK_API_VERSION_MAJOR(modifiedApplicationInfo.apiVersion), VK_API_VERSION_MINOR(modifiedApplicationInfo.apiVersion), VK_API_VERSION_PATCH(modifiedApplicationInfo.apiVersion));
+    checkAssert(VK_VERSION_MINOR(modifiedApplicationInfo.apiVersion) != 0 || VK_VERSION_MAJOR(modifiedApplicationInfo.apiVersion) > 1, "Vulkan version needs to be v1.1 or higher!");
 
     Log::OnInstanceCreated();
     return result;
 }
 
 
-VkResult VRLayer::VkInstanceOverrides::EnumeratePhysicalDevices(const vkroots::VkInstanceDispatch& pDispatch, VkInstance instance, uint32_t* pPhysicalDeviceCount, VkPhysicalDevice* pPhysicalDevices) {
-    // Proceed to get all devices
-    uint32_t internalCount = 0;
-    checkVkResult(pDispatch.EnumeratePhysicalDevices(instance, &internalCount, nullptr), "Failed to retrieve number of vulkan physical devices!");
-    std::vector<VkPhysicalDevice> internalDevices(internalCount);
-    checkVkResult(pDispatch.EnumeratePhysicalDevices(instance, &internalCount, internalDevices.data()), "Failed to retrieve vulkan physical devices!");
-
-    VkPhysicalDevice matchedDevice = VK_NULL_HANDLE;
-    VkPhysicalDevice fallbackDevice = VK_NULL_HANDLE;
-
-    for (const VkPhysicalDevice& device : internalDevices) {
-        VkPhysicalDeviceIDProperties deviceId = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ID_PROPERTIES };
-        VkPhysicalDeviceProperties2 properties = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2 };
-        properties.pNext = &deviceId;
-        pDispatch.GetPhysicalDeviceProperties2(device, &properties);
-
-        if (deviceId.deviceLUIDValid && memcmp(&VRManager::instance().XR->m_capabilities.adapter, deviceId.deviceLUID, VK_LUID_SIZE) == 0) {
-            matchedDevice = device;
-            break;
-        }
-
-        // Keep track of the first discrete GPU as fallback for drivers that don't report valid LUIDs
-        if (fallbackDevice == VK_NULL_HANDLE && properties.properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) {
-            fallbackDevice = device;
-        }
-    }
-
-    // Use matched device, or fallback to first discrete GPU if no LUID match found
-    VkPhysicalDevice selectedDevice = matchedDevice != VK_NULL_HANDLE ? matchedDevice : fallbackDevice;
-
-    // Last resort: use first available device
-    if (selectedDevice == VK_NULL_HANDLE && !internalDevices.empty()) {
-        selectedDevice = internalDevices[0];
-        Log::print<WARNING>("No device matched OpenXR LUID and no discrete GPU found, using first available device");
-    }
-
-    if (selectedDevice != VK_NULL_HANDLE) {
-        VkPhysicalDeviceProperties props = {};
-        pDispatch.GetPhysicalDeviceProperties(selectedDevice, &props);
-        const bool luidMatched = matchedDevice != VK_NULL_HANDLE;
-        Log::print<INFO>("Selected Vulkan GPU: '{}' (vendor=0x{:04X}, device=0x{:04X}, type={}, driver={}.{}.{}, api={}.{}.{}) | LUID match: {}",
-            props.deviceName,
-            props.vendorID,
-            props.deviceID,
-            (int)props.deviceType,
-            VK_VERSION_MAJOR(props.driverVersion), VK_VERSION_MINOR(props.driverVersion), VK_VERSION_PATCH(props.driverVersion),
-            VK_VERSION_MAJOR(props.apiVersion), VK_VERSION_MINOR(props.apiVersion), VK_VERSION_PATCH(props.apiVersion),
-            luidMatched ? "yes" : "no");
-
-        if (pPhysicalDevices != nullptr) {
-            if (*pPhysicalDeviceCount < 1) {
-                *pPhysicalDeviceCount = 1;
-                return VK_INCOMPLETE;
-            }
-            *pPhysicalDeviceCount = 1;
-            pPhysicalDevices[0] = selectedDevice;
-            return VK_SUCCESS;
-        }
-        else {
-            *pPhysicalDeviceCount = 1;
-            return VK_SUCCESS;
-        }
-    }
-
-    *pPhysicalDeviceCount = 0;
-    return VK_SUCCESS;
-}
-
-// Some layers (OBS vulkan layer) will skip the vkEnumeratePhysicalDevices hook
-// Therefor we also override vkGetPhysicalDeviceProperties to make any non-compatible VkPhysicalDevice use Vulkan 1.0 which Cemu won't list due to it being too low
-void VRLayer::VkInstanceOverrides::GetPhysicalDeviceProperties(const vkroots::VkPhysicalDeviceDispatch& pDispatch, VkPhysicalDevice physicalDevice, VkPhysicalDeviceProperties* pProperties) {
-    // Do original query
-    pDispatch.GetPhysicalDeviceProperties(physicalDevice, pProperties);
-
-    // Do a seperate internal query to make sure that we also query the LUID
-    {
-        VkPhysicalDeviceIDProperties deviceId = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ID_PROPERTIES };
-        VkPhysicalDeviceProperties2 properties = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2 };
-        properties.pNext = &deviceId;
-        pDispatch.GetPhysicalDeviceProperties2(physicalDevice, &properties);
-
-        if (deviceId.deviceLUIDValid && memcmp(&VRManager::instance().XR->m_capabilities.adapter, deviceId.deviceLUID, VK_LUID_SIZE) != 0) {
-            pProperties->apiVersion = VK_API_VERSION_1_0;
-        }
-    }
-}
-
-// Some layers (OBS vulkan layer) will skip the vkEnumeratePhysicalDevices hook
-// Therefor we also override vkGetPhysicalDeviceQueueFamilyProperties to make any non-VR-compatible VkPhysicalDevice have 0 queues
-void VRLayer::VkInstanceOverrides::GetPhysicalDeviceQueueFamilyProperties(const vkroots::VkPhysicalDeviceDispatch& pDispatch, VkPhysicalDevice physicalDevice, uint32_t* pQueueFamilyPropertyCount, VkQueueFamilyProperties* pQueueFamilyProperties) {
-    // Check whether this VkPhysicalDevice matches the LUID that OpenXR returns
-    VkPhysicalDeviceIDProperties deviceId = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ID_PROPERTIES };
-    VkPhysicalDeviceProperties2 properties = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2 };
-    properties.pNext = &deviceId;
-    pDispatch.GetPhysicalDeviceProperties2(physicalDevice, &properties);
-
-    if (deviceId.deviceLUIDValid && memcmp(&VRManager::instance().XR->m_capabilities.adapter, deviceId.deviceLUID, VK_LUID_SIZE) != 0) {
-        *pQueueFamilyPropertyCount = 0;
-        return;
-    }
-
-    return pDispatch.GetPhysicalDeviceQueueFamilyProperties(physicalDevice, pQueueFamilyPropertyCount, pQueueFamilyProperties);
-}
-
 const std::vector<std::string> additionalDeviceExtensions = {
-    VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME,
-    VK_KHR_EXTERNAL_MEMORY_WIN32_EXTENSION_NAME,
     VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME,
-    VK_KHR_EXTERNAL_SEMAPHORE_EXTENSION_NAME,
-    VK_KHR_EXTERNAL_SEMAPHORE_WIN32_EXTENSION_NAME,
     VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME,
 #if ENABLE_VK_DEVICE_FAULT
     VK_EXT_DEVICE_FAULT_EXTENSION_NAME,
@@ -239,8 +188,10 @@ const std::vector<std::string> additionalDeviceExtensions = {
 #endif
 };
 
-VkResult VRLayer::VkInstanceOverrides::CreateDevice(const vkroots::VkPhysicalDeviceDispatch& pDispatch, VkPhysicalDevice gpu, const VkDeviceCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDevice* pDevice) {
-    // Query available extensions for this device
+VkResult VulkanDevice::CreateDevice(const vkroots::VkPhysicalDeviceDispatch& pDispatch, VkPhysicalDevice gpu, const VkDeviceCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDevice* pDevice) {
+    OpenXR* xr = VRManager::instance().XR.get();
+    checkAssert(xr != nullptr, "The OpenXR instance wasn't available while creating the Vulkan device!");
+
     uint32_t extensionCount = 0;
     pDispatch.EnumerateDeviceExtensionProperties(gpu, nullptr, &extensionCount, nullptr);
     std::vector<VkExtensionProperties> availableExtensions(extensionCount);
@@ -253,12 +204,11 @@ VkResult VRLayer::VkInstanceOverrides::CreateDevice(const vkroots::VkPhysicalDev
             }) != availableExtensions.end();
     };
 
-    // Modify VkDevice with needed extensions
     std::vector<const char*> modifiedExtensions;
     for (uint32_t i = 0; i < pCreateInfo->enabledExtensionCount; i++) {
         modifiedExtensions.push_back(pCreateInfo->ppEnabledExtensionNames[i]);
     }
-    for (const std::string& extension : additionalDeviceExtensions) {
+    auto addExtension = [&](const std::string& extension) {
         if (std::find(modifiedExtensions.begin(), modifiedExtensions.end(), extension) == modifiedExtensions.end()) {
             if (isExtensionSupported(extension)) {
                 modifiedExtensions.push_back(extension.c_str());
@@ -267,9 +217,18 @@ VkResult VRLayer::VkInstanceOverrides::CreateDevice(const vkroots::VkPhysicalDev
                 Log::print<WARNING>("Device extension {} is not supported, skipping", extension);
             }
         }
+    };
+
+    for (const std::string& extension : additionalDeviceExtensions) {
+        addExtension(extension);
     }
 
-    // Query supported features from the GPU
+    const std::vector<std::string> runtimeExtensions = xr->UsesVulkanEnable2() ? std::vector<std::string>{} : xr->GetRequiredVulkanDeviceExtensions();
+    for (const std::string& extension : runtimeExtensions) {
+        Log::print<INFO>("Adding the OpenXR runtime's required device extension {}", extension);
+        addExtension(extension);
+    }
+
     VkPhysicalDeviceTimelineSemaphoreFeatures supportedTimelineSemaphoreFeatures = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES };
     VkPhysicalDeviceFeatures2 supportedFeatures = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2 };
     supportedFeatures.pNext = &supportedTimelineSemaphoreFeatures;
@@ -292,7 +251,6 @@ VkResult VRLayer::VkInstanceOverrides::CreateDevice(const vkroots::VkPhysicalDev
 
     pDispatch.GetPhysicalDeviceFeatures2(gpu, &supportedFeatures);
 
-    // Test if timeline semaphores are already enabled in the create info
     bool timelineSemaphoresEnabled = false;
     bool imageRobustnessEnabled = false;
     bool robustness2Enabled = false;
@@ -345,7 +303,6 @@ VkResult VRLayer::VkInstanceOverrides::CreateDevice(const vkroots::VkPhysicalDev
 
 #if ENABLE_VK_ROBUSTNESS
     if (!robustness2Enabled && isExtensionSupported(VK_EXT_ROBUSTNESS_2_EXTENSION_NAME)) {
-        // Only enable features that are actually supported
         createRobustness2Features.robustBufferAccess2 = supportedRobustness2Features.robustBufferAccess2;
         createRobustness2Features.robustImageAccess2 = supportedRobustness2Features.robustImageAccess2;
         createRobustness2Features.nullDescriptor = supportedRobustness2Features.nullDescriptor;
@@ -372,8 +329,6 @@ VkResult VRLayer::VkInstanceOverrides::CreateDevice(const vkroots::VkPhysicalDev
     VkDeviceCreateInfo modifiedCreateInfo = { VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO };
     modifiedCreateInfo.pNext = nextChain;
     modifiedCreateInfo.flags = pCreateInfo->flags;
-    modifiedCreateInfo.queueCreateInfoCount = pCreateInfo->queueCreateInfoCount;
-    modifiedCreateInfo.pQueueCreateInfos = pCreateInfo->pQueueCreateInfos;
     modifiedCreateInfo.enabledLayerCount = pCreateInfo->enabledLayerCount;
     modifiedCreateInfo.ppEnabledLayerNames = pCreateInfo->ppEnabledLayerNames;
     modifiedCreateInfo.enabledExtensionCount = (uint32_t)modifiedExtensions.size();
@@ -382,7 +337,6 @@ VkResult VRLayer::VkInstanceOverrides::CreateDevice(const vkroots::VkPhysicalDev
     // Dropping this can cause AMD drivers to disable features the application needs
     modifiedCreateInfo.pEnabledFeatures = pCreateInfo->pEnabledFeatures;
 
-    // Log queue family selection for diagnostics
     uint32_t queueFamilyCount = 0;
     pDispatch.GetPhysicalDeviceQueueFamilyProperties(gpu, &queueFamilyCount, nullptr);
     std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
@@ -390,7 +344,50 @@ VkResult VRLayer::VkInstanceOverrides::CreateDevice(const vkroots::VkPhysicalDev
         pDispatch.GetPhysicalDeviceQueueFamilyProperties(gpu, &queueFamilyCount, queueFamilies.data());
     }
 
-    Log::print<INFO>("Creating Vulkan device with {} queue infos", modifiedCreateInfo.queueCreateInfoCount);
+    // the mod's queue has to be in Cemu's graphics family since the layer textures use exclusive sharing
+    std::vector<VkDeviceQueueCreateInfo> modifiedQueueCreateInfos(pCreateInfo->pQueueCreateInfos, pCreateInfo->pQueueCreateInfos + pCreateInfo->queueCreateInfoCount);
+    checkAssert(!modifiedQueueCreateInfos.empty(), "Cemu created a Vulkan device without a single queue!");
+
+    uint32_t graphicsQueueInfoIdx = UINT32_MAX;
+    for (uint32_t i = 0; i < (uint32_t)modifiedQueueCreateInfos.size(); i++) {
+        const uint32_t familyIndex = modifiedQueueCreateInfos[i].queueFamilyIndex;
+        if (familyIndex < queueFamilies.size() && (queueFamilies[familyIndex].queueFlags & VK_QUEUE_GRAPHICS_BIT) != 0) {
+            graphicsQueueInfoIdx = i;
+            break;
+        }
+    }
+    if (graphicsQueueInfoIdx == UINT32_MAX) {
+        graphicsQueueInfoIdx = 0;
+        Log::print<WARNING>("None of Cemu's queue families reports graphics support, falling back to its first queue family for the mod's own submits");
+    }
+
+    VkDeviceQueueCreateInfo& graphicsQueueCreateInfo = modifiedQueueCreateInfos[graphicsQueueInfoIdx];
+    const uint32_t familyCapacity = graphicsQueueCreateInfo.queueFamilyIndex < queueFamilies.size() ? queueFamilies[graphicsQueueCreateInfo.queueFamilyIndex].queueCount : graphicsQueueCreateInfo.queueCount;
+
+    std::vector<float> modQueuePriorities;
+    ModQueueBinding modQueue = {};
+    modQueue.familyIndex = graphicsQueueCreateInfo.queueFamilyIndex;
+    if (graphicsQueueCreateInfo.queueCount < familyCapacity) {
+        modQueuePriorities.assign(graphicsQueueCreateInfo.pQueuePriorities, graphicsQueueCreateInfo.pQueuePriorities + graphicsQueueCreateInfo.queueCount);
+        modQueuePriorities.push_back(1.0f);
+
+        modQueue.queueIndex = graphicsQueueCreateInfo.queueCount;
+        modQueue.shared = false;
+
+        graphicsQueueCreateInfo.queueCount += 1;
+        graphicsQueueCreateInfo.pQueuePriorities = modQueuePriorities.data();
+    }
+    else {
+        modQueue.queueIndex = 0;
+        modQueue.shared = true;
+        Log::print<WARNING>("Queue family {} is already fully claimed by Cemu ({} of {} queues), so the mod shares Cemu's queue instead", modQueue.familyIndex, graphicsQueueCreateInfo.queueCount, familyCapacity);
+    }
+    VRManager::instance().modQueue = modQueue;
+
+    modifiedCreateInfo.queueCreateInfoCount = (uint32_t)modifiedQueueCreateInfos.size();
+    modifiedCreateInfo.pQueueCreateInfos = modifiedQueueCreateInfos.data();
+
+    Log::print<INFO>("Creating Vulkan device with {} queue infos, mod queue on family {} index {}{}", modifiedCreateInfo.queueCreateInfoCount, modQueue.familyIndex, modQueue.queueIndex, modQueue.shared ? " (shared with Cemu)" : "");
     for (uint32_t i = 0; i < modifiedCreateInfo.queueCreateInfoCount; i++) {
         const auto& qci = modifiedCreateInfo.pQueueCreateInfos[i];
         VkQueueFlags familyFlags = 0;
@@ -401,45 +398,36 @@ VkResult VRLayer::VkInstanceOverrides::CreateDevice(const vkroots::VkPhysicalDev
             qci.queueFamilyIndex, qci.queueCount, familyFlags, qci.flags);
     }
 
-    VkResult result = pDispatch.CreateDevice(gpu, &modifiedCreateInfo, pAllocator, pDevice);
+    // with enable2 the runtime creates the device itself, so vkroots never builds its dispatch table
+    VkResult result;
+    if (xr->UsesVulkanEnable2()) {
+        // the runtime creates the device on the GPU it named itself
+        if (xr->GetVulkanGraphicsDevice(pDispatch.pInstanceDispatch->Instance) != gpu) {
+            Log::print<WARNING>("The OpenXR runtime names a different Vulkan GPU than the one Cemu is creating its device on");
+        }
+        result = xr->CreateVulkanDevice(gpu, modifiedCreateInfo, pAllocator, pDevice);
+        if (result == VK_SUCCESS) {
+            vkroots::tables::CreateDispatchTable(&modifiedCreateInfo, VulkanLoader::GetDeviceProcAddr(), gpu, *pDevice);
+            Log::print<INFO>("The OpenXR runtime created this Vulkan device through xrCreateVulkanDeviceKHR");
+        }
+        else {
+            Log::print<WARNING>("The OpenXR runtime wouldn't create the Vulkan device (error {}), creating it without the runtime instead", result);
+            result = pDispatch.CreateDevice(gpu, &modifiedCreateInfo, pAllocator, pDevice);
+        }
+    }
+    else {
+        result = pDispatch.CreateDevice(gpu, &modifiedCreateInfo, pAllocator, pDevice);
+    }
+
     if (result != VK_SUCCESS) {
         Log::print<ERROR>("Failed to create Vulkan device! Error {}", result);
         return result;
     }
 
-    // Initialize VRManager late if neither vkEnumeratePhysicalDevices and vkGetPhysicalDeviceProperties were called and used to filter the device
-    if (!VRManager::instance().VK) {
-        Log::print<WARNING>("Wasn't able to filter OpenXR-compatible devices for this instance!");
-        Log::print<WARNING>("You might encounter an error if you've selected a GPU that's not connected to the VR headset in Cemu's settings. Usually this error is fine as long as this is the case.");
-        Log::print<WARNING>("This issue appears due to OBS's Vulkan layer being installed which skips some calls used to hide GPUs that aren't compatible with your VR headset.");
-    }
-
     return result;
 }
 
-void VRLayer::VkInstanceOverrides::DestroyInstance(const vkroots::VkInstanceDispatch& pDispatch, VkInstance instance, const VkAllocationCallbacks* pAllocator) {
-#ifdef _DEBUG
-    if (instance == s_debugMessengerInstance && s_debugMessenger != VK_NULL_HANDLE) {
-        pDispatch.DestroyDebugUtilsMessengerEXT(instance, s_debugMessenger, pAllocator);
-        s_debugMessengerInstance = VK_NULL_HANDLE;
-        s_debugMessenger = VK_NULL_HANDLE;
-    }
-#endif
-
-    PFN_vkDestroyInstance ptr_vkDestroyInstance = (PFN_vkDestroyInstance)pDispatch.GetInstanceProcAddr(instance, "vkDestroyInstance");
-    vkroots::tables::DestroyDispatchTable(instance);
-    ptr_vkDestroyInstance(instance, pAllocator);
-
-    Log::OnInstanceDestroyed();
-}
-
-void VRLayer::VkDeviceOverrides::DestroyDevice(const vkroots::VkDeviceDispatch& pDispatch, VkDevice device, const VkAllocationCallbacks* pAllocator) {
-    PFN_vkDestroyDevice ptr_vkDestroyDeviceFn = (PFN_vkDestroyDevice)pDispatch.GetDeviceProcAddr(device, "vkDestroyDevice");
-    vkroots::tables::DestroyDispatchTable(device);
-    ptr_vkDestroyDeviceFn(device, pAllocator);
-}
-
-void VRLayer::LogDeviceFaultInfo() {
+void VulkanDevice::LogDeviceFaultInfo() {
     if (!s_deviceFaultLoggingEnabled) {
         return;
     }
@@ -495,5 +483,3 @@ void VRLayer::LogDeviceFaultInfo() {
         Log::print<ERROR>("The driver did not report any address or vendor fault details.");
     }
 }
-
-VKROOTS_DEFINE_LAYER_INTERFACES(VRLayer::VkInstanceOverrides, VRLayer::VkDeviceOverrides);

@@ -86,17 +86,6 @@ private:
         float thickness;
         bool xray = false;
 
-        // LINE: a, b
-        // DOT: a = center, radius used
-        // SPHERE: a = center, radius/segments used
-        // CAPSULE: a = center, radius used, duration = halfHeight, segments used
-        // PHYSICS_BODY: a = center, radius used, duration = halfHeight, segments used
-        // CIRCLE: a = center, radius/segments used
-        // POLYLINE: points/thickness used
-        // ARC: a = start, b = initial velocity, c = acceleration, duration/segments used
-        // AABB: a = min, b = max
-        // ORIENTED_BOX: a = center, b = halfExtents, rotation used
-        // FRUSTUM: inverseVP used
         glm::vec3 a = {};
         glm::vec3 b = {};
         glm::vec3 c = {};

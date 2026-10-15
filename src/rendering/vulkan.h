@@ -14,7 +14,6 @@ public:
     VkPhysicalDevice GetPhysicalDevice() { return m_physicalDevice; }
 
     const vkroots::VkInstanceDispatch* GetInstanceDispatch() const { return m_instanceDispatch; }
-    const vkroots::VkPhysicalDeviceDispatch* GetPhysicalDeviceDispatch() const { return m_physicalDeviceDispatch; }
     const vkroots::VkDeviceDispatch* GetDeviceDispatch() const { return m_deviceDispatch; }
 
 private:
@@ -23,7 +22,6 @@ private:
     VkDevice m_device;
     VkPhysicalDeviceMemoryProperties2 m_memoryProperties = {};
 
-    // todo: use these with caution
     const vkroots::VkInstanceDispatch* m_instanceDispatch;
     const vkroots::VkPhysicalDeviceDispatch* m_physicalDeviceDispatch;
     const vkroots::VkDeviceDispatch* m_deviceDispatch;

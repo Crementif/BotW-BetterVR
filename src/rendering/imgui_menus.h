@@ -20,14 +20,19 @@ namespace ImGuiMenus {
     inline constexpr uint8_t DEBUG_PAGE = 11;
     inline constexpr uint8_t PAGE_COUNT = 12;
 
+    inline std::atomic_bool g_isOpen = false;
+    inline std::atomic_uint8_t g_currentPage = PLAYSTYLE_PAGE;
+
     bool IsPageAvailable(uint8_t page);
+
+    // false until the overlay exists
+    bool ProcessInputs(OpenXR::InputState& inputs, const VPADStatus& vpadStatus);
+    // a debug window with a text field has the keyboard
+    bool BlocksGameInput();
 
     void OpenLinkInBrowser(const char* url);
 
     extern ImFont* g_titleFont;
 
     void DrawFPSOverlay(class RND_Renderer* renderer);
-    void DrawWeaponSensitivityOverlays();
-    bool IsWeaponSensitivityOverlayVisible(OpenXR::EyeSide side);
-    void SetWeaponSensitivityOverlayVisible(OpenXR::EyeSide side, bool visible);
 }

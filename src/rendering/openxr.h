@@ -1,7 +1,11 @@
 #pragma once
 
-#include "hooking/rumble.h"
+#include "rendering/rumble.h"
+#include "utils/mod_settings.h"
 #include "utils/controller_bindings.h"
+
+// the friend declaration alone isn't enough for GetRenderer
+class RND_Renderer;
 
 class OpenXR {
     friend class RND_Renderer;
@@ -16,8 +20,11 @@ public:
     };
 
     struct Capabilities {
-        LUID adapter;
-        D3D_FEATURE_LEVEL minFeatureLevel;
+        XrVersion minVulkanApiVersion;
+        XrVersion maxVulkanApiVersion;
+        bool usesVulkanEnable2;
+        VkInstance vulkanInstance;
+        VkPhysicalDevice vulkanPhysicalDevice;
         bool supportsOrientational;
         bool supportsPositional;
         bool supportsMutatableFOV;
@@ -27,40 +34,14 @@ public:
         bool supportsPicoUltraController;
         bool supportsCosmosController;
         bool supportsHPMixedRealityController;
+        bool supportsEyeGaze;
         ControllerType activeControllerType = ControllerType::Unknown;
     } m_capabilities = {};
 
     struct InputState {
-        struct ButtonState {
-            enum class Event {
-                None,
-                ShortPress,
-                LongPress,
-                //DoublePress
-            };
-
-            bool wasDownLastFrame = false;
-            bool longFired = false;
-            bool waitingForSecond = false;
-            bool longFired_actedUpon = false;
-            bool longFired_stillPressed = false;
-            std::chrono::steady_clock::time_point pressStartTime;
-            std::chrono::steady_clock::time_point lastReleaseTime;
-
-            Event lastEvent = Event::None;
-
-            void resetFrameFlags() { lastEvent = Event::None; }
-            void resetButtonState() {
-                wasDownLastFrame = false;
-                longFired = false;
-                waitingForSecond = false;
-            }
-        };
-
         struct Shared {
             bool in_game = true;
             XrTime inputTime;
-            std::optional<EyeSide> lastPickupSide = std::nullopt;
 
             std::array<XrActionStatePose, 2> pose;
             std::array<XrSpaceLocation, 2> poseLocation;
@@ -70,14 +51,11 @@ public:
             std::array<XrSpaceLocation, 2> hmdRelativePoseLocation;
 
             XrActionStateBoolean inventory_map;
-            ButtonState inventory_mapState;
             XrActionStateBoolean modMenu;
-            ButtonState modMenuState;
         } shared;
 
         struct InGame {
             XrActionStateBoolean crouch_scope;
-            ButtonState crouch_scopeState;
 
             XrActionStateVector2f move;
             XrActionStateVector2f camera;
@@ -85,16 +63,12 @@ public:
             std::array<XrActionStateFloat, 2> grab;
             XrActionStateBoolean jump_cancel;
             XrActionStateBoolean run_interact;
-            ButtonState runState;
             XrActionStateBoolean useRune_dpadMenu;
-            ButtonState useRune_runeMenuState;
 
             XrActionStateBoolean useLeftItem;
             XrActionStateBoolean useRightItem;
 
-            std::array<bool, 2> drop_weapon; // LEFT/RIGHT
 
-            std::array<ButtonState, 2> grabState; // LEFT/RIGHT
         } inGame;
         struct InMenu {
             XrActionStateVector2f scroll;
@@ -104,7 +78,6 @@ public:
             XrActionStateBoolean back;
             XrActionStateBoolean sort;
             XrActionStateBoolean hold;
-            ButtonState holdState;
 
             XrActionStateBoolean leftGrip;
             XrActionStateBoolean rightGrip;
@@ -114,82 +87,23 @@ public:
         } inMenu;
     };
     std::atomic<InputState> m_input = InputState{};
-    std::atomic<glm::fquat> m_inputCameraRotation = glm::identity<glm::fquat>();
-    std::atomic_int32_t m_pendingSnapTurnDirection = 0;
-    std::atomic_uint64_t m_pendingSnapTurnRequestUntilNs = 0;
-    std::atomic_uint64_t m_snapTurnFadeStartNs = 0;
-    std::atomic_uint64_t m_snapTurnFadeUntilNs = 0;
-    std::atomic<float> m_smoothTurnStickDeflection = 0.0f;
-    std::atomic_bool m_isSnapTurnCameraActive = false;
 
-    struct GameState {
-        uint32_t previous_button_hold;
-        bool in_game = false;
-        bool was_in_game = false;
-        bool map_open = false; // map = true, inventory = false
-        bool dpad_menu_open_requested = false;
-        bool was_dpad_menu_open = false;
-        EquipType last_dpad_menu_open = EquipType::None;
-
-        bool prevent_inputs = false;
-        std::chrono::steady_clock::time_point prevent_inputs_time;
-        bool prevent_grab_inputs = false;
-        std::chrono::steady_clock::time_point prevent_grab_time;
-
-        //Pull gesture
-        bool right_hand_was_over_left_shoulder_slot = false;
-        bool right_hand_was_over_right_shoulder_slot = false;
-        bool right_hand_was_over_left_waist_slot = false;
-        bool left_hand_was_over_left_shoulder_slot = false;
-        bool left_hand_was_over_right_shoulder_slot = false;
-        bool left_hand_was_over_left_waist_slot = false;
-
-        EquipType right_hand_current_equip_type = EquipType::None;
-        EquipType left_hand_current_equip_type = EquipType::None;
-        EquipType right_hand_previous_frame_equip_type = EquipType::None;
-        EquipType left_hand_previous_frame_equip_type = EquipType::None;
-        EquipType last_equip_type_held = EquipType::None;
-        bool dpad_menu_selection_already_equipped = false;
-        bool rune_need_reequip = false;
-        float rune_reequip_timer = 0.0f;
-        int right_hand_equip_type_change_requested_over_frames = 0;
-        int left_hand_equip_type_change_requested_over_frames = 0;
-        bool has_something_in_left_hand = false;
-        bool has_something_in_right_hand = false;
-        bool is_throwable_object_held = false; // true if a throwable object is held
-
-        bool is_locking_on_target = false;
-        bool is_shield_guarding = false;
-        bool is_riding_mount = false;
-        bool is_climbing = false;
-        bool is_paragliding = false;
-
-        float previous_left_hand_velocity = 0.0f;
-        glm::fvec3 stored_left_hand_position = glm::fvec3(0.0f, 0.0f, 0.0f);
-        bool left_hand_position_stored = false;
-        glm::fvec3 stored_right_hand_position = glm::fvec3(0.0f, 0.0f, 0.0f);
-        bool right_hand_position_stored = false;
-        int magnesis_forward_frames_interval = 0;
-        bool trigger_pressed_over_body_slot = false;
-    };
-    std::atomic<GameState> m_gameState{};
-    std::atomic_bool m_isMenuOpen = false;
-    std::atomic_uint8_t m_currMenuTab = 0;
-
-    // We'll manage the rumble commands priority inside controls.cpp
-    struct RumbleParameters {
-        bool leftHand = false;
-        double duration = 0;
-        float frequency = 0.0f;
-        float amplitude = 0.0f;
-    } rumbleParameters ;
-    std::atomic<RumbleParameters> m_rumbleParameters{};
-
-    void CreateSession(const XrGraphicsBindingD3D12KHR& d3d12Binding);
+    void CreateSession(const XrGraphicsBindingVulkan2KHR& vulkanBinding);
     void CreateActions();
+
+    // with enable2 the runtime creates the Vulkan instance and device itself, the enable fallback only gives back extension names
+    bool UsesVulkanEnable2() const { return m_capabilities.usesVulkanEnable2; }
+    std::vector<std::string> GetRequiredVulkanInstanceExtensions() const;
+    std::vector<std::string> GetRequiredVulkanDeviceExtensions() const;
+    uint32_t ClampVulkanApiVersion(uint32_t requestedApiVersion) const;
+    VkResult CreateVulkanInstance(const VkInstanceCreateInfo& createInfo, const VkAllocationCallbacks* allocator, VkInstance* pInstance);
+    VkResult CreateVulkanDevice(VkPhysicalDevice physicalDevice, const VkDeviceCreateInfo& createInfo, const VkAllocationCallbacks* allocator, VkDevice* pDevice);
+    VkPhysicalDevice GetVulkanGraphicsDevice(VkInstance vulkanInstance);
     std::array<XrViewConfigurationView, 2> GetViewConfigurations();
     std::optional<XrSpaceLocation> UpdateSpaces(XrTime predictedDisplayTime);
-    std::optional<InputState> UpdateActions(XrTime predictedFrameTime, glm::fquat controllerRotation, bool inMenu);
+    std::optional<InputState> UpdateActions(XrTime predictedFrameTime, bool inMenu);
+    // where the eyes look in stage space, on headsets that track them and only while they do
+    std::optional<glm::fvec3> LocateEyeGaze(XrTime predictedDisplayTime) const;
     void UpdateSeatedHeightCalibration(XrTime predictedDisplayTime, const std::optional<XrSpaceLocation>& headLocation);
     void RequestSeatedHeightCalibration(XrTime notBeforeTime = 0);
     std::optional<float> GetCalibratedSeatedEyeHeight() const;
@@ -203,7 +117,7 @@ public:
 private:
     XrPath GetXRPath(const char* str) const {
         XrPath path;
-        checkXRResult(xrStringToPath(m_instance, str, &path), std::format("Failed to get path for {}", str).c_str());
+        checkXRResult(xrStringToPath(m_instance, str, &path), fmt::format("Failed to get path for {}", str).c_str());
         return path;
     };
     void ReplaceStageSpace(float floorOffset);
@@ -231,7 +145,6 @@ private:
     XrAction m_inMenuGripPoseAction = XR_NULL_HANDLE;
     XrAction m_inMenuAimPoseAction = XR_NULL_HANDLE;
 
-    // gameplay actions
     XrActionSet m_gameplayActionSet = XR_NULL_HANDLE;
     XrAction m_moveAction = XR_NULL_HANDLE;
     XrAction m_cameraAction = XR_NULL_HANDLE;
@@ -250,7 +163,11 @@ private:
 
     XrAction m_rumbleAction = XR_NULL_HANDLE;
 
-    // menu actions
+    // synced with both the gameplay and menu sets since the eyes are tracked in menus too
+    XrActionSet m_eyeGazeActionSet = XR_NULL_HANDLE;
+    XrAction m_eyeGazeAction = XR_NULL_HANDLE;
+    XrSpace m_eyeGazeSpace = XR_NULL_HANDLE;
+
     XrActionSet m_menuActionSet = XR_NULL_HANDLE;
     XrAction m_scrollAction = XR_NULL_HANDLE;
     XrAction m_navigateAction = XR_NULL_HANDLE;
@@ -274,18 +191,31 @@ private:
 
     XrDebugUtilsMessengerEXT m_debugMessengerHandle = XR_NULL_HANDLE;
 
-    PFN_xrGetD3D12GraphicsRequirementsKHR func_xrGetD3D12GraphicsRequirementsKHR = nullptr;
-    PFN_xrConvertTimeToWin32PerformanceCounterKHR func_xrConvertTimeToWin32PerformanceCounterKHR = nullptr;
-    PFN_xrConvertWin32PerformanceCounterToTimeKHR func_xrConvertWin32PerformanceCounterToTimeKHR = nullptr;
+    PFN_xrGetVulkanGraphicsRequirements2KHR func_xrGetVulkanGraphicsRequirements2KHR = nullptr;
+    PFN_xrCreateVulkanInstanceKHR func_xrCreateVulkanInstanceKHR = nullptr;
+    PFN_xrCreateVulkanDeviceKHR func_xrCreateVulkanDeviceKHR = nullptr;
+    PFN_xrGetVulkanGraphicsDevice2KHR func_xrGetVulkanGraphicsDevice2KHR = nullptr;
+
+    PFN_xrGetVulkanGraphicsRequirementsKHR func_xrGetVulkanGraphicsRequirementsKHR = nullptr;
+    PFN_xrGetVulkanInstanceExtensionsKHR func_xrGetVulkanInstanceExtensionsKHR = nullptr;
+    PFN_xrGetVulkanDeviceExtensionsKHR func_xrGetVulkanDeviceExtensionsKHR = nullptr;
+    PFN_xrGetVulkanGraphicsDeviceKHR func_xrGetVulkanGraphicsDeviceKHR = nullptr;
+
+#if defined(_WIN32)
+    PFN_xrConvertTimeToWin32PerformanceCounterKHR func_xrConvertTimeToPlatformTime = nullptr;
+    PFN_xrConvertWin32PerformanceCounterToTimeKHR func_xrConvertPlatformTimeToTime = nullptr;
+#else
+    PFN_xrConvertTimeToTimespecTimeKHR func_xrConvertTimeToPlatformTime = nullptr;
+    PFN_xrConvertTimespecTimeToTimeKHR func_xrConvertPlatformTimeToTime = nullptr;
+#endif
     PFN_xrCreateDebugUtilsMessengerEXT func_xrCreateDebugUtilsMessengerEXT = nullptr;
     PFN_xrDestroyDebugUtilsMessengerEXT func_xrDestroyDebugUtilsMessengerEXT = nullptr;
 };
-using ButtonState = OpenXR::InputState::ButtonState;
 using EyeSide = OpenXR::EyeSide;
 
 template <>
-struct std::formatter<EyeSide> : std::formatter<string> {
-    auto format(const EyeSide side, std::format_context& ctx) const {
-        return std::format_to(ctx.out(), "{}", side == EyeSide::LEFT ? "LEFT" : "RIGHT");
+struct fmt::formatter<EyeSide> : fmt::formatter<std::string_view> {
+    auto format(const EyeSide side, fmt::format_context& ctx) const {
+        return fmt::format_to(ctx.out(), "{}", side == EyeSide::LEFT ? "LEFT" : "RIGHT");
     }
 };

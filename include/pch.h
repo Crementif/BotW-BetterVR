@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <atomic>
 #include <charconv>
 #include <span>
@@ -8,25 +9,39 @@
 #include <functional>
 #include <type_traits>
 #include <ranges>
+#include <map>
 #include <set>
 #include <unordered_set>
+#include <unordered_map>
 #include <queue>
 #include <iostream>
 #include <vector>
 #include <algorithm>
 #include <thread>
 #include <cstring>
+#include <cerrno>
+#include <cmath>
+#include <cstdio>
+#include <cstdint>
+#include <ctime>
+#include <fmt/format.h>
+#include <memory>
 #include <mutex>
 #include <condition_variable>
+#include <optional>
+#include <stdexcept>
+#include <string_view>
+#include <utility>
 #include <thread>
 #include <chrono>
 #include <algorithm>
 #include <cctype>
 
+#if defined(_WIN32)
 #include <Windows.h>
+#include <objbase.h>
 #include <winrt/base.h>
 #include <shellapi.h>
-
 
 // These macros mess with some of Vulkan's functions
 #undef ERROR
@@ -34,31 +49,25 @@
 #undef CreateSemaphore
 
 #define VK_USE_PLATFORM_WIN32_KHR
+#endif
+
+// Cemu defines it for everything it compiles, the mod included
+#ifndef VK_NO_PROTOTYPES
 #define VK_NO_PROTOTYPES
+#endif
 #include <vulkan/vk_layer.h>
 #include <vulkan/vulkan_core.h>
 
 // vkroots vulkan layer framework includes
-#define VKROOTS_NEGOTIATION_INTERFACE VRLayer_NegotiateLoaderLayerInterfaceVersion
 #include "vkroots.h"
 
-// D3D12 includes
-#include <d3d12.h>
-#include <D3Dcompiler.h>
-#include <dxgi1_6.h>
-
-#pragma comment(lib, "d3d12.lib")
-#pragma comment(lib, "dxgi.lib")
-#pragma comment(lib, "D3DCompiler.lib")
-#pragma comment(lib, "dxguid.lib")
-
-#include <wrl/client.h>
-
-using Microsoft::WRL::ComPtr;
-
 // OpenXR includes
+#if defined(_WIN32)
 #define XR_USE_PLATFORM_WIN32
-#define XR_USE_GRAPHICS_API_D3D12
+#else
+#define XR_USE_TIMESPEC
+#endif
+#define XR_USE_GRAPHICS_API_VULKAN
 #include <openxr/openxr.h>
 #include <openxr/openxr_platform.h>
 
@@ -107,8 +116,16 @@ static bool IsAllFinite(const glm::vec3& value) {
     return glm::all(glm::isfinite(value));
 }
 
+static bool IsAllFinite(const glm::mat4& value) {
+    return glm::all(glm::isfinite(value[0])) && glm::all(glm::isfinite(value[1])) && glm::all(glm::isfinite(value[2])) && glm::all(glm::isfinite(value[3]));
+}
+
 inline uint64_t GetTimeStamp() {
     return (uint64_t)std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+}
+
+inline uint64_t GetTimeStampMs() {
+    return (uint64_t)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
 }
 
 inline float NormalizeDegrees(float degrees) {
@@ -163,14 +180,16 @@ inline uint32_t stringToHash(const char* str) {
     return hash;
 }
 
+#if defined(_WIN32)
 inline std::string wcharToUtf8(const wchar_t* wstr) {
     int size_needed = WideCharToMultiByte(CP_UTF8, 0, wstr, -1, nullptr, 0, nullptr, nullptr);
     std::string str(size_needed, 0);
     WideCharToMultiByte(CP_UTF8, 0, wstr, -1, &str[0], size_needed, nullptr, nullptr);
     return str;
 }
+#endif
 
-#define PADDED_BYTES(from, up) uint8_t byte_##from##[ ## (up-from+0x04) ## ]
+#define PADDED_BYTES(from, up) uint8_t byte_##from[(up - from + 0x04)]
 
 template<class T, template<class...> class U>
 inline constexpr bool is_instance_of_v = std::false_type{};
@@ -281,8 +300,11 @@ inline T swapEndianness(T val) {
 struct BETypeCompatible {
 };
 
+// Deliberately not deriving from BETypeCompatible: an empty base inside a member subobject collides
+// with the enclosing struct's own empty base at offset 0, which the Itanium ABI resolves by shifting
+// the member (MSVC overlaps them). is_BEType_v picks BEType up through is_instance_of_v instead.
 template<typename T>
-struct BEType : BETypeCompatible {
+struct BEType {
     T val;
 
     BEType() = default;
@@ -339,7 +361,7 @@ struct BEType : BETypeCompatible {
 
 
 template<typename T>
-inline constexpr bool is_BEType_v = std::is_base_of_v<BETypeCompatible, T>;
+inline constexpr bool is_BEType_v = std::is_base_of_v<BETypeCompatible, T> || is_instance_of_v<T, BEType>;
 
 struct BEVec2 : BETypeCompatible {
     BEType<float> x;

@@ -43,7 +43,7 @@ struct ControllerActionBindings {
 
 static XrPath GetPath(XrInstance instance, const char* str) {
     XrPath path;
-    checkXRResult(xrStringToPath(instance, str, &path), std::format("Failed to get path for {}", str).c_str());
+    checkXRResult(xrStringToPath(instance, str, &path), fmt::format("Failed to get path for {}", str).c_str());
     return path;
 }
 
@@ -58,7 +58,7 @@ static void SuggestProfileBindings(XrInstance instance, const char* interactionP
         Log::print<INFO>("Runtime doesn't support the {} interaction profile - skipping its suggested bindings.", interactionProfile);
         return;
     }
-    checkXRResult(result, std::format("Failed to suggest bindings for the {} interaction profile!", interactionProfile).c_str());
+    checkXRResult(result, fmt::format("Failed to suggest bindings for the {} interaction profile!", interactionProfile).c_str());
 }
 
 inline void SuggestControllerBindings(XrInstance instance, const ControllerActionBindings& a, bool enablePicoBindings = true, bool enablePicoUltraBindings = true, bool enableCosmosBindings = true, bool enableHPMixedRealityBindings = true) {

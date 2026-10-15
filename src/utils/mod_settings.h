@@ -233,7 +233,6 @@ public:
             *this = false;
         }
         else {
-            //numeric load backup for older syntax
             int parsed = 0;
             const auto [parseEnd, ec] = std::from_chars(valueString.data(), valueString.data() + valueString.size(), parsed);
             if (ec != std::errc()) {
@@ -247,44 +246,6 @@ public:
 
     void AddToGUI(bool* changed) {
         AddWidgetToGUI(changed, [](bool* value) { return ImGui::Checkbox("##value", value); });
-    }
-};
-
-class StringSetting : public ModSettingBase {
-private:
-    std::string m_value;
-
-public:
-    const std::string defaultValue;
-
-    StringSetting(const char* name, std::string defaultValue): ModSettingBase(name), m_value(defaultValue), defaultValue(std::move(defaultValue)) {}
-
-    const std::string& Get() const {
-        return m_value;
-    }
-
-    operator const std::string&() const {
-        return Get();
-    }
-
-    void Set(std::string value) {
-        m_value = NormalizeValue(std::move(value));
-    }
-
-    [[nodiscard]] std::string Serialize() const override {
-        return m_value;
-    }
-
-    void Deserialize(std::string_view valueString) override {
-        Set(std::string(valueString));
-    }
-
-    void Reset() override {
-        m_value = defaultValue;
-    }
-
-    virtual std::string NormalizeValue(std::string value) const {
-        return value;
     }
 };
 
@@ -359,7 +320,6 @@ public:
     }
 
     void Deserialize(std::string_view valueString) override {
-        //numeric load backup for older syntax
         std::underlying_type_t<T> parsed{};
         const bool isNumeric = std::from_chars(valueString.data(), valueString.data() + valueString.size(), parsed).ec == std::errc();
         for (const EnumEntry<T>& entry : SelectableEnumEntries<T>()) {
@@ -389,7 +349,7 @@ public:
             if (ImGui::IsItemHovered()) {
                 const ImVec2 itemMin = ImGui::GetItemRectMin();
                 const ImVec2 itemMax = ImGui::GetItemRectMax();
-                ImGui::GetWindowDrawList()->AddRect(ImVec2(itemMin.x - 3.0f, itemMin.y - 2.0f), ImVec2(itemMax.x + 3.0f, itemMax.y + 2.0f), ImGui::GetColorU32(ImGuiCol_NavCursor), ImGui::GetStyle().FrameRounding, ImDrawFlags_None, 2.0f);
+                ImGui::GetWindowDrawList()->AddRect(ImVec2(itemMin.x - 3.0f, itemMin.y - 2.0f), ImVec2(itemMax.x + 3.0f, itemMax.y + 2.0f), ImGui::GetColorU32(ImGuiCol_NavHighlight), ImGui::GetStyle().FrameRounding, ImDrawFlags_None, 2.0f);
             }
         }
         ImGui::PopID();
@@ -490,6 +450,21 @@ struct EnumTable<PerformanceOverlayMode> {
     });
 };
 
+enum class FoveatedRenderingMode : int32_t {
+    ON = 0,
+    OFF = 1,
+    EXAGGERATED = 2,
+};
+
+template <>
+struct EnumTable<FoveatedRenderingMode> {
+    static constexpr auto entries = std::to_array<EnumEntry<FoveatedRenderingMode>>({
+        { FoveatedRenderingMode::ON, "ON", "On" },
+        { FoveatedRenderingMode::OFF, "OFF", "Off" },
+        { FoveatedRenderingMode::EXAGGERATED, "EXAGGERATED", "Exaggerated (To Check It Works)" }
+    });
+};
+
 enum class WalkingDirection : int32_t {
     CAMERA = 0,
     CONTROLLER = 1,
@@ -541,16 +516,14 @@ struct ModSettings {
     static constexpr float kDefaultAxisThreshold = 0.5f;
     static constexpr float kDefaultStickDeadzone = 0.15f;
 
-    // playing mode settings
     EnumSetting<CameraMode> cameraMode{ "CameraMode", CameraMode::FIRST_PERSON };
-    // not keyed "PlayMode": that key is retired in settings.cpp, so a Seated choice saved by an older build stays unread
+    // not "PlayMode" so a Seated choice from older builds isn't read
     EnumSetting<PlayMode> playMode{ "PlayPosition", PlayMode::STANDING };
     FloatSetting thirdPlayerDistance{ "ThirdPlayerDistance", 0.5f, 0.0f };
     BoolSetting thirdPersonBowCameraAim{ "ThirdPersonBowCameraAim", true };
     EnumSetting<EventMode> cutsceneCameraMode{ "CutsceneCameraMode", EventMode::FOLLOW_DEFAULT_EVENT_SETTINGS };
     BoolSetting useBlackBarsForCutscenes{ "UseBlackBarsForCutscenes", false };
 
-    // first-person settings
     FloatSetting playerHeightOffset{ "PlayerHeightOffset", 0.0f };
     BoolSetting leftHanded{ "LeftHanded", false };
     BoolSetting uiFollowsGaze{ "UiFollowsGaze", true };
@@ -558,7 +531,6 @@ struct ModSettings {
     FloatSetting hudSize{ "HudSize", 0.85f, 0.4f, 1.75f };
     FloatSetting bowArcOpacity{ "BowArcTransparency", 0.7f, 0.0f, 1.0f };
 
-    // advanced settings
     BoolSetting enableDebuggerTools{ "EnableDebugOverlay", false };
     BoolSetting debugShowEntityBoxesIn3DView{ "DebugShowEntityBoxesIn3DView", false };
     BoolSetting debugShowRoomscalePhysics{ "DebugShowRoomscalePhysics", false };
@@ -569,6 +541,7 @@ struct ModSettings {
     EnumSetting<AngularVelocityFixerMode> buggyAngularVelocity{ "BuggyAngularVelocity", AngularVelocityFixerMode::AUTO };
     EnumSetting<PerformanceOverlayMode> performanceOverlay{ "PerformanceOverlay", PerformanceOverlayMode::DISABLE };
     UIntSetting performanceOverlayFrequency{ "PerformanceOverlayFrequency", 90 };
+    EnumSetting<FoveatedRenderingMode> foveatedRendering{ "FoveatedRendering", FoveatedRenderingMode::ON };
     BoolSetting logRendering{ "LogRendering", false, Log::SetCategory<RENDERING> };
     BoolSetting logInterop{ "LogInterop", false, Log::SetCategory<INTEROP> };
     BoolSetting logControls{ "LogControls", false, Log::SetCategory<CONTROLS> };
@@ -580,10 +553,7 @@ struct ModSettings {
     BoolSetting logTimestamps{ "LogTimestamps", true, &Log::SetShowTimestamps };
     BoolSetting logThreadIds{ "LogThreadIds", false, &Log::SetShowThreadIds };
     BoolSetting tutorialPromptShown{ "TutorialPromptShown", false };
-    BoolSetting bootDirectlyIntoGame{ "BootDirectlyIntoGame", false };
-    StringSetting bootDirectlyTitleId{ "BootDirectlyTitleId", "" };
 
-    // Input settings
     FloatSetting axisThreshold{ "AxisThreshold", kDefaultAxisThreshold, 0.0f, 1.0f };
     FloatSetting stickDeadzone{ "StickDeadzone", kDefaultStickDeadzone, 0.0f, 1.0f };
     EnumSetting<WalkingDirection> walkingDirection{ "WalkingDirection", WalkingDirection::CAMERA };
@@ -601,11 +571,9 @@ struct ModSettings {
     bool DoesUIFollowGaze() const { return uiFollowsGaze; }
     bool IsLeftHanded() const { return leftHanded; }
     float GetPlayerHeightOffset() const {
-        // disable height offset in third-person mode
         return GetCameraMode() == CameraMode::THIRD_PERSON ? 0.0f : playerHeightOffset;
     }
     EventMode GetCutsceneCameraMode() const {
-        // if in third-person mode, always use third-person cutscene camera
         return GetCameraMode() == CameraMode::THIRD_PERSON ? EventMode::ALWAYS_THIRD_PERSON : cutsceneCameraMode;
     }
     bool UseBlackBarsForCutscenes() const { return useBlackBarsForCutscenes; }
@@ -615,7 +583,6 @@ struct ModSettings {
     bool AlwaysPreventFirstPersonCutsceneCameraMovement() const { return alwaysPreventFirstPersonCutsceneCameraMovement; }
     bool ShouldPreventFirstPersonRagdoll() const { return preventFirstPersonRagdoll; }
     bool UseOneHitPerSwing() const { return oneHitPerSwing; }
-    bool ShouldBootDirectlyIntoGame() const { return bootDirectlyIntoGame; }
     AngularVelocityFixerMode AngularVelocityFixer_GetMode() const { return buggyAngularVelocity; }
     SwingSensitivity GetSwingSensitivity() const { return swingSensitivity; }
     WalkingDirection GetWalkingDirection() const { return walkingDirection; }
@@ -648,9 +615,9 @@ struct ModSettings {
 
     std::string ToString() const {
         std::string buffer = "";
-        std::format_to(std::back_inserter(buffer), " - Camera Mode: {}\n", EnumDisplayName(GetCameraMode()));
-        std::format_to(std::back_inserter(buffer), " - Left Handed: {}\n", IsLeftHanded() ? "Yes" : "No");
-        std::format_to(std::back_inserter(buffer), " - Player Height: {} meters\n", GetPlayerHeightOffset());
+        fmt::format_to(std::back_inserter(buffer), " - Camera Mode: {}\n", EnumDisplayName(GetCameraMode()));
+        fmt::format_to(std::back_inserter(buffer), " - Left Handed: {}\n", IsLeftHanded() ? "Yes" : "No");
+        fmt::format_to(std::back_inserter(buffer), " - Player Height: {} meters\n", GetPlayerHeightOffset());
         return buffer;
     }
 };

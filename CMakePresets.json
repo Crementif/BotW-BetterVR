@@ -2,22 +2,34 @@
   "version": 3,
   "configurePresets": [
     {
-      "name": "vcpkg",
+      "name": "base",
       "hidden": true,
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/cmake-build-${presetName}",
-      "environment": {
-        "META_XR_SIMULATOR_PATH": "${sourceDir}/MetaXRSimulator"
-      },
       "cacheVariables": {
-        "CMAKE_TOOLCHAIN_FILE": {
-          "type": "FILEPATH",
-          "value": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
-        },
-        "VCPKG_MANIFEST_MODE": {
-          "type": "BOOL",
-          "value": "ON"
-        }
+        "CEMU_ENABLE_LTO": "OFF"
+      }
+    },
+    {
+      "name": "Debug",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "RelWithDebInfo",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo"
+      }
+    },
+    {
+      "name": "Release",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CEMU_ENABLE_LTO": "ON"
       }
     }
   ]

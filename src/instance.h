@@ -2,10 +2,11 @@
 
 #include <pch.h>
 
-#include "hooking/cemu_hooks.h"
-#include "rendering/d3d12.h"
+#include "cemu/cemu_host.h"
+#include "game/botw/debug/entity_debugger.h"
 #include "rendering/openxr.h"
 #include "rendering/renderer.h"
+#include "rendering/vk_backend.h"
 #include "rendering/vulkan.h"
 
 class VRManager {
@@ -19,26 +20,31 @@ public:
     void operator=(VRManager const&) = delete;
 
     void Init(VkInstance instance, VkPhysicalDevice physicalDevice, VkDevice device) {
-        D3D12 = std::make_unique<RND_D3D12>();
         VK = std::make_unique<RND_Vulkan>(instance, physicalDevice, device);
+        Backend = std::make_unique<RND_VkBackend>(instance, physicalDevice, device, modQueue);
         Log::print<INFO>("Initialized VRManager instance...");
     }
 
     void InitSession() {
-        XrGraphicsBindingD3D12KHR d3d12Binding = { XR_TYPE_GRAPHICS_BINDING_D3D12_KHR };
-        d3d12Binding.device = D3D12->GetDevice();
-        d3d12Binding.queue = D3D12->GetCommandQueue();
-        XR->CreateSession(d3d12Binding);
+        XrGraphicsBindingVulkan2KHR vulkanBinding = { XR_TYPE_GRAPHICS_BINDING_VULKAN2_KHR };
+        vulkanBinding.instance = VK->GetInstance();
+        vulkanBinding.physicalDevice = VK->GetPhysicalDevice();
+        vulkanBinding.device = VK->GetDevice();
+        vulkanBinding.queueFamilyIndex = Backend->GetQueueBinding().familyIndex;
+        vulkanBinding.queueIndex = Backend->GetQueueBinding().queueIndex;
+        XR->CreateSession(vulkanBinding);
         XR->CreateActions();
-        Hooks = std::make_unique<CemuHooks>();
+        Cemu = std::make_unique<CemuHost>();
     }
 
     std::unique_ptr<OpenXR> XR;
-    std::unique_ptr<RND_D3D12> D3D12;
     std::unique_ptr<RND_Vulkan> VK;
-    std::unique_ptr<CemuHooks> Hooks;
+    std::unique_ptr<RND_VkBackend> Backend;
+    std::unique_ptr<CemuHost> Cemu;
+    std::unique_ptr<EntityDebugger> Debugger;
 
     uint32_t vkVersion = 0;
+    ModQueueBinding modQueue = {};
 
 private:
     VRManager() {
@@ -47,10 +53,11 @@ private:
     };
 
     ~VRManager() {
-        // note: OpenXR gets to remove its swapchains first before D3D12 gets destroyed, so reverse that order
-        VK.reset();
+        // note: OpenXR gets to destroy its swapchains and layer resources before the backend and the device wrapper they were built on
+        Debugger.reset();
         XR.reset();
-        D3D12.reset();
+        Backend.reset();
+        VK.reset();
 
         m_logger.reset();
     };

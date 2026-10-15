@@ -2,14 +2,13 @@
 
 #include "imgui_menus.h"
 
-#include "cemu_hooks.h"
+#include "game/botw/debug/weapon_attack_debugger.h"
 #include "imgui_internal.h"
 #include "instance.h"
 #include "rendering/renderer.h"
 #include "rendering/openxr.h"
 #include "utils/profiler.h"
 #include "utils/mod_settings.h"
-#include "weapon.h"
 #include "supporters_generated.h"
 
 static constexpr ImVec4 kDescriptionColor = ImVec4(0.63f, 0.71f, 0.78f, 1.0f);
@@ -18,14 +17,14 @@ static constexpr ImVec4 kHintColor = ImVec4(0.35f, 0.95f, 0.45f, 1.0f);
 static constexpr ImVec4 kHighTierSupporterColor = ImVec4(0.78f, 0.53f, 1.0f, 1.0f);
 static constexpr ImVec4 kSupporterColor = ImVec4(0.29f, 0.80f, 0.90f, 1.0f);
 static constexpr ImVec4 kCreditNameColor = ImVec4(1.0f, 0.80f, 0.42f, 1.0f);
+static constexpr ImVec4 kLinkColor = ImVec4(0.26f, 0.59f, 0.98f, 1.0f);
+static constexpr ImVec4 kLinkHoveredColor = ImVec4(0.45f, 0.72f, 1.0f, 1.0f);
 
-// text and read-only tables give the cursor nothing to land on, so pages that trail off into them need a weightless
-// focus stop to keep going: imgui scrolls whatever it focuses into view, which is the only scrolling this menu has.
-// they stay out of the default focus so that entering a page still lands on its first real widget
+// text and tables can't be focused, so pages that end with them need an invisible focus stop for the gamepad to scroll down
 static void DrawNavScrollStop(const char* id) {
-    ImGui::PushStyleColor(ImGuiCol_NavCursor, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+    ImGui::PushStyleColor(ImGuiCol_NavHighlight, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
     ImGui::PushItemFlag(ImGuiItemFlags_NoNavDefaultFocus, true);
-    ImGui::InvisibleButton(id, ImVec2(std::max(1.0f, ImGui::GetContentRegionAvail().x), 1.0f), ImGuiButtonFlags_EnableNav);
+    ImGui::InvisibleButton(id, ImVec2(std::max(1.0f, ImGui::GetContentRegionAvail().x), 1.0f));
     ImGui::PopItemFlag();
     ImGui::PopStyleColor();
 }
@@ -169,8 +168,7 @@ static SidebarNavTarget DrawSidebar(std::atomic_uint8_t& selectedPage) {
     return navTarget;
 }
 
-// imgui only links items sideways when their vertical middles overlap, which the sidebar entries and the setting widgets
-// rarely do, so a right move out of the sidebar scores no candidate at all and would otherwise be dropped
+// imgui only links items sideways when they overlap vertically, which the sidebar and settings rarely do
 static bool WantsToEnterContentPane(ImGuiWindow* sidebarWindow, const SidebarNavTarget& sidebarNavTarget) {
     if (sidebarWindow == nullptr) {
         return false;
@@ -182,16 +180,14 @@ static bool WantsToEnterContentPane(ImGuiWindow* sidebarWindow, const SidebarNav
     return sidebarNavTarget.enterContentRequested || (g.NavMoveSubmitted && g.NavMoveDir == ImGuiDir_Right);
 }
 
-// a nav init request is only picked up by items submitted after it and is dropped again at the start of the next frame,
-// so this has to run inside the content child window, before its widgets are drawn
+// imgui only picks up a nav init request from items after it, so this has to run in the content window before its widgets
 static void EnterContentPane(ImGuiWindow* contentWindow, bool startAtFirstItem) {
     ImGui::SetNavWindow(contentWindow); // also cancels the pending move request, so nothing else can claim it
     ImGui::NavInitWindow(contentWindow, startAtFirstItem);
-    ImGui::SetNavCursorVisible(true);
+    ImGui::GetCurrentContext()->NavDisableHighlight = false;
 }
 
-// a left move out of the content pane has no target inside it, so imgui resolves it to nothing and the sidebar has to
-// claim it by hand
+// imgui finds no target for a left move out of the content pane, so the sidebar has to take it
 static void ApplyPaneNavFallback(ImGuiWindow* sidebarWindow, ImGuiWindow* contentWindow, const SidebarNavTarget& sidebarNavTarget) {
     ImGuiContext& g = *ImGui::GetCurrentContext();
     if (!g.NavMoveSubmitted || g.NavMoveDir != ImGuiDir_Left || contentWindow == nullptr || g.NavWindow != contentWindow) {
@@ -204,38 +200,66 @@ static void ApplyPaneNavFallback(ImGuiWindow* sidebarWindow, ImGuiWindow* conten
     if (sidebarWindow != nullptr && sidebarNavTarget.itemId != 0) {
         ImGui::SetNavWindow(sidebarWindow);
         ImGui::SetNavID(sidebarNavTarget.itemId, ImGuiNavLayer_Main, sidebarNavTarget.focusScopeId, sidebarNavTarget.rectRel);
-        ImGui::SetNavCursorVisible(true);
+        g.NavDisableHighlight = false;
     }
 }
 
 void ImGuiMenus::OpenLinkInBrowser(const char* url) {
-    if (url == nullptr || (_strnicmp(url, "https://", 8) != 0 && _strnicmp(url, "http://", 7) != 0)) {
+    const std::string_view link = url != nullptr ? url : "";
+    if (!link.starts_with("https://") && !link.starts_with("http://")) {
         Log::print<WARNING>("Refusing to open link that isn't a http(s) URL: {}", url != nullptr ? url : "(null)");
         return;
     }
 
     // opening the browser can block for a while, so keep it off the render thread
-    std::thread([link = std::string(url)]() {
-        HRESULT comResult = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
-        INT_PTR shellResult = (INT_PTR)ShellExecuteA(nullptr, "open", link.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
-        if (shellResult <= 32) {
-            Log::print<WARNING>("Failed to open {} in the default browser (error {})", link, shellResult);
-        }
-        else {
+    std::thread([link = std::string(link)]() {
+        if (Platform::OpenUrl(link.c_str())) {
             Log::print<INFO>("Opened {} in the default browser, it's behind the game window", link);
         }
-        if (SUCCEEDED(comResult)) {
-            CoUninitialize();
+        else {
+            Log::print<WARNING>("Failed to open {} in the default browser", link);
         }
     }).detach();
 }
 
+// underlined text that the gamepad cursor can land on
+static bool LinkButton(const char* label) {
+    ImGuiWindow* window = ImGui::GetCurrentWindow();
+    if (window->SkipItems) {
+        return false;
+    }
+
+    const ImGuiID id = window->GetID(label);
+    const ImVec2 pos(window->DC.CursorPos.x, window->DC.CursorPos.y + window->DC.CurrLineTextBaseOffset);
+    const ImRect bb(pos, pos + ImGui::CalcTextSize(label, nullptr, true));
+    ImGui::ItemSize(bb.GetSize(), 0.0f);
+    if (!ImGui::ItemAdd(bb, id)) {
+        return false;
+    }
+
+    bool hovered, held;
+    const bool pressed = ImGui::ButtonBehavior(bb, id, &hovered, &held);
+    ImGui::RenderNavHighlight(bb, id);
+    if (hovered) {
+        ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+    }
+
+    const ImU32 color = ImGui::GetColorU32(hovered || held ? kLinkHoveredColor : kLinkColor);
+    window->DrawList->AddLine(ImVec2(bb.Min.x, bb.Max.y), ImVec2(bb.Max.x, bb.Max.y), color);
+    ImGui::PushStyleColor(ImGuiCol_Text, color);
+    ImGui::RenderText(bb.Min, label);
+    ImGui::PopStyleColor();
+    return pressed;
+}
+
 static void DrawLink(const char* label, const char* url) {
-    if (ImGui::TextLink(label)) {
+    if (LinkButton(label)) {
         Log::print<INFO>("Mod menu link pressed: {}", url);
         ImGuiMenus::OpenLinkInBrowser(url);
     }
-    ImGui::SetItemTooltip("Open %s", url);
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) {
+        ImGui::SetTooltip("Open %s", url);
+    }
 }
 
 struct CreditEntry {
@@ -403,80 +427,58 @@ enum class OverlayProfilerMode : uint8_t {
 };
 
 static void DrawFPSOverlayContent(RND_Renderer* renderer, bool renderText, OverlayProfilerMode profilerMode) {
-    const float predictedDisplayPeriodMs = (float)renderer->GetPredictedDisplayPeriodMs();
     const float predictedHz = GetSettings().performanceOverlayFrequency;
 
-    const float appMs = (float)renderer->GetLastFrameTimeMs();      // Total frame time (includes wait)
-    const float workMs = (float)renderer->GetLastFrameWorkTimeMs(); // GPU Work time only (excludes wait)
-    const float waitMs = (float)renderer->GetLastWaitTimeMs();
-    const float overheadMs = (float)renderer->GetLastOverheadMs();
-
-    // --- 2. Convert to FPS ---
+    // the interval between the predicted display times of the frames that were submitted, averaged over half a second
+    const float appMs = (float)renderer->GetAverageFrameTimeMs();
     const float appFps = appMs > 0.0000001f ? (1000.0f / appMs) : 0.0f;
 
-    // "Theoretical FPS": How fast you COULD run if you didn't have to wait for V-Sync/OpenXR
-    const float workFps = workMs >= 0.0000001f ? (1000.0f / workMs) : 0.0f;
-
-    // Calculate percentage of the frame budget used (still useful in % terms)
-    const float workPct = predictedDisplayPeriodMs > 0.0f ? (workMs / predictedDisplayPeriodMs) * 100.0f : 0.0f;
-
-    // --- 3. Text Summary ---
     if (renderText) {
         ImGui::Text("The visualization refresh rate of your headset is set to %.0f Hz", predictedHz);
         ImGui::Text("Currently Running At %.1f FPS", appFps);
         ImGui::Text("");
-        ImGui::Text("OpenXR waited %.1f ms so that it can interpolate/have low latency.", waitMs);
-        ImGui::Text("Theoretically, it'd run at %.1f FPS if that didn't matter", workFps);
     }
 
-    if (predictedHz > 0.0f && workFps >= 0.0f) {
+    if (predictedHz > 0.0f) {
         auto rateForDivisor = [predictedHz](int divisor) -> double {
             return divisor > 0 ? (predictedHz / (double)divisor) : 0.0;
         };
 
+        // the refresh divisor (1x, 1/2x, 1/3x, 1/4x) the current frame rate holds
         auto chooseBestDivisor = [&](double fps) -> int {
-            // Pick the refresh divisor (1x, 1/2x, 1/3x, 1/4x) that is able to be achieved using the workFPS (frame time minus OpenXR wait time)
             for (int div = 1; div <= 4; ++div) {
-                if (fps >= rateForDivisor(div)) {
+                if (fps >= rateForDivisor(div) * 0.98) {
                     return div;
                 }
             }
             return 4;
         };
 
-        // Use theoretical FPS (GPU work time) as the basis for which step we're closest to.
-        const int currentDiv = chooseBestDivisor(workFps);
+        const int currentDiv = chooseBestDivisor(appFps);
         const double currentTarget = rateForDivisor(currentDiv);
         const int nextDiv = std::max(1, currentDiv - 1);
         const double nextTarget = rateForDivisor(nextDiv);
-        const double missingNext = std::max(0.0, nextTarget - (double)workFps);
 
         if (renderText) {
             if (currentDiv == 1) {
                 ImGui::Text("Its reaching the full refresh rate you've set (%.0f hz)", currentTarget);
-                ImGui::Text("You've got ~%.1f FPS of headroom to spare", (float)std::max(0.0, (double)workFps - nextTarget));
             }
             else {
-                ImGui::Text("It is however able to reliably reach %.0f FPS (%.0f Hz / %d)", currentTarget, predictedHz, currentDiv);
-                ImGui::Text("You'd need to get %.1f FPS more to get it to switch to %.0f FPS", missingNext, nextTarget);
+                ImGui::Text("It is reaching %.0f FPS (%.0f Hz / %d)", currentTarget, predictedHz, currentDiv);
+                ImGui::Text("The next step up is %.0f FPS", nextTarget);
             }
         }
     }
 
-    // --- 4. History Buffers (Storing FPS now) ---
     static float history_app_fps[60] = {};
-    static float history_work_fps[60] = {};
     static int offset = 0;
 
     history_app_fps[offset] = appFps;
-    history_work_fps[offset] = workFps;
     offset = (offset + 1) % 60;
 
-    // --- 5. Plotting ---
     const double targetFps = predictedHz;
     const double halfFps = predictedHz / 2.0;
     const double thirdFps = predictedHz / 3.0;
-    const double fourthFps = predictedHz / 4.0;
 
     if (ImPlot::BeginPlot("##Frametime", ImVec2(300, 150), ImPlotFlags_NoFrame | ImPlotFlags_NoTitle | ImPlotFlags_NoMouseText | ImPlotFlags_NoMenus | ImPlotFlags_NoBoxSelect | ImPlotFlags_NoInputs)) {
         ImPlot::SetupAxes(nullptr, "##FPS", ImPlotAxisFlags_NoDecorations, ImPlotAxisFlags_NoInitialFit);
@@ -485,17 +487,14 @@ static void DrawFPSOverlayContent(RND_Renderer* renderer, bool renderText, Overl
         if (targetFps >= 0.000000001f) {
             ImPlot::SetupAxisLimits(ImAxis_Y1, 0.0, predictedHz * 1.5f, ImPlotCond_Always);
 
-            // 1. Target Refresh Rate (Green)
             ImPlot::SetNextLineStyle(ImVec4(0, 1, 0, 0.5f));
             ImPlot::PlotInfLines("##Target", &targetFps, 1, ImPlotInfLinesFlags_Horizontal);
             ImPlot::TagY(targetFps, ImVec4(0, 1, 0, 0.5f), "%.0f Hz", targetFps);
 
-            // 2. Half Rate (ASW/Reprojection threshold) (Yellow)
             ImPlot::SetNextLineStyle(ImVec4(1, 1, 0, 0.5f));
             ImPlot::PlotInfLines("##1/2 Rate", &halfFps, 1, ImPlotInfLinesFlags_Horizontal);
             ImPlot::TagY(halfFps, ImVec4(1, 1, 0, 0.5f), "%.0f Hz", halfFps);
 
-            // 3. Third Rate (Red)
             ImPlot::SetNextLineStyle(ImVec4(1, 0, 0, 0.5f));
             ImPlot::PlotInfLines("##1/3 Rate", &thirdFps, 1, ImPlotInfLinesFlags_Horizontal);
         }
@@ -503,19 +502,11 @@ static void DrawFPSOverlayContent(RND_Renderer* renderer, bool renderText, Overl
             ImPlot::SetupAxisLimits(ImAxis_Y1, 0.0, 144.0, ImPlotCond_Always);
         }
 
-        // --- Draw Graphs ---
-        // 1. Theoretical Max FPS (Work Time) - Purple/Pink
-        ImPlot::SetNextLineStyle(ImVec4(1.0f, 0.4f, 1.0f, 1.0f));
-        ImPlot::PlotLine("Theoretical Max", history_work_fps, 60, 1.0, 0.0, 0, offset);
-
-        // 2. Actual FPS (App Time) - Blue
-        // This represents what is actually hitting the screen (capped by Wait).
         ImPlot::SetNextFillStyle(ImVec4(0.4f, 0.4f, 1.0f, 0.50f));
         ImPlot::SetNextLineStyle(ImVec4(0.4f, 0.4f, 1.0f, 1.0f));
         ImPlot::PlotShaded("Actual", history_app_fps, 60, 0.0, 1.0, 0.0, 0, offset);
         ImPlot::PlotLine("##TotalLine", history_app_fps, 60, 1.0, 0.0, 0, offset);
 
-        // Current FPS Tag
         if (appFps > 0.0f) {
             const double currentFps = appFps;
             ImPlot::SetNextLineStyle(ImVec4(1, 1, 1, 0.65f));
@@ -528,370 +519,6 @@ static void DrawFPSOverlayContent(RND_Renderer* renderer, bool renderText, Overl
 
     if (profilerMode != OverlayProfilerMode::NONE) {
         DrawBetterVRProfiler(profilerMode == OverlayProfilerMode::DETAILED);
-    }
-}
-
-namespace WeaponAttackDebugger {
-    struct WeaponLiveDebugState {
-        bool hasWeapon = false;
-        uint32_t weaponPtr = 0;
-        std::string actorName;
-        float baseDamage = 0.0f;
-        float multiplier = 1.0f;
-        float estimatedDamage = 0.0f;
-        uint32_t setupDamage = 0;
-        uint32_t finalizedDamage = 0;
-        uint32_t damageMgrDamage = 0;
-    };
-
-    struct AttackPeriodSummary {
-        AttackType attackType = AttackType::None;
-        float damageIntegral = 0.0f;
-        float duration = 0.0f;
-        float peakDamage = 0.0f;
-    };
-
-    struct AttackPeriodTracker {
-        bool wasActive = false;
-        XrTime previousSampleTime = 0;
-        AttackType currentAttackType = AttackType::None;
-        float currentDamageIntegral = 0.0f;
-        float currentDuration = 0.0f;
-        float currentPeakDamage = 0.0f;
-        std::array<AttackPeriodSummary, 3> history = {};
-        size_t historyCount = 0;
-    };
-
-    constexpr ImVec4 kPassColor = ImVec4(0.35f, 0.95f, 0.45f, 1.0f);
-    constexpr ImVec4 kFailColor = ImVec4(0.95f, 0.35f, 0.35f, 1.0f);
-    constexpr ImVec4 kNeutralColor = ImVec4(0.90f, 0.85f, 0.45f, 1.0f);
-    constexpr uint32_t kMotionPlotSampleCount = 30;
-    std::array<AttackPeriodTracker, 2> s_attackPeriodTrackers = {};
-    std::array<bool, 2> s_showWeaponSensitivityOverlay = { false, false };
-
-    const char* ToString(AttackType attackType) {
-        switch (attackType) {
-            case AttackType::Slash:
-                return "Slash";
-            case AttackType::Stab:
-                return "Stab";
-            default:
-                return "None";
-        }
-    }
-
-    const char* ToString(WeaponType weaponType) {
-        switch (weaponType) {
-            case WeaponType::SmallSword:
-                return "Small Sword";
-            case WeaponType::LargeSword:
-                return "Large Sword";
-            case WeaponType::Spear:
-                return "Spear";
-            case WeaponType::Bow:
-                return "Bow";
-            case WeaponType::Shield:
-                return "Shield";
-            default:
-                return "Unknown";
-        }
-    }
-
-    const char* ToString(OpenXR::EyeSide side) {
-        return side == EyeSide::LEFT ? "Left Hand" : "Right Hand";
-    }
-
-    void DrawMotionPlots(OpenXR::EyeSide side, const WeaponMotionAnalyser& analyser);
-
-    void DrawStatusValue(const char* label, float value, float threshold, const char* unit, bool passed, bool higherIsBetter = true) {
-        ImGui::AlignTextToFramePadding();
-        ImGui::Text("%s", label);
-        ImGui::SameLine(220.0f);
-        const char* comparator = higherIsBetter ? ">=" : "<=";
-        ImGui::TextColored(passed ? kPassColor : kFailColor, "%.3f %s  %s  %.3f %s", value, unit, comparator, threshold, unit);
-    }
-
-    void DrawStatusText(const char* label, const char* value, const ImVec4& color) {
-        ImGui::AlignTextToFramePadding();
-        ImGui::Text("%s", label);
-        ImGui::SameLine(220.0f);
-        ImGui::TextColored(color, "%s", value);
-    }
-
-    float ClampProgress(float value, float maxValue) {
-        if (maxValue <= 0.0f) {
-            return 0.0f;
-        }
-        return std::clamp(value / maxValue, 0.0f, 1.0f);
-    }
-
-    WeaponLiveDebugState ReadWeaponLiveDebugState(uint32_t weaponPtr) {
-        WeaponLiveDebugState state = {};
-        if (weaponPtr == 0) {
-            return state;
-        }
-
-        Weapon weapon = {};
-        CemuHooks::readMemory(weaponPtr, &weapon);
-
-        state.hasWeapon = true;
-        state.weaponPtr = weaponPtr;
-        state.actorName = weapon.name.getLE();
-        state.setupDamage = weapon.setupAttackSensor.powerForPlayers.getLE();
-        state.finalizedDamage = weapon.finalizedAttackSensor.powerForPlayers.getLE();
-        state.multiplier = weapon.finalizedAttackSensor.multiplier.getLE();
-        if (state.multiplier <= 0.0f) {
-            state.multiplier = weapon.setupAttackSensor.multiplier.getLE();
-        }
-        if (state.multiplier <= 0.0f) {
-            state.multiplier = 1.0f;
-        }
-
-        if (const uint32_t damageMgrPtr = weapon.damageMgrPtr.getLE(); damageMgrPtr != 0) {
-            DamageMgr damageMgr = {};
-            CemuHooks::readMemory(damageMgrPtr, &damageMgr);
-            state.damageMgrDamage = damageMgr.damage.getLE();
-        }
-
-        state.baseDamage = (float)state.finalizedDamage;
-        if (state.baseDamage <= 0.0f) {
-            state.baseDamage = (float)state.setupDamage;
-        }
-        if (state.baseDamage <= 0.0f) {
-            state.baseDamage = (float)state.damageMgrDamage;
-        }
-
-        state.estimatedDamage = state.baseDamage * state.multiplier;
-        return state;
-    }
-
-    void PushHistoryEntry(AttackPeriodTracker& tracker) {
-        if (tracker.currentDuration <= 0.0f && tracker.currentDamageIntegral <= 0.0f && tracker.currentPeakDamage <= 0.0f) {
-            return;
-        }
-
-        for (size_t i = tracker.history.size() - 1; i > 0; --i) {
-            tracker.history[i] = tracker.history[i - 1];
-        }
-
-        tracker.history[0] = AttackPeriodSummary {
-            .attackType = tracker.currentAttackType,
-            .damageIntegral = tracker.currentDamageIntegral,
-            .duration = tracker.currentDuration,
-            .peakDamage = tracker.currentPeakDamage,
-        };
-        tracker.historyCount = std::min(tracker.historyCount + 1, tracker.history.size());
-    }
-
-    void UpdateAttackPeriodTracker(OpenXR::EyeSide side, const WeaponDebugSnapshot& snapshot, const WeaponLiveDebugState& liveState) {
-        auto& tracker = s_attackPeriodTrackers[side];
-        const bool isActive = snapshot.attackActive || snapshot.hitboxEnabled;
-        const float liveDamage = liveState.estimatedDamage;
-
-        if (isActive && tracker.wasActive && snapshot.sampleTime > tracker.previousSampleTime) {
-            const float dt = std::clamp((float)(snapshot.sampleTime - tracker.previousSampleTime) / 1e9f, 0.0f, 0.25f);
-            tracker.currentDamageIntegral += liveDamage * dt;
-            tracker.currentDuration += dt;
-        }
-
-        if (isActive) {
-            tracker.currentAttackType = snapshot.lockedAttackType;
-            tracker.currentPeakDamage = std::max(tracker.currentPeakDamage, liveDamage);
-            tracker.previousSampleTime = snapshot.sampleTime;
-        }
-        else if (tracker.wasActive) {
-            PushHistoryEntry(tracker);
-            tracker.currentAttackType = AttackType::None;
-            tracker.currentDamageIntegral = 0.0f;
-            tracker.currentDuration = 0.0f;
-            tracker.currentPeakDamage = 0.0f;
-            tracker.previousSampleTime = snapshot.sampleTime;
-        }
-
-        if (!tracker.wasActive && isActive) {
-            tracker.currentAttackType = snapshot.lockedAttackType;
-            tracker.currentDamageIntegral = 0.0f;
-            tracker.currentDuration = 0.0f;
-            tracker.currentPeakDamage = liveDamage;
-            tracker.previousSampleTime = snapshot.sampleTime;
-        }
-
-        if (!isActive && !tracker.wasActive) {
-            tracker.previousSampleTime = snapshot.sampleTime;
-        }
-
-        tracker.wasActive = isActive;
-    }
-
-    void DrawAttackPeriodSummary(OpenXR::EyeSide side) {
-        const auto& tracker = s_attackPeriodTrackers[side];
-        ImGui::Text("Current period: %s | %.3f dmg*s | %.3f s | peak %.1f",
-            ToString(tracker.currentAttackType),
-            tracker.currentDamageIntegral,
-            tracker.currentDuration,
-            tracker.currentPeakDamage
-        );
-
-        if (tracker.historyCount == 0) {
-            ImGui::TextDisabled("Last 3 periods: none yet");
-            return;
-        }
-
-        ImGui::Text("Last 3 periods:");
-        for (size_t i = 0; i < tracker.historyCount; ++i) {
-            const auto& entry = tracker.history[i];
-            ImGui::BulletText("%s | %.3f dmg*s | %.3f s | peak %.1f",
-                ToString(entry.attackType),
-                entry.damageIntegral,
-                entry.duration,
-                entry.peakDamage
-            );
-        }
-    }
-
-    void DrawSensitivityPanel(OpenXR::EyeSide side, const WeaponMotionAnalyser& analyser) {
-        const WeaponDebugSnapshot snapshot = analyser.GetDebugSnapshot();
-        const WeaponLiveDebugState liveState = ReadWeaponLiveDebugState(CemuHooks::m_heldWeapons[side]);
-        UpdateAttackPeriodTracker(side, snapshot, liveState);
-
-        ImGui::PushID((int)side);
-        DrawStatusText("Held weapon", liveState.hasWeapon ? liveState.actorName.c_str() : "None", liveState.hasWeapon ? kPassColor : kNeutralColor);
-        ImGui::Text("Weapon type: %s | Attack: %s | Active: %s | Hitbox: %s",
-            ToString(snapshot.weaponType),
-            ToString(snapshot.lockedAttackType),
-            snapshot.attackActive ? "Yes" : "No",
-            snapshot.hitboxEnabled ? "Yes" : "No"
-        );
-        ImGui::Text("Current damage: %.1f | Multiplier: %.2f | Estimated output: %.1f",
-            liveState.baseDamage,
-            liveState.multiplier,
-            liveState.estimatedDamage
-        );
-        ImGui::Text("Bad samples: %.3f / %.3f s | Swing power: %.2f | Arm calibration: %.3f m",
-            snapshot.badSampleAccumTime,
-            snapshot.maxBadDuration,
-            snapshot.swingPower,
-            snapshot.calibratedArmLength
-        );
-
-        if (ImGui::CollapsingHeader("Stab", ImGuiTreeNodeFlags_DefaultOpen)) {
-            DrawStatusValue("Stab speed", snapshot.forwardStabSpeed, snapshot.stabSpeedThreshold, "m/s", snapshot.stabSpeedOk);
-            DrawStatusValue("Stab acceleration", snapshot.forwardStabAcceleration, snapshot.stabAccThreshold, "m/s^2", snapshot.stabAccelOk);
-            DrawStatusValue("Stab direction", snapshot.stabDirectionAbsZ, snapshot.stabLinearSteadinessThreshold, "ratio", snapshot.stabDirectionOk);
-            DrawStatusValue("Stab angular steadiness", snapshot.stabAngularXY, snapshot.stabAngularSteadinessThreshold, "rad/s", snapshot.stabAngularOk, false);
-            ImGui::AlignTextToFramePadding();
-            ImGui::Text("Stab duration");
-            ImGui::SameLine(220.0f);
-            ImGui::TextColored(snapshot.stabDurationOk ? kPassColor : kFailColor, "%.3f s / %.3f s", snapshot.goodStabAccumTime, snapshot.minGoodStabDuration);
-            ImGui::SameLine();
-            ImGui::ProgressBar(ClampProgress(snapshot.goodStabAccumTime, snapshot.minGoodStabDuration), ImVec2(120.0f, 0.0f));
-        }
-
-        if (ImGui::CollapsingHeader("Swing", ImGuiTreeNodeFlags_DefaultOpen)) {
-            DrawStatusValue("Swing speed", snapshot.slashAngularSpeed, snapshot.slashSpeedThreshold, "rad/s", snapshot.slashSpeedOk);
-            DrawStatusValue("Swing acceleration", snapshot.slashAngularAcceleration, snapshot.slashAccThreshold, "rad/s^2", snapshot.slashAccelOk);
-            DrawStatusValue("Swing velocity gate", snapshot.slashAngularSpeed, snapshot.slashVelocityThreshold, "rad/s", snapshot.slashVelocityOk);
-            DrawStatusValue("Swing drift", snapshot.slashAngularDrift, snapshot.slashAccDriftThreshold, "rad/s^2", snapshot.slashDriftOk, false);
-            ImGui::AlignTextToFramePadding();
-            ImGui::Text("Swing duration");
-            ImGui::SameLine(220.0f);
-            ImGui::TextColored(snapshot.slashDurationOk ? kPassColor : kFailColor, "%.3f s / %.3f s", snapshot.goodSwingAccumTime, snapshot.minGoodSwingDuration);
-            ImGui::SameLine();
-            ImGui::ProgressBar(ClampProgress(snapshot.goodSwingAccumTime, snapshot.minGoodSwingDuration), ImVec2(120.0f, 0.0f));
-        }
-
-        ImGui::SeparatorText("Attack Periods");
-        DrawAttackPeriodSummary(side);
-
-        if (ImGui::CollapsingHeader("Motion Graphs")) {
-            DrawMotionPlots(side, analyser);
-        }
-
-        ImGui::PopID();
-    }
-
-    void DrawMotionPlots(OpenXR::EyeSide side, const WeaponMotionAnalyser& analyser) {
-        const WeaponDebugSnapshot snapshot = analyser.GetDebugSnapshot();
-        const auto& samples = analyser.GetSamples();
-        const uint32_t lastSampleIdx = analyser.GetLastSampleIndex();
-        const auto oldestIdx = [&](uint32_t j) { return (lastSampleIdx + 1 + WeaponMotionAnalyser::MAX_SAMPLES - kMotionPlotSampleCount + j) % WeaponMotionAnalyser::MAX_SAMPLES; };
-
-        ImGui::PushID((int)side);
-        ImGui::Text("%s", ToString(side));
-        ImGui::Text("Weapon: %s | Showing last %u samples", ToString(snapshot.weaponType), kMotionPlotSampleCount);
-        ImGui::Text("Attack: %s | Active: %s | Bad: %.3f s | Power: %.2f",
-            ToString(snapshot.lockedAttackType),
-            snapshot.attackActive ? "Yes" : "No",
-            snapshot.badSampleAccumTime,
-            snapshot.swingPower
-        );
-
-        {
-            std::array<float, kMotionPlotSampleCount> t{}, avX{}, avY{}, avZ{}, maskSlash{}, maskStab{};
-            for (uint32_t j = 0; j < kMotionPlotSampleCount; ++j) {
-                const auto& s = samples[oldestIdx(j)];
-                t[j] = static_cast<float>(j);
-                avX[j] = s.localAngularVelocity.x;
-                avY[j] = s.localAngularVelocity.y;
-                avZ[j] = s.localAngularVelocity.z;
-                maskSlash[j] = (s.attackType == AttackType::Slash) ? 100.0f : -100.0f;
-                maskStab[j] = (s.attackType == AttackType::Stab) ? 100.0f : -100.0f;
-            }
-
-            if (ImPlot::BeginPlot("Weapon Steadiness", ImVec2(-1.0f, 120.0f), ImPlotFlags_NoTitle)) {
-                ImPlot::SetupAxes("Sample", "Angular Velocity", ImPlotAxisFlags_Lock, ImPlotAxisFlags_Lock);
-                ImPlot::SetupAxisLimits(ImAxis_X1, 0, kMotionPlotSampleCount - 1, ImPlotCond_Always);
-                ImPlot::SetupAxisLimits(ImAxis_Y1, -15, 15, ImPlotCond_Always);
-
-                ImPlot::SetNextLineStyle(ImVec4(0, 1, 0, 0.3f), 3);
-                ImPlot::PlotShaded("Slash", t.data(), maskSlash.data(), kMotionPlotSampleCount, -100.0f);
-                ImPlot::SetNextLineStyle(ImVec4(1, 0.5f, 0, 0.3f), 3);
-                ImPlot::PlotShaded("Stab", t.data(), maskStab.data(), kMotionPlotSampleCount, -100.0f);
-
-                ImPlot::SetNextLineStyle(ImVec4(0, 1, 0.5f, 0.5f), 2);
-                ImPlot::PlotLine("X", t.data(), avX.data(), kMotionPlotSampleCount);
-                ImPlot::PlotLine("Y", t.data(), avY.data(), kMotionPlotSampleCount);
-                ImPlot::PlotLine("Z", t.data(), avZ.data(), kMotionPlotSampleCount);
-                ImPlot::EndPlot();
-            }
-        }
-
-        {
-            std::array<float, kMotionPlotSampleCount> t{}, lvX{}, lvY{}, lvZ{}, accZ{}, maskSlash{}, maskStab{};
-            for (uint32_t j = 0; j < kMotionPlotSampleCount; ++j) {
-                const auto& s = samples[oldestIdx(j)];
-                t[j] = static_cast<float>(j);
-                lvX[j] = s.localLinearVelocity.x;
-                lvY[j] = s.localLinearVelocity.y;
-                lvZ[j] = s.localLinearVelocity.z;
-                accZ[j] = s.smoothedLinearAcceleration.z;
-                maskSlash[j] = (s.attackType == AttackType::Slash) ? 100.0f : -100.0f;
-                maskStab[j] = (s.attackType == AttackType::Stab) ? 100.0f : -100.0f;
-            }
-
-            if (ImPlot::BeginPlot("Controller Linear Velocity", ImVec2(-1.0f, 120.0f), ImPlotFlags_NoTitle)) {
-                ImPlot::SetupAxes("Sample", "Linear Velocity", ImPlotAxisFlags_Lock, ImPlotAxisFlags_Lock);
-                ImPlot::SetupAxisLimits(ImAxis_X1, 0, kMotionPlotSampleCount - 1, ImPlotCond_Always);
-                ImPlot::SetupAxisLimits(ImAxis_Y1, -6, 6, ImPlotCond_Always);
-
-                ImPlot::SetNextLineStyle(ImVec4(0, 1, 0, 0.01f), 3);
-                ImPlot::PlotShaded("Slash", t.data(), maskSlash.data(), kMotionPlotSampleCount, -100.0f);
-                ImPlot::SetNextLineStyle(ImVec4(1, 0.5f, 0, 0.01f), 3);
-                ImPlot::PlotShaded("Stab", t.data(), maskStab.data(), kMotionPlotSampleCount, -100.0f);
-
-                ImPlot::SetNextLineStyle(ImVec4(0, 1, 0.5f, 0.5f), 2);
-                ImPlot::PlotLine("X", t.data(), lvX.data(), kMotionPlotSampleCount);
-                ImPlot::PlotLine("Y", t.data(), lvY.data(), kMotionPlotSampleCount);
-                ImPlot::PlotLine("Z", t.data(), lvZ.data(), kMotionPlotSampleCount);
-                ImPlot::PlotLine("Acc Z (smoothed)", t.data(), accZ.data(), kMotionPlotSampleCount);
-                ImPlot::EndPlot();
-            }
-        }
-
-        if (side == EyeSide::LEFT) {
-            ImGui::Separator();
-        }
-        ImGui::PopID();
     }
 }
 
@@ -923,30 +550,6 @@ namespace ImGuiMenus {
         }
         ImGui::End();
     }
-
-    void DrawWeaponSensitivityOverlays() {
-        for (uint8_t sideIdx = 0; sideIdx < WeaponAttackDebugger::s_showWeaponSensitivityOverlay.size(); ++sideIdx) {
-            if (!WeaponAttackDebugger::s_showWeaponSensitivityOverlay[sideIdx]) {
-                continue;
-            }
-
-            OpenXR::EyeSide side = (OpenXR::EyeSide)sideIdx;
-            std::string windowName = std::format("Attack Debugger - {}", WeaponAttackDebugger::ToString(side));
-            if (ImGui::Begin(windowName.c_str(), &WeaponAttackDebugger::s_showWeaponSensitivityOverlay[sideIdx])) {
-                WeaponAttackDebugger::DrawSensitivityPanel(side, CemuHooks::m_motionAnalyzers[side]);
-            }
-            ImGui::End();
-        }
-    }
-
-    bool IsWeaponSensitivityOverlayVisible(OpenXR::EyeSide side) {
-        return WeaponAttackDebugger::s_showWeaponSensitivityOverlay[side];
-    }
-
-    void SetWeaponSensitivityOverlayVisible(OpenXR::EyeSide side, bool visible) {
-        WeaponAttackDebugger::s_showWeaponSensitivityOverlay[side] = visible;
-    }
-
 }
 
 void RND_Renderer::ImGuiOverlay::DrawPlaystylePage(bool* changed) {
@@ -1004,13 +607,13 @@ void RND_Renderer::ImGuiOverlay::DrawPlaystylePage(bool* changed) {
                         float heightInches = height * -39.3700787f;
                         int32_t heightFeet = std::floor(heightInches / 12.0f);
                         heightInches -= heightFeet * 12.0f;
-                        return std::format("-{0:.02f}m / {1}\'{2:.02f}\"", -height, heightFeet, heightInches);
+                        return fmt::format("-{0:.02f}m / {1}\'{2:.02f}\"", -height, heightFeet, heightInches);
                     }
                     if (height > .01f) {
                         float heightInches = height * 39.3700787f;
                         int32_t heightFeet = std::floor(heightInches / 12.0f);
                         heightInches -= heightFeet * 12.0f;
-                        return std::format("+{0:.02f}m / {1}\'{2:.02f}\"", height, heightFeet, heightInches);
+                        return fmt::format("+{0:.02f}m / {1}\'{2:.02f}\"", height, heightFeet, heightInches);
                     }
                     return std::string("0.0");
                 };
@@ -1165,9 +768,6 @@ void RND_Renderer::ImGuiOverlay::DrawSystemPage(bool* changed) {
     DrawPageHeader(ICON_KI_COG, "System");
 
     if (BeginSettingsSection("##General")) {
-        DrawSetting("Boot Directly Into BotW", "Skips Cemu's game list on startup.", [&]() {
-            settings.bootDirectlyIntoGame.AddToGUI(changed);
-        });
         DrawSetting("Show FPS Overlay", [&]() {
             settings.performanceOverlay.AddComboToGUI(changed);
         });
@@ -1183,7 +783,7 @@ void RND_Renderer::ImGuiOverlay::DrawSystemPage(bool* changed) {
             }
 
             DrawSetting("Headset Refresh Rate", "The graph's target line is drawn at this refresh rate.", [&]() {
-                if (ImGui::SliderInt("##RefreshRate", &freqIdx, 0, (int)std::size(freqOptions) - 1, std::format("{} Hz", freqOptions[freqIdx]).c_str())) {
+                if (ImGui::SliderInt("##RefreshRate", &freqIdx, 0, (int)std::size(freqOptions) - 1, fmt::format("{} Hz", freqOptions[freqIdx]).c_str())) {
                     settings.performanceOverlayFrequency = freqOptions[freqIdx];
                     *changed = true;
                 }
@@ -1193,9 +793,14 @@ void RND_Renderer::ImGuiOverlay::DrawSystemPage(bool* changed) {
     }
 
     if (BeginSettingsSection("##Troubleshooting", "Troubleshooting")) {
+        DrawSetting("Foveated Rendering", "Draws the edges of your view in less detail, so the game runs faster.", [&]() {
+            settings.foveatedRendering.AddComboToGUI(changed);
+        });
+#ifdef _DEBUG
         DrawSetting("Enable Debugger Tools", "Lowers performance and can cause crashes.", [&]() {
             settings.enableDebuggerTools.AddToGUI(changed);
         });
+#endif
         DrawSetting("Reset All Settings", [&]() {
             ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.55f, 0.18f, 0.18f, 1.0f));
             ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.75f, 0.22f, 0.22f, 1.0f));
@@ -1211,15 +816,17 @@ void RND_Renderer::ImGuiOverlay::DrawSystemPage(bool* changed) {
         EndSettingsSection();
     }
 
-    // the read-only diagnostics go last so that every widget on the page sits in one uninterrupted run for the cursor
+    // the read-only info goes last so it doesn't interrupt the gamepad cursor
     if (settings.performanceOverlay != PerformanceOverlayMode::DISABLE) {
         DrawSectionCaption("Live Frame Timings");
         DrawFPSOverlayContent(VRManager::instance().XR->GetRenderer(), true, OverlayProfilerMode::NONE);
         DrawNavScrollStop("##AfterFrameTimings");
     }
 
+#ifdef _DEBUG
     ImGui::Dummy(ImVec2(0.0f, 10.0f));
     DrawBetterVRProfiler(true);
+#endif
     DrawNavScrollStop("##SystemBottom");
 }
 
@@ -1234,7 +841,7 @@ static void DrawLogToggle(const char* label, BoolSetting& setting, bool* changed
 void RND_Renderer::ImGuiOverlay::DrawDebugPage(bool* changed) {
     DrawPageHeader(ICON_KI_WRENCH, "Debug");
 
-    auto* entityDebugger = VRManager::instance().Hooks->m_entityDebugger.get();
+    auto* entityDebugger = VRManager::instance().Debugger.get();
     if (entityDebugger != nullptr) {
         ImGui::Dummy(ImVec2(0.0f, 10.0f));
         ImGui::SeparatorText("World-Space Overlay");
@@ -1249,14 +856,14 @@ void RND_Renderer::ImGuiOverlay::DrawDebugPage(bool* changed) {
 
     ImGui::Dummy(ImVec2(0.0f, 10.0f));
     ImGui::SeparatorText("Attack Debugger");
-    bool showLeftOverlay = ImGuiMenus::IsWeaponSensitivityOverlayVisible(EyeSide::LEFT);
+    bool showLeftOverlay = WeaponAttackDebugger::IsOverlayVisible(EyeSide::LEFT);
     if (ImGui::Checkbox("Left Hand", &showLeftOverlay)) {
-        ImGuiMenus::SetWeaponSensitivityOverlayVisible(EyeSide::LEFT, showLeftOverlay);
+        WeaponAttackDebugger::SetOverlayVisible(EyeSide::LEFT, showLeftOverlay);
     }
     ImGui::SameLine();
-    bool showRightOverlay = ImGuiMenus::IsWeaponSensitivityOverlayVisible(EyeSide::RIGHT);
+    bool showRightOverlay = WeaponAttackDebugger::IsOverlayVisible(EyeSide::RIGHT);
     if (ImGui::Checkbox("Right Hand", &showRightOverlay)) {
-        ImGuiMenus::SetWeaponSensitivityOverlayVisible(EyeSide::RIGHT, showRightOverlay);
+        WeaponAttackDebugger::SetOverlayVisible(EyeSide::RIGHT, showRightOverlay);
     }
 
     ImGui::Dummy(ImVec2(0.0f, 10.0f));
@@ -1285,7 +892,7 @@ void RND_Renderer::ImGuiOverlay::DrawGuidePage(const char* icon, const char* tit
     }
     const auto& image = m_helpImages[helpImageIndex];
 
-    if (ImGui::BeginChild("HelpImage", ImVec2(0.0f, 0.0f), ImGuiChildFlags_None, ImGuiWindowFlags_NoBackground)) {
+    if (ImGui::BeginChild("HelpImage", ImVec2(0.0f, 0.0f), false, ImGuiWindowFlags_NoBackground)) {
         ImVec2 availableSize = ImGui::GetContentRegionAvail();
         float widthScale = availableSize.x / (float)image.m_image->GetWidth();
         float heightScale = availableSize.y / (float)image.m_image->GetHeight();
@@ -1367,7 +974,7 @@ static void DrawTutorialPromptAndControllerVerification(bool isMenuOpen) {
     if (!settings.tutorialPromptShown) {
         if (isMenuOpen || ImGui::GetTime() > timeLimit) {
             settings.tutorialPromptShown = true;
-            ImGui::SaveIniSettingsToDisk("BetterVR_settings.ini");
+            ImGui::SaveIniSettingsToDisk(ImGui::GetIO().IniFilename);
         }
     }
 
@@ -1397,7 +1004,7 @@ static void DrawTutorialPromptAndControllerVerification(bool isMenuOpen) {
 }
 
 void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
-    auto& isMenuOpen = VRManager::instance().XR->m_isMenuOpen;
+    auto& isMenuOpen = ImGuiMenus::g_isOpen;
     auto& settings = GetSettings();
 
     DrawTutorialPromptAndControllerVerification(isMenuOpen);
@@ -1432,7 +1039,7 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
     ImVec2 displaySize = ImVec2(ImGui::GetIO().DisplaySize.x, ImGui::GetIO().DisplaySize.y);
     ImVec2 windowSize = displaySize * ImVec2(0.925f, 1.0f);
 
-    auto& selectedPage = VRManager::instance().XR->m_currMenuTab;
+    auto& selectedPage = ImGuiMenus::g_currentPage;
     if (!ImGuiMenus::IsPageAvailable(selectedPage)) {
         selectedPage = ImGuiMenus::PLAYSTYLE_PAGE;
     }
@@ -1470,7 +1077,7 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
         float sidebarWidth = std::min(215.0f, windowSize.x * 0.3f);
         ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.05490196f, 0.07843138f, 0.09411765f, 1.0f));
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(10.0f, 12.0f));
-        if (ImGui::BeginChild("Sidebar", ImVec2(sidebarWidth, -footerHeight), ImGuiChildFlags_NavFlattened | ImGuiChildFlags_AlwaysUseWindowPadding)) {
+        if (ImGui::BeginChild("Sidebar", ImVec2(sidebarWidth, -footerHeight), false, ImGuiWindowFlags_NavFlattened | ImGuiWindowFlags_AlwaysUseWindowPadding)) {
             sidebarWindow = ImGui::GetCurrentWindow();
             sidebarNavTarget = DrawSidebar(selectedPage);
         }
@@ -1482,7 +1089,7 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
 
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(16.0f, 8.0f));
         ImGui::PushID(selectedPage);
-        if (ImGui::BeginChild("Content", ImVec2(0.0f, -footerHeight), ImGuiChildFlags_NavFlattened | ImGuiChildFlags_AlwaysUseWindowPadding)) {
+        if (ImGui::BeginChild("Content", ImVec2(0.0f, -footerHeight), false, ImGuiWindowFlags_NavFlattened | ImGuiWindowFlags_AlwaysUseWindowPadding)) {
             contentWindow = ImGui::GetCurrentWindow();
             if (WantsToEnterContentPane(sidebarWindow, sidebarNavTarget)) {
                 EnterContentPane(contentWindow, sidebarNavTarget.enterContentRequested);
@@ -1507,23 +1114,9 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
         ImGui::PopID();
         ImGui::PopStyleVar();
 
-        if (settings.bootDirectlyIntoGame) {
-            CemuHooks* hooks = VRManager::instance().Hooks.get();
-            if (hooks != nullptr) {
-                const uint64_t currentTitleId = hooks->GetCurrentTitleId();
-                if (currentTitleId != 0) {
-                    const std::string formattedTitleId = std::format("{:016X}", currentTitleId);
-                    if (settings.bootDirectlyTitleId.Get() != formattedTitleId) {
-                        settings.bootDirectlyTitleId.Set(formattedTitleId);
-                        changed = true;
-                    }
-                }
-            }
-        }
-
         if (changed) {
             shouldLogSavedSettingsOnClose = true;
-            ImGui::SaveIniSettingsToDisk("BetterVR_settings.ini");
+            ImGui::SaveIniSettingsToDisk(ImGui::GetIO().IniFilename);
         }
 
         ImGui::Separator();

@@ -3,32 +3,26 @@
 
 
 namespace VulkanUtils {
-    // Determine the correct aspect mask for a given Vulkan format
     static constexpr VkImageAspectFlags GetAspectMaskForFormat(VkFormat format) {
         switch (format) {
-            // Depth-only formats
             case VK_FORMAT_D16_UNORM:
             case VK_FORMAT_D32_SFLOAT:
             case VK_FORMAT_X8_D24_UNORM_PACK32:
                 return VK_IMAGE_ASPECT_DEPTH_BIT;
 
-            // Depth+Stencil formats
             case VK_FORMAT_D16_UNORM_S8_UINT:
             case VK_FORMAT_D24_UNORM_S8_UINT:
             case VK_FORMAT_D32_SFLOAT_S8_UINT:
                 return VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
 
-            // Stencil-only formats
             case VK_FORMAT_S8_UINT:
                 return VK_IMAGE_ASPECT_STENCIL_BIT;
 
-            // All other formats are color
             default:
                 return VK_IMAGE_ASPECT_COLOR_BIT;
         }
     }
 
-    // Check if a Vulkan format is a depth or depth+stencil format
     static constexpr bool IsDepthFormat(VkFormat format) {
         switch (format) {
             case VK_FORMAT_D16_UNORM:
@@ -37,6 +31,22 @@ namespace VulkanUtils {
             case VK_FORMAT_D16_UNORM_S8_UINT:
             case VK_FORMAT_D24_UNORM_S8_UINT:
             case VK_FORMAT_D32_SFLOAT_S8_UINT:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    // Check if a Vulkan format applies the sRGB transfer function on attachment writes
+    static constexpr bool IsSrgbFormat(VkFormat format) {
+        switch (format) {
+            case VK_FORMAT_R8_SRGB:
+            case VK_FORMAT_R8G8_SRGB:
+            case VK_FORMAT_R8G8B8_SRGB:
+            case VK_FORMAT_B8G8R8_SRGB:
+            case VK_FORMAT_R8G8B8A8_SRGB:
+            case VK_FORMAT_B8G8R8A8_SRGB:
+            case VK_FORMAT_A8B8G8R8_SRGB_PACK32:
                 return true;
             default:
                 return false;
@@ -67,14 +77,6 @@ namespace VulkanUtils {
         };
 
         vkroots::tables::CommandBufferDispatches.find(cmdBuffer)->CmdPipelineBarrier(cmdBuffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
-    }
-
-    static void PipelineBarrier(VkCommandBuffer cmdBuffer, VkAccessFlags srcAccessMask, VkAccessFlags dstAccessMask, VkPipelineStageFlags srcStageMask, VkPipelineStageFlags dstStageMask) {
-        VkMemoryBarrier barrier = { VK_STRUCTURE_TYPE_MEMORY_BARRIER };
-        barrier.srcAccessMask = srcAccessMask;
-        barrier.dstAccessMask = dstAccessMask;
-
-        vkroots::tables::CommandBufferDispatches.find(cmdBuffer)->CmdPipelineBarrier(cmdBuffer, srcStageMask, dstStageMask, 0, 1, &barrier, 0, nullptr, 0, nullptr);
     }
 
     static void DebugPipelineBarrier(VkCommandBuffer cmdBuffer) {
@@ -115,7 +117,9 @@ namespace VulkanUtils {
             VK_ACCESS_MEMORY_READ_BIT |
             VK_ACCESS_MEMORY_WRITE_BIT;
 
-        vkroots::tables::CommandBufferDispatches.find(cmdBuffer)->CmdPipelineBarrier(cmdBuffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 1, &memoryBarrier, 0, nullptr, 0, nullptr);
+        // ALL_COMMANDS does not cover the host, so the HOST_* access bits need the host stage alongside it
+        constexpr VkPipelineStageFlags stageMask = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT | VK_PIPELINE_STAGE_HOST_BIT;
+        vkroots::tables::CommandBufferDispatches.find(cmdBuffer)->CmdPipelineBarrier(cmdBuffer, stageMask, stageMask, 0, 1, &memoryBarrier, 0, nullptr, 0, nullptr);
     }
 
 }

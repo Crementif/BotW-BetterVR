@@ -43,8 +43,7 @@ public:
         PPCActorJob2_1Ragdoll,
         PPCActorJob2_2,
         PPCActorJob4,
-        // everything below is appended, never inserted: patch_debug_PPC_Profiling.asm hardcodes
-        // the indices above and cannot see this enum
+        // only append below, patch_debug_PPC_Profiling.asm hardcodes the indices above
         XRSwapchainWait3D,
         XRSwapchainWait2D,
         XRAcquireSwapchain,
@@ -127,10 +126,6 @@ public:
         bool m_isActive = false;
         Clock::time_point m_start;
     };
-
-    static constexpr uint32_t GetAverageWindowFrames() {
-        return kAverageWindowFrames;
-    }
 
     static bool IsEnabled() {
         return s_enabled.load(std::memory_order_relaxed);
@@ -304,29 +299,30 @@ public:
     }
 
 private:
+    // no default member initializers since the class is still incomplete where the statics below are defined
     struct ActiveSpan {
-        Section section = Section::RoomscaleResolve;
-        uint64_t startNs = 0;
-        uint32_t generation = 0;
+        Section section;
+        uint64_t startNs;
+        uint32_t generation;
     };
 
     struct ThreadSpanState {
-        std::array<ActiveSpan, 64> spans = {};
-        size_t count = 0;
-        uint32_t generation = 0;
+        std::array<ActiveSpan, 64> spans;
+        size_t count;
+        uint32_t generation;
     };
 
     struct SectionState {
-        std::atomic<uint64_t> pendingFrameTotalNs = 0;
-        std::atomic<uint32_t> pendingFrameCalls = 0;
-        std::atomic<uint64_t> lastFrameTotalNs = 0;
-        std::atomic<uint64_t> averageFrameTotalNs = 0;
-        std::atomic<uint64_t> maxFrameTotalNs = 0;
-        std::atomic<uint32_t> lastFrameCalls = 0;
-        std::atomic<uint32_t> averageFrameSamples = 0;
-        std::atomic<uint64_t> lastCallNs = 0;
-        std::atomic<uint64_t> maxCallNs = 0;
-        std::atomic<uint64_t> activeSpanStartNs = 0;
+        std::atomic<uint64_t> pendingFrameTotalNs;
+        std::atomic<uint32_t> pendingFrameCalls;
+        std::atomic<uint64_t> lastFrameTotalNs;
+        std::atomic<uint64_t> averageFrameTotalNs;
+        std::atomic<uint64_t> maxFrameTotalNs;
+        std::atomic<uint32_t> lastFrameCalls;
+        std::atomic<uint32_t> averageFrameSamples;
+        std::atomic<uint64_t> lastCallNs;
+        std::atomic<uint64_t> maxCallNs;
+        std::atomic<uint64_t> activeSpanStartNs;
     };
 
     inline static std::atomic_bool s_enabled = false;

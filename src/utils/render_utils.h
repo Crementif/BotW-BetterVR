@@ -141,19 +141,6 @@ namespace RenderUtils {
         return GetSubFovUvTransform(GetRenderFov(rawFov, renderAspectRatio), rawFov);
     }
 
-    inline std::optional<XrFovf> ResolveGameProjectionFov(const std::optional<XrFovf>& rawFov, std::optional<float> renderAspectRatio, float gameFovY, float gameAspectRatio) {
-        if (std::optional<XrFovf> renderFov = GetRenderFov(rawFov, renderAspectRatio)) {
-            return renderFov;
-        }
-
-        std::optional<float> sanitizedGameFovY = SanitizeGameFovY(gameFovY);
-        if (!sanitizedGameFovY.has_value() || !std::isfinite(gameAspectRatio) || gameAspectRatio <= 0.0f) {
-            return rawFov;
-        }
-
-        return CreateSymmetricFov(sanitizedGameFovY.value(), gameAspectRatio);
-    }
-
     inline data_VRProjectionMatrixOut CalculateFOVAndOffset(const XrFovf& viewFOV) {
         const float left = tanf(viewFOV.angleLeft);
         const float right = tanf(viewFOV.angleRight);
@@ -174,6 +161,18 @@ namespace RenderUtils {
         ret.offsetY = (up + down) / (2.0f * height);
 
         return ret;
+    }
+
+    // 0,0 is the top left, 1,1 the bottom right
+    inline std::array<float, 2> ProjectDirectionToPicture(const XrFovf& fov, const glm::fvec3& direction) {
+        const float left = tanf(fov.angleLeft);
+        const float right = tanf(fov.angleRight);
+        const float down = tanf(fov.angleDown);
+        const float up = tanf(fov.angleUp);
+        const glm::fvec3 ahead = direction.z < -0.01f ? direction : glm::fvec3(0.0f, 0.0f, -1.0f);
+        const float x = ahead.x / -ahead.z;
+        const float y = ahead.y / -ahead.z;
+        return { std::clamp((x - left) / (right - left), 0.0f, 1.0f), std::clamp((up - y) / (up - down), 0.0f, 1.0f) };
     }
 
     inline glm::mat4 CalculateProjectionMatrix(float nearZ, float farZ, const XrFovf& fov) {
@@ -199,4 +198,12 @@ namespace RenderUtils {
         return dst;
     }
 
+    // sead::PerspectiveProjection's deviceZScale/deviceZOffset folded into a projection matrix
+    inline glm::mat4 ApplyDeviceZTransform(glm::mat4 projection, float zScale, float zOffset) {
+        projection[2][0] *= zScale;
+        projection[2][1] *= zScale;
+        projection[2][2] = (projection[2][2] + projection[3][2] * zOffset) * zScale;
+        projection[2][3] = projection[2][3] * zScale + projection[3][3] * zOffset;
+        return projection;
+    }
 }

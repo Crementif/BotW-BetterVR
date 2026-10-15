@@ -2,14 +2,77 @@
 
 #include "openxr.h"
 #include "instance.h"
+#include "game/game.h"
+#include "cemu/host_window.h"
+#include "cemu/vulkan_loader.h"
 
 #ifndef XR_BD_ULTRA_CONTROLLER_INTERACTION_EXTENSION_NAME
 #define XR_BD_ULTRA_CONTROLLER_INTERACTION_EXTENSION_NAME "XR_BD_ultra_controller_interaction"
 #endif
 
+#if defined(_WIN32)
+static constexpr const char* kTimeBridgeExtensionName = XR_KHR_WIN32_CONVERT_PERFORMANCE_COUNTER_TIME_EXTENSION_NAME;
+static constexpr const char* kTimeBridgeToXrTimeName = "xrConvertWin32PerformanceCounterToTimeKHR";
+static constexpr const char* kTimeBridgeFromXrTimeName = "xrConvertTimeToWin32PerformanceCounterKHR";
+#else
+static constexpr const char* kTimeBridgeExtensionName = XR_KHR_CONVERT_TIMESPEC_TIME_EXTENSION_NAME;
+static constexpr const char* kTimeBridgeToXrTimeName = "xrConvertTimespecTimeToTimeKHR";
+static constexpr const char* kTimeBridgeFromXrTimeName = "xrConvertTimeToTimespecTimeKHR";
+#endif
+
+template <size_t N>
+static void CopyFixedString(char (&destination)[N], const char* source) {
+    std::snprintf(destination, N, "%s", source);
+}
+
 static XrBool32 XR_DebugUtilsMessengerCallback(XrDebugUtilsMessageSeverityFlagsEXT messageSeverity, XrDebugUtilsMessageTypeFlagsEXT messageType, const XrDebugUtilsMessengerCallbackDataEXT* callbackData, void* userData) {
     Log::print<XR_DEBUGUTILS>("Function {}: {}", callbackData->functionName, callbackData->message);
     return XR_FALSE;
+}
+
+static std::vector<std::string> SplitExtensionList(const std::string& extensions) {
+    std::vector<std::string> result;
+    std::string current;
+    for (const char character : extensions) {
+        if (character == ' ' || character == '\0') {
+            if (!current.empty()) {
+                result.emplace_back(std::move(current));
+            }
+            current.clear();
+        }
+        else {
+            current.push_back(character);
+        }
+    }
+    if (!current.empty()) {
+        result.emplace_back(std::move(current));
+    }
+    return result;
+}
+
+// what the player can do about it, shown in Cemu's error dialog
+static std::string RuntimeFailureHelp(const char* what, XrResult result) {
+    std::string help = what;
+    switch (result) {
+        case XR_ERROR_RUNTIME_UNAVAILABLE:
+            help += " No OpenXR runtime is set up. Pick one in your headset's software (SteamVR, the Meta app, Virtual Desktop's VDXR, or Monado/WiVRn on Linux) and set it as the active OpenXR runtime.";
+            break;
+        case XR_ERROR_RUNTIME_FAILURE:
+            help += " The active OpenXR runtime failed to start. Restart it or your PC, and check that the right runtime is active.";
+            break;
+        case XR_ERROR_FORM_FACTOR_UNAVAILABLE:
+            help += " Make sure the headset is connected, switched on, awake and seen by the runtime.";
+            break;
+        case XR_ERROR_FORM_FACTOR_UNSUPPORTED:
+            help += " The active OpenXR runtime doesn't support headsets.";
+            break;
+        case XR_ERROR_INSTANCE_LOST:
+            help += " The OpenXR runtime stopped. Restart it and try again.";
+            break;
+        default:
+            break;
+    }
+    return help + fmt::format(" (error {})\n\nCemu keeps running without VR.", (int32_t)result);
 }
 
 OpenXR::OpenXR() {
@@ -19,27 +82,27 @@ OpenXR::OpenXR() {
     instanceExtensions.resize(xrExtensionCount, { XR_TYPE_EXTENSION_PROPERTIES, NULL });
     {
         XrResult result = xrEnumerateInstanceExtensionProperties(NULL, xrExtensionCount, &xrExtensionCount, instanceExtensions.data());
-        if (result == XR_ERROR_RUNTIME_FAILURE) {
-            Log::print<ERROR>("Couldn't enumerate OpenXR extensions! Is the OpenXR runtime installed and set to the correct runtime? Restarting might help, or going to SteamVR/Oculus Link's Settings and making sure OpenXR is enabled.");
-        }
-        checkXRResult(result, "Couldn't enumerate OpenXR extensions!");
+        checkXRResult(result, RuntimeFailureHelp("Couldn't reach the OpenXR runtime.", result).c_str());
     }
 
-    // Create instance with required extensions
-    bool d3d12Supported = false;
+    bool vulkanEnable2Supported = false;
+    bool vulkanEnableSupported = false;
     bool depthSupported = false;
-    bool timeConvSupported = false;
+    bool timeBridgeSupported = false;
     bool debugUtilsSupported = false;
     for (XrExtensionProperties& extensionProperties : instanceExtensions) {
         Log::print<VERBOSE>("Found available OpenXR extension: {}", extensionProperties.extensionName);
-        if (strcmp(extensionProperties.extensionName, XR_KHR_D3D12_ENABLE_EXTENSION_NAME) == 0) {
-            d3d12Supported = true;
+        if (strcmp(extensionProperties.extensionName, XR_KHR_VULKAN_ENABLE2_EXTENSION_NAME) == 0) {
+            vulkanEnable2Supported = true;
+        }
+        if (strcmp(extensionProperties.extensionName, XR_KHR_VULKAN_ENABLE_EXTENSION_NAME) == 0) {
+            vulkanEnableSupported = true;
         }
         if (strcmp(extensionProperties.extensionName, XR_KHR_COMPOSITION_LAYER_DEPTH_EXTENSION_NAME) == 0) {
             depthSupported = true;
         }
-        else if (strcmp(extensionProperties.extensionName, XR_KHR_WIN32_CONVERT_PERFORMANCE_COUNTER_TIME_EXTENSION_NAME) == 0) {
-            timeConvSupported = true;
+        else if (strcmp(extensionProperties.extensionName, kTimeBridgeExtensionName) == 0) {
+            timeBridgeSupported = true;
         }
         else if (strcmp(extensionProperties.extensionName, XR_EXT_DEBUG_UTILS_EXTENSION_NAME) == 0) {
 #ifdef _DEBUG
@@ -58,30 +121,38 @@ OpenXR::OpenXR() {
         else if (strcmp(extensionProperties.extensionName, XR_EXT_HP_MIXED_REALITY_CONTROLLER_EXTENSION_NAME) == 0) {
             m_capabilities.supportsHPMixedRealityController = true;
         }
+        else if (strcmp(extensionProperties.extensionName, XR_EXT_EYE_GAZE_INTERACTION_EXTENSION_NAME) == 0) {
+            m_capabilities.supportsEyeGaze = true;
+        }
     }
 
-    if (!d3d12Supported) {
-        Log::print<ERROR>("OpenXR runtime doesn't support D3D12 (XR_KHR_D3D12_ENABLE)!");
-        throw std::runtime_error("Current OpenXR runtime doesn't support Direct3D 12 (XR_KHR_D3D12_ENABLE). See the Github page's troubleshooting section for a solution!");
+    if (!vulkanEnable2Supported && !vulkanEnableSupported) {
+        Log::print<ERROR>("OpenXR runtime doesn't support Vulkan (neither XR_KHR_vulkan_enable2 nor XR_KHR_vulkan_enable)!");
+        checkAssert(false, "Current OpenXR runtime doesn't support Vulkan (XR_KHR_vulkan_enable2). See the Github page's troubleshooting section for a solution!");
+    }
+    m_capabilities.usesVulkanEnable2 = vulkanEnable2Supported;
+    if (!vulkanEnable2Supported) {
+        Log::print<WARNING>("OpenXR runtime doesn't support XR_KHR_vulkan_enable2, falling back to XR_KHR_vulkan_enable.");
     }
     if (!depthSupported) {
         Log::print<ERROR>("OpenXR runtime doesn't support depth composition layers (XR_KHR_COMPOSITION_LAYER_DEPTH)!");
-        throw std::runtime_error("Current OpenXR runtime doesn't support depth composition layers (XR_KHR_COMPOSITION_LAYER_DEPTH). See the Github page's troubleshooting section for a solution!");
+        checkAssert(false, "Current OpenXR runtime doesn't support depth composition layers (XR_KHR_COMPOSITION_LAYER_DEPTH). See the Github page's troubleshooting section for a solution!");
     }
-    if (!timeConvSupported) {
-        Log::print<WARNING>("OpenXR runtime doesn't support converting time from/to XrTime (XR_KHR_WIN32_CONVERT_PERFORMANCE_COUNTER_TIME). Not required, as of this version.");
+    if (!timeBridgeSupported) {
+        Log::print<WARNING>("OpenXR runtime doesn't support converting time from/to XrTime ({}). Not required, as of this version.", kTimeBridgeExtensionName);
     }
     if (!debugUtilsSupported && Log::isLogTypeEnabled<XR_DEBUGUTILS>()) {
         Log::print<INFO>("OpenXR runtime doesn't support debug utils (XR_EXT_DEBUG_UTILS)! Errors/debug information will no longer be able to be shown!");
     }
 
-    std::vector<const char*> enabledExtensions = { XR_KHR_D3D12_ENABLE_EXTENSION_NAME, XR_KHR_COMPOSITION_LAYER_DEPTH_EXTENSION_NAME };
-    if (timeConvSupported) enabledExtensions.emplace_back(XR_KHR_WIN32_CONVERT_PERFORMANCE_COUNTER_TIME_EXTENSION_NAME);
+    std::vector<const char*> enabledExtensions = { vulkanEnable2Supported ? XR_KHR_VULKAN_ENABLE2_EXTENSION_NAME : XR_KHR_VULKAN_ENABLE_EXTENSION_NAME, XR_KHR_COMPOSITION_LAYER_DEPTH_EXTENSION_NAME };
+    if (timeBridgeSupported) enabledExtensions.emplace_back(kTimeBridgeExtensionName);
     if (debugUtilsSupported) enabledExtensions.emplace_back(XR_EXT_DEBUG_UTILS_EXTENSION_NAME);
     if (m_capabilities.supportsPicoController) enabledExtensions.emplace_back(XR_BD_CONTROLLER_INTERACTION_EXTENSION_NAME);
     if (m_capabilities.supportsPicoUltraController) enabledExtensions.emplace_back(XR_BD_ULTRA_CONTROLLER_INTERACTION_EXTENSION_NAME);
     if (m_capabilities.supportsCosmosController) enabledExtensions.emplace_back(XR_HTC_VIVE_COSMOS_CONTROLLER_INTERACTION_EXTENSION_NAME);
     if (m_capabilities.supportsHPMixedRealityController) enabledExtensions.emplace_back(XR_EXT_HP_MIXED_REALITY_CONTROLLER_EXTENSION_NAME);
+    if (m_capabilities.supportsEyeGaze) enabledExtensions.emplace_back(XR_EXT_EYE_GAZE_INTERACTION_EXTENSION_NAME);
 
     XrInstanceCreateInfo xrInstanceCreateInfo = { XR_TYPE_INSTANCE_CREATE_INFO };
     xrInstanceCreateInfo.createFlags = 0;
@@ -100,24 +171,34 @@ OpenXR::OpenXR() {
              std::this_thread::sleep_for(std::chrono::seconds(2));
         }
 
-        if (result == XR_ERROR_RUNTIME_FAILURE) {
-            Log::print<ERROR>("Failed to create OpenXR instance! Is the OpenXR runtime installed and set to the correct runtime? Restarting might help, or going to SteamVR/Oculus Link's Settings and making sure OpenXR is enabled.");
-        }
-        checkXRResult(result, "Failed to initialize the OpenXR instance!");
+        checkXRResult(result, RuntimeFailureHelp("The OpenXR runtime didn't start.", result).c_str());
     }
 
-    // Load extension pointers for this XrInstance
-    xrGetInstanceProcAddr(m_instance, "xrGetD3D12GraphicsRequirementsKHR", (PFN_xrVoidFunction*)&func_xrGetD3D12GraphicsRequirementsKHR);
-    if (timeConvSupported) {
-        xrGetInstanceProcAddr(m_instance, "xrConvertTimeToWin32PerformanceCounterKHR", (PFN_xrVoidFunction*)&func_xrConvertTimeToWin32PerformanceCounterKHR);
-        xrGetInstanceProcAddr(m_instance, "xrConvertWin32PerformanceCounterToTimeKHR", (PFN_xrVoidFunction*)&func_xrConvertWin32PerformanceCounterToTimeKHR);
+    if (m_capabilities.usesVulkanEnable2) {
+        xrGetInstanceProcAddr(m_instance, "xrGetVulkanGraphicsRequirements2KHR", (PFN_xrVoidFunction*)&func_xrGetVulkanGraphicsRequirements2KHR);
+        xrGetInstanceProcAddr(m_instance, "xrCreateVulkanInstanceKHR", (PFN_xrVoidFunction*)&func_xrCreateVulkanInstanceKHR);
+        xrGetInstanceProcAddr(m_instance, "xrCreateVulkanDeviceKHR", (PFN_xrVoidFunction*)&func_xrCreateVulkanDeviceKHR);
+        xrGetInstanceProcAddr(m_instance, "xrGetVulkanGraphicsDevice2KHR", (PFN_xrVoidFunction*)&func_xrGetVulkanGraphicsDevice2KHR);
+        checkAssert(func_xrGetVulkanGraphicsRequirements2KHR != nullptr && func_xrCreateVulkanInstanceKHR != nullptr && func_xrCreateVulkanDeviceKHR != nullptr && func_xrGetVulkanGraphicsDevice2KHR != nullptr,
+            "The OpenXR runtime advertises XR_KHR_vulkan_enable2 but doesn't expose all of its functions!");
+    }
+    else {
+        xrGetInstanceProcAddr(m_instance, "xrGetVulkanGraphicsRequirementsKHR", (PFN_xrVoidFunction*)&func_xrGetVulkanGraphicsRequirementsKHR);
+        xrGetInstanceProcAddr(m_instance, "xrGetVulkanInstanceExtensionsKHR", (PFN_xrVoidFunction*)&func_xrGetVulkanInstanceExtensionsKHR);
+        xrGetInstanceProcAddr(m_instance, "xrGetVulkanDeviceExtensionsKHR", (PFN_xrVoidFunction*)&func_xrGetVulkanDeviceExtensionsKHR);
+        xrGetInstanceProcAddr(m_instance, "xrGetVulkanGraphicsDeviceKHR", (PFN_xrVoidFunction*)&func_xrGetVulkanGraphicsDeviceKHR);
+        checkAssert(func_xrGetVulkanGraphicsRequirementsKHR != nullptr && func_xrGetVulkanInstanceExtensionsKHR != nullptr && func_xrGetVulkanDeviceExtensionsKHR != nullptr && func_xrGetVulkanGraphicsDeviceKHR != nullptr,
+            "The OpenXR runtime advertises XR_KHR_vulkan_enable but doesn't expose all of its functions!");
+    }
+    if (timeBridgeSupported) {
+        xrGetInstanceProcAddr(m_instance, kTimeBridgeFromXrTimeName, (PFN_xrVoidFunction*)&func_xrConvertTimeToPlatformTime);
+        xrGetInstanceProcAddr(m_instance, kTimeBridgeToXrTimeName, (PFN_xrVoidFunction*)&func_xrConvertPlatformTimeToTime);
     }
     if (debugUtilsSupported) {
         xrGetInstanceProcAddr(m_instance, "xrCreateDebugUtilsMessengerEXT", (PFN_xrVoidFunction*)&func_xrCreateDebugUtilsMessengerEXT);
         xrGetInstanceProcAddr(m_instance, "xrDestroyDebugUtilsMessengerEXT", (PFN_xrVoidFunction*)&func_xrDestroyDebugUtilsMessengerEXT);
     }
 
-    // Create debug utils messenger
     if (debugUtilsSupported) {
         XrDebugUtilsMessengerCreateInfoEXT utilsMessengerCreateInfo = { XR_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT };
         utilsMessengerCreateInfo.messageSeverities = XR_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | XR_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT | XR_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | XR_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
@@ -126,13 +207,17 @@ OpenXR::OpenXR() {
         func_xrCreateDebugUtilsMessengerEXT(m_instance, &utilsMessengerCreateInfo, &m_debugMessengerHandle);
     }
 
-    // Get system information
     XrSystemGetInfo xrSystemGetInfo = { XR_TYPE_SYSTEM_GET_INFO };
     xrSystemGetInfo.formFactor = XR_FORM_FACTOR_HEAD_MOUNTED_DISPLAY;
-    checkXRResult(xrGetSystem(m_instance, &xrSystemGetInfo, &m_systemId), "No (available) head mounted display found!");
+    const XrResult systemResult = xrGetSystem(m_instance, &xrSystemGetInfo, &m_systemId);
+    checkXRResult(systemResult, RuntimeFailureHelp("The OpenXR runtime has no headset to offer.", systemResult).c_str());
 
     XrSystemProperties xrSystemProperties = { XR_TYPE_SYSTEM_PROPERTIES };
+    // the extension is there for the runtime, this says whether the headset has the cameras
+    XrSystemEyeGazeInteractionPropertiesEXT eyeGazeProperties = { XR_TYPE_SYSTEM_EYE_GAZE_INTERACTION_PROPERTIES_EXT };
+    if (m_capabilities.supportsEyeGaze) xrSystemProperties.next = &eyeGazeProperties;
     checkXRResult(xrGetSystemProperties(m_instance, m_systemId, &xrSystemProperties), "Couldn't get system properties of the given VR headset!");
+    m_capabilities.supportsEyeGaze = m_capabilities.supportsEyeGaze && eyeGazeProperties.supportsEyeGazeInteraction;
     m_capabilities.supportsOrientational = xrSystemProperties.trackingProperties.orientationTracking;
     m_capabilities.supportsPositional = xrSystemProperties.trackingProperties.positionTracking;
 
@@ -143,12 +228,17 @@ OpenXR::OpenXR() {
     checkXRResult(xrGetViewConfigurationProperties(m_instance, m_systemId, XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO, &stereoViewConfiguration), "There's no VR headset available that allows stereo rendering!");
     m_capabilities.supportsMutatableFOV = stereoViewConfiguration.fovMutable;
 
-    XrGraphicsRequirementsD3D12KHR graphicsRequirements = { XR_TYPE_GRAPHICS_REQUIREMENTS_D3D12_KHR };
-    checkXRResult(func_xrGetD3D12GraphicsRequirementsKHR(m_instance, m_systemId, &graphicsRequirements), "Couldn't get D3D12 requirements for the given VR headset!");
-    m_capabilities.adapter = graphicsRequirements.adapterLuid;
-    m_capabilities.minFeatureLevel = graphicsRequirements.minFeatureLevel;
+    // has to happen before the first xrCreateVulkanInstanceKHR
+    XrGraphicsRequirementsVulkan2KHR graphicsRequirements = { XR_TYPE_GRAPHICS_REQUIREMENTS_VULKAN2_KHR };
+    if (m_capabilities.usesVulkanEnable2) {
+        checkXRResult(func_xrGetVulkanGraphicsRequirements2KHR(m_instance, m_systemId, &graphicsRequirements), "Couldn't get Vulkan requirements for the given VR headset!");
+    }
+    else {
+        checkXRResult(func_xrGetVulkanGraphicsRequirementsKHR(m_instance, m_systemId, &graphicsRequirements), "Couldn't get Vulkan requirements for the given VR headset!");
+    }
+    m_capabilities.minVulkanApiVersion = graphicsRequirements.minApiVersionSupported;
+    m_capabilities.maxVulkanApiVersion = graphicsRequirements.maxApiVersionSupported;
 
-    // Print configuration used, mostly for debugging purposes
     Log::print<INFO>("Acquired system to be used:");
     Log::print<INFO>(" - System Name: {}", xrSystemProperties.systemName); // Oculus Quest2
     Log::print<INFO>(" - Runtime Name: {}", properties.runtimeName); // Oculus
@@ -156,7 +246,11 @@ OpenXR::OpenXR() {
     Log::print<INFO>(" - Supports Mutable FOV: {}", m_capabilities.supportsMutatableFOV ? "Yes" : "No");
     Log::print<INFO>(" - Supports Orientation Tracking: {}", xrSystemProperties.trackingProperties.orientationTracking ? "Yes" : "No");
     Log::print<INFO>(" - Supports Positional Tracking: {}", xrSystemProperties.trackingProperties.positionTracking ? "Yes" : "No");
-    Log::print<INFO>(" - Supports D3D12 feature level {} or higher", graphicsRequirements.minFeatureLevel);
+    Log::print<INFO>(" - Supports Eye Tracking: {}", m_capabilities.supportsEyeGaze ? "Yes" : "No");
+    Log::print<INFO>(" - Vulkan handshake: {}", m_capabilities.usesVulkanEnable2 ? XR_KHR_VULKAN_ENABLE2_EXTENSION_NAME : XR_KHR_VULKAN_ENABLE_EXTENSION_NAME);
+    Log::print<INFO>(" - Supports Vulkan {}.{}.{} up to {}.{}.{}",
+        XR_VERSION_MAJOR(m_capabilities.minVulkanApiVersion), XR_VERSION_MINOR(m_capabilities.minVulkanApiVersion), XR_VERSION_PATCH(m_capabilities.minVulkanApiVersion),
+        XR_VERSION_MAJOR(m_capabilities.maxVulkanApiVersion), XR_VERSION_MINOR(m_capabilities.maxVulkanApiVersion), XR_VERSION_PATCH(m_capabilities.maxVulkanApiVersion));
 
     m_capabilities.isOculusLinkRuntime = std::string(properties.runtimeName) == "Oculus";
     Log::print<INFO>(" - Using Meta Quest Link OpenXR runtime: {}", m_capabilities.isOculusLinkRuntime ? "Yes" : "No");
@@ -165,6 +259,7 @@ OpenXR::OpenXR() {
 }
 
 OpenXR::~OpenXR() {
+    m_rumbleManager.reset(); // join the worker while the session and haptic actions still exist
     this->m_renderer.reset();
 
     for (XrSpace& handSpace : m_inGameHandSpaces) {
@@ -190,6 +285,10 @@ OpenXR::~OpenXR() {
             xrDestroySpace(aimSpace);
             aimSpace = XR_NULL_HANDLE;
         }
+    }
+    if (m_eyeGazeSpace != XR_NULL_HANDLE) {
+        xrDestroySpace(m_eyeGazeSpace);
+        m_eyeGazeSpace = XR_NULL_HANDLE;
     }
 
     if (m_headSpace != XR_NULL_HANDLE) {
@@ -218,10 +317,117 @@ OpenXR::~OpenXR() {
     }
 }
 
+std::vector<std::string> OpenXR::GetRequiredVulkanInstanceExtensions() const {
+    if (func_xrGetVulkanInstanceExtensionsKHR == nullptr) {
+        return {};
+    }
+
+    uint32_t bufferSize = 0;
+    checkXRResult(func_xrGetVulkanInstanceExtensionsKHR(m_instance, m_systemId, 0, &bufferSize, nullptr), "Couldn't count the Vulkan instance extensions the OpenXR runtime needs!");
+    std::string buffer(bufferSize, '\0');
+    checkXRResult(func_xrGetVulkanInstanceExtensionsKHR(m_instance, m_systemId, bufferSize, &bufferSize, buffer.data()), "Couldn't get the Vulkan instance extensions the OpenXR runtime needs!");
+    return SplitExtensionList(buffer);
+}
+
+std::vector<std::string> OpenXR::GetRequiredVulkanDeviceExtensions() const {
+    if (func_xrGetVulkanDeviceExtensionsKHR == nullptr) {
+        return {};
+    }
+
+    uint32_t bufferSize = 0;
+    checkXRResult(func_xrGetVulkanDeviceExtensionsKHR(m_instance, m_systemId, 0, &bufferSize, nullptr), "Couldn't count the Vulkan device extensions the OpenXR runtime needs!");
+    std::string buffer(bufferSize, '\0');
+    checkXRResult(func_xrGetVulkanDeviceExtensionsKHR(m_instance, m_systemId, bufferSize, &bufferSize, buffer.data()), "Couldn't get the Vulkan device extensions the OpenXR runtime needs!");
+    return SplitExtensionList(buffer);
+}
+
+uint32_t OpenXR::ClampVulkanApiVersion(uint32_t requestedApiVersion) const {
+    const uint32_t minVersion = VK_MAKE_API_VERSION(0, XR_VERSION_MAJOR(m_capabilities.minVulkanApiVersion), XR_VERSION_MINOR(m_capabilities.minVulkanApiVersion), 0);
+    const uint32_t maxVersion = VK_MAKE_API_VERSION(0, XR_VERSION_MAJOR(m_capabilities.maxVulkanApiVersion), XR_VERSION_MINOR(m_capabilities.maxVulkanApiVersion), 0);
+
+    uint32_t clampedApiVersion = requestedApiVersion;
+    if (requestedApiVersion < minVersion) {
+        clampedApiVersion = minVersion;
+    }
+    // a runtime that caps below Vulkan 1.1 can't work anyway, clamping would only make Cemu abort instead
+    else if (requestedApiVersion > maxVersion && maxVersion >= VK_API_VERSION_1_1) {
+        clampedApiVersion = maxVersion;
+    }
+
+    if (clampedApiVersion != requestedApiVersion) {
+        Log::print<WARNING>("Clamping the requested Vulkan {}.{}.{} to {}.{}.{} to stay inside the OpenXR runtime's supported range",
+            VK_API_VERSION_MAJOR(requestedApiVersion), VK_API_VERSION_MINOR(requestedApiVersion), VK_API_VERSION_PATCH(requestedApiVersion),
+            VK_API_VERSION_MAJOR(clampedApiVersion), VK_API_VERSION_MINOR(clampedApiVersion), VK_API_VERSION_PATCH(clampedApiVersion));
+    }
+    else if (requestedApiVersion > maxVersion) {
+        Log::print<WARNING>("The OpenXR runtime reports Vulkan {}.{} as its maximum, which is below the v1.1 the mod needs, so Cemu's requested version is kept",
+            XR_VERSION_MAJOR(m_capabilities.maxVulkanApiVersion), XR_VERSION_MINOR(m_capabilities.maxVulkanApiVersion));
+    }
+    return clampedApiVersion;
+}
+
+VkResult OpenXR::CreateVulkanInstance(const VkInstanceCreateInfo& createInfo, const VkAllocationCallbacks* allocator, VkInstance* pInstance) {
+    checkAssert(func_xrCreateVulkanInstanceKHR != nullptr, "The OpenXR runtime's xrCreateVulkanInstanceKHR is missing!");
+
+    XrVulkanInstanceCreateInfoKHR vulkanInstanceCreateInfo = { XR_TYPE_VULKAN_INSTANCE_CREATE_INFO_KHR };
+    vulkanInstanceCreateInfo.systemId = m_systemId;
+    vulkanInstanceCreateInfo.createFlags = 0;
+    vulkanInstanceCreateInfo.pfnGetInstanceProcAddr = VulkanLoader::GetInstanceProcAddr();
+    vulkanInstanceCreateInfo.vulkanCreateInfo = &createInfo;
+    vulkanInstanceCreateInfo.vulkanAllocator = allocator;
+
+    VkResult vulkanResult = VK_ERROR_INITIALIZATION_FAILED;
+    if (XrResult result = func_xrCreateVulkanInstanceKHR(m_instance, &vulkanInstanceCreateInfo, pInstance, &vulkanResult); XR_FAILED(result)) {
+        Log::print<ERROR>("xrCreateVulkanInstanceKHR failed with {}", result);
+        return VK_ERROR_INITIALIZATION_FAILED;
+    }
+    return vulkanResult;
+}
+
+VkResult OpenXR::CreateVulkanDevice(VkPhysicalDevice physicalDevice, const VkDeviceCreateInfo& createInfo, const VkAllocationCallbacks* allocator, VkDevice* pDevice) {
+    checkAssert(func_xrCreateVulkanDeviceKHR != nullptr, "The OpenXR runtime's xrCreateVulkanDeviceKHR is missing!");
+
+    XrVulkanDeviceCreateInfoKHR vulkanDeviceCreateInfo = { XR_TYPE_VULKAN_DEVICE_CREATE_INFO_KHR };
+    vulkanDeviceCreateInfo.systemId = m_systemId;
+    vulkanDeviceCreateInfo.createFlags = 0;
+    vulkanDeviceCreateInfo.pfnGetInstanceProcAddr = VulkanLoader::GetInstanceProcAddr();
+    vulkanDeviceCreateInfo.vulkanPhysicalDevice = physicalDevice;
+    vulkanDeviceCreateInfo.vulkanCreateInfo = &createInfo;
+    vulkanDeviceCreateInfo.vulkanAllocator = allocator;
+
+    VkResult vulkanResult = VK_ERROR_INITIALIZATION_FAILED;
+    if (XrResult result = func_xrCreateVulkanDeviceKHR(m_instance, &vulkanDeviceCreateInfo, pDevice, &vulkanResult); XR_FAILED(result)) {
+        Log::print<ERROR>("xrCreateVulkanDeviceKHR failed with {}", result);
+        return VK_ERROR_INITIALIZATION_FAILED;
+    }
+    return vulkanResult;
+}
+
+VkPhysicalDevice OpenXR::GetVulkanGraphicsDevice(VkInstance vulkanInstance) {
+    if (m_capabilities.vulkanPhysicalDevice != VK_NULL_HANDLE && m_capabilities.vulkanInstance == vulkanInstance) {
+        return m_capabilities.vulkanPhysicalDevice;
+    }
+
+    VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
+    if (m_capabilities.usesVulkanEnable2) {
+        XrVulkanGraphicsDeviceGetInfoKHR graphicsDeviceGetInfo = { XR_TYPE_VULKAN_GRAPHICS_DEVICE_GET_INFO_KHR };
+        graphicsDeviceGetInfo.systemId = m_systemId;
+        graphicsDeviceGetInfo.vulkanInstance = vulkanInstance;
+        checkXRResult(func_xrGetVulkanGraphicsDevice2KHR(m_instance, &graphicsDeviceGetInfo, &physicalDevice), "Couldn't get the Vulkan GPU that drives the VR headset!");
+    }
+    else {
+        checkXRResult(func_xrGetVulkanGraphicsDeviceKHR(m_instance, m_systemId, vulkanInstance, &physicalDevice), "Couldn't get the Vulkan GPU that drives the VR headset!");
+    }
+
+    m_capabilities.vulkanInstance = vulkanInstance;
+    m_capabilities.vulkanPhysicalDevice = physicalDevice;
+    return physicalDevice;
+}
+
 std::array<XrViewConfigurationView, 2> OpenXR::GetViewConfigurations() {
     uint32_t eyeViewsConfigurationCount = 0;
     checkXRResult(xrEnumerateViewConfigurationViews(m_instance, m_systemId, XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO, 0, &eyeViewsConfigurationCount, nullptr), "Can't get number of individual views for stereo view available");
-    checkAssert(eyeViewsConfigurationCount == 2, std::format("Expected 2 views for the stereo configuration but got {} which is unsupported!", eyeViewsConfigurationCount).c_str());
+    checkAssert(eyeViewsConfigurationCount == 2, fmt::format("Expected 2 views for the stereo configuration but got {} which is unsupported!", eyeViewsConfigurationCount).c_str());
 
     std::array<XrViewConfigurationView, 2> xrViewConf = { XrViewConfigurationView{ XR_TYPE_VIEW_CONFIGURATION_VIEW }, XrViewConfigurationView{ XR_TYPE_VIEW_CONFIGURATION_VIEW } };
     checkXRResult(xrEnumerateViewConfigurationViews(m_instance, m_systemId, XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO, eyeViewsConfigurationCount, &eyeViewsConfigurationCount, xrViewConf.data()), "Can't get individual views for stereo view available!");
@@ -234,12 +440,12 @@ std::array<XrViewConfigurationView, 2> OpenXR::GetViewConfigurations() {
     return xrViewConf;
 }
 
-void OpenXR::CreateSession(const XrGraphicsBindingD3D12KHR& d3d12Binding) {
-    Log::print<INFO>("Creating the OpenXR session...");
+void OpenXR::CreateSession(const XrGraphicsBindingVulkan2KHR& vulkanBinding) {
+    Log::print<INFO>("Creating the OpenXR session on queue family {} index {}...", vulkanBinding.queueFamilyIndex, vulkanBinding.queueIndex);
 
     XrSessionCreateInfo sessionCreateInfo = { XR_TYPE_SESSION_CREATE_INFO };
     sessionCreateInfo.systemId = m_systemId;
-    sessionCreateInfo.next = &d3d12Binding;
+    sessionCreateInfo.next = &vulkanBinding;
     sessionCreateInfo.createFlags = 0;
     checkXRResult(xrCreateSession(m_instance, &sessionCreateInfo, &m_session), "Failed to create Vulkan-based OpenXR session!");
 
@@ -295,7 +501,7 @@ void OpenXR::UpdateSeatedHeightCalibration(XrTime predictedDisplayTime, const st
     }
     m_lastSeenPlayMode = playMode;
 
-    if (!m_seenFirstLoadingScreen && CemuHooks::IsScreenVisible(ScreenId::LoadingWeapon_00)) {
+    if (!m_seenFirstLoadingScreen && Game::GetPresentation().loadingScreenVisible) {
         m_seenFirstLoadingScreen = true;
         if (playMode == PlayMode::SEATED) {
             RequestSeatedHeightCalibration();
@@ -337,17 +543,17 @@ void OpenXR::CreateActions() {
     auto createAction = [this](const XrActionSet& actionSet, const char* id, const char* name, XrActionType actionType, XrAction& action) {
         XrActionCreateInfo actionInfo = { XR_TYPE_ACTION_CREATE_INFO };
         actionInfo.actionType = actionType;
-        strncpy_s(actionInfo.actionName, id, XR_MAX_ACTION_NAME_SIZE-1);
-        strncpy_s(actionInfo.localizedActionName, name, XR_MAX_LOCALIZED_ACTION_NAME_SIZE-1);
+        CopyFixedString(actionInfo.actionName, id);
+        CopyFixedString(actionInfo.localizedActionName, name);
         actionInfo.countSubactionPaths = (uint32_t)m_handPaths.size();
         actionInfo.subactionPaths = m_handPaths.data();
-        checkXRResult(xrCreateAction(actionSet, &actionInfo, &action), std::format("Failed to create action for {}", id).c_str());
+        checkXRResult(xrCreateAction(actionSet, &actionInfo, &action), fmt::format("Failed to create action for {}", id).c_str());
     };
 
     {
         XrActionSetCreateInfo actionSetInfo = { XR_TYPE_ACTION_SET_CREATE_INFO };
-        strcpy_s(actionSetInfo.actionSetName, "gameplay_fps");
-        strcpy_s(actionSetInfo.localizedActionSetName, "Gameplay");
+        CopyFixedString(actionSetInfo.actionSetName, "gameplay_fps");
+        CopyFixedString(actionSetInfo.localizedActionSetName, "Gameplay");
         actionSetInfo.priority = 0;
         checkXRResult(xrCreateActionSet(m_instance, &actionSetInfo, &m_gameplayActionSet), "Failed to create controller actions for gameplay_fps!");
 
@@ -373,8 +579,8 @@ void OpenXR::CreateActions() {
 
     {
         XrActionSetCreateInfo actionSetInfo = { XR_TYPE_ACTION_SET_CREATE_INFO };
-        strcpy_s(actionSetInfo.actionSetName, "menu");
-        strcpy_s(actionSetInfo.localizedActionSetName, "Menu Navigation");
+        CopyFixedString(actionSetInfo.actionSetName, "menu");
+        CopyFixedString(actionSetInfo.localizedActionSetName, "Menu Navigation");
         actionSetInfo.priority = 0;
         checkXRResult(xrCreateActionSet(m_instance, &actionSetInfo, &m_menuActionSet), "Failed to create controller bindings for the menu!");
 
@@ -430,8 +636,25 @@ void OpenXR::CreateActions() {
         SuggestControllerBindings(m_instance, bindings, m_capabilities.supportsPicoController, m_capabilities.supportsPicoUltraController, m_capabilities.supportsCosmosController, m_capabilities.supportsHPMixedRealityController);
     }
 
+    std::vector actionSets = { m_gameplayActionSet, m_menuActionSet };
+    if (m_capabilities.supportsEyeGaze) {
+        XrActionSetCreateInfo actionSetInfo = { XR_TYPE_ACTION_SET_CREATE_INFO };
+        CopyFixedString(actionSetInfo.actionSetName, "eye_gaze");
+        CopyFixedString(actionSetInfo.localizedActionSetName, "Eye Tracking");
+        checkXRResult(xrCreateActionSet(m_instance, &actionSetInfo, &m_eyeGazeActionSet), "Failed to create the eye tracking actions!");
+
+        XrActionCreateInfo actionInfo = { XR_TYPE_ACTION_CREATE_INFO };
+        actionInfo.actionType = XR_ACTION_TYPE_POSE_INPUT;
+        CopyFixedString(actionInfo.actionName, "gaze");
+        CopyFixedString(actionInfo.localizedActionName, "Eye Gaze");
+        checkXRResult(xrCreateAction(m_eyeGazeActionSet, &actionInfo, &m_eyeGazeAction), "Failed to create action for eye gaze");
+
+        const XrActionSuggestedBinding gazeBinding = { m_eyeGazeAction, GetXRPath("/user/eyes_ext/input/gaze_ext/pose") };
+        SuggestProfileBindings(m_instance, "/interaction_profiles/ext/eye_gaze_interaction", &gazeBinding, 1, false);
+        actionSets.emplace_back(m_eyeGazeActionSet);
+    }
+
     XrSessionActionSetsAttachInfo attachInfo = { XR_TYPE_SESSION_ACTION_SETS_ATTACH_INFO };
-    std::array actionSets = { m_gameplayActionSet, m_menuActionSet };
     attachInfo.countActionSets = (uint32_t)actionSets.size();
     attachInfo.actionSets = actionSets.data();
     checkXRResult(xrAttachSessionActionSets(m_session, &attachInfo), "Failed to attach action sets to session!");
@@ -458,68 +681,34 @@ void OpenXR::CreateActions() {
         checkXRResult(xrCreateActionSpace(m_session, &createInfo, &m_inMenuAimSpaces[side]), "Failed to create action space for menu aim pose!");
     }
 
-    // initialize rumble manager
+    if (m_eyeGazeAction != XR_NULL_HANDLE) {
+        XrActionSpaceCreateInfo createInfo = { XR_TYPE_ACTION_SPACE_CREATE_INFO };
+        createInfo.action = m_eyeGazeAction;
+        createInfo.poseInActionSpace = s_xrIdentityPose;
+        checkXRResult(xrCreateActionSpace(m_session, &createInfo, &m_eyeGazeSpace), "Failed to create action space for eye gaze!");
+    }
+
     m_rumbleManager = std::make_unique<RumbleManager>(m_session, m_rumbleAction);
     m_rumbleManager.get()->initializeXrPathsAndStartTime(m_instance);
 
     m_capabilities.activeControllerType = DetectActiveControllerType(m_instance, m_session);
 }
 
-void CheckButtonState(bool buttonPressed, ButtonState& buttonState) {
-    buttonState.resetFrameFlags();
-    
-    constexpr std::chrono::milliseconds longPressThreshold{ 250 };
-    const bool down = buttonPressed;
-    const auto now = std::chrono::steady_clock::now();
-    
-    // Rising edge - button just pressed
-    if (down && !buttonState.wasDownLastFrame) {
-        buttonState.pressStartTime = now;
-    }
-    
-    // Pressed state - check for long press threshold
-    if (down) {
-        auto pressDuration = now - buttonState.pressStartTime;
-        
-        if (pressDuration >= longPressThreshold) {
-            buttonState.lastEvent = ButtonState::Event::LongPress;
-            buttonState.longFired = true;
-            if (!buttonState.longFired_stillPressed) {
-                buttonState.longFired_stillPressed = true;
-                buttonState.longFired_actedUpon = true;
-            }
-        }
-    }
-    else {
-        buttonState.longFired_stillPressed = false;
-        buttonState.longFired_actedUpon = false;
-    }
-    
-    // Falling edge - button just released
-    if (!down && buttonState.wasDownLastFrame) {
-        // Only register short press if long press didn't fire
-        if (!buttonState.longFired) {
-            buttonState.lastEvent = ButtonState::Event::ShortPress;
-        }
-        else
-            buttonState.longFired = false; // reset long press fired flag
-    }
-    
-    // Store current state for next frame
-    buttonState.wasDownLastFrame = down;
-}
-
-std::optional<OpenXR::InputState> OpenXR::UpdateActions(XrTime predictedFrameTime, glm::fquat controllerRotation, bool inMenu) {
+std::optional<OpenXR::InputState> OpenXR::UpdateActions(XrTime predictedFrameTime, bool inMenu) {
     BetterVRProfiler::Scope profile(BetterVRProfiler::Section::XRUpdateActions);
 
-    XrActiveActionSet activeActionSet = { (inMenu ? m_menuActionSet : m_gameplayActionSet), XR_NULL_PATH };
+    const std::array activeActionSets = {
+        XrActiveActionSet{ inMenu ? m_menuActionSet : m_gameplayActionSet, XR_NULL_PATH },
+        XrActiveActionSet{ m_eyeGazeActionSet, XR_NULL_PATH }
+    };
 
     XrActionsSyncInfo syncInfo = { XR_TYPE_ACTIONS_SYNC_INFO };
-    syncInfo.countActiveActionSets = 1;
-    syncInfo.activeActionSets = &activeActionSet;
+    syncInfo.countActiveActionSets = m_eyeGazeActionSet != XR_NULL_HANDLE ? 2 : 1;
+    syncInfo.activeActionSets = activeActionSets.data();
     checkXRResult(xrSyncActions(m_session, &syncInfo), "Failed to sync actions!");
 
-    InputState newState = m_input.load();
+
+    InputState newState = {};
     newState.shared.in_game = !inMenu;
     newState.shared.inputTime = predictedFrameTime;
 
@@ -543,22 +732,22 @@ std::optional<OpenXR::InputState> OpenXR::UpdateActions(XrTime predictedFrameTim
             XrSpaceVelocity spaceVelocity = { XR_TYPE_SPACE_VELOCITY };
             if (outVelocity != nullptr) {
                 spaceLocation.next = &spaceVelocity;
-                outVelocity->linearVelocity = { 0.0f, 0.0f, 0.0f };
-                outVelocity->angularVelocity = { 0.0f, 0.0f, 0.0f };
+                *outVelocity = { XR_TYPE_SPACE_VELOCITY };
             }
 
             checkXRResult(xrLocateSpace(handSpace, m_stageSpace, predictedFrameTime, &spaceLocation), "Failed to get location from controllers!");
             if ((spaceLocation.locationFlags & XR_SPACE_LOCATION_POSITION_VALID_BIT) != 0 && (spaceLocation.locationFlags & XR_SPACE_LOCATION_ORIENTATION_VALID_BIT) != 0) {
                 outLocation = spaceLocation;
+                outLocation.next = nullptr;
 
-                if (outVelocity != nullptr && (spaceLocation.locationFlags & XR_SPACE_VELOCITY_LINEAR_VALID_BIT) != 0 && (spaceLocation.locationFlags & XR_SPACE_VELOCITY_ANGULAR_VALID_BIT) != 0) {
+                if (outVelocity != nullptr) {
                     // rotate angular velocity to world space when it's using a buggy runtime
                     auto mode = GetSettings().AngularVelocityFixer_GetMode();
                     bool isUsingQuestRuntime = m_capabilities.isOculusLinkRuntime;
-                    if ((mode == AngularVelocityFixerMode::AUTO && isUsingQuestRuntime) || mode == AngularVelocityFixerMode::FORCED_ON) {
+                    if ((spaceVelocity.velocityFlags & XR_SPACE_VELOCITY_ANGULAR_VALID_BIT) != 0 && ((mode == AngularVelocityFixerMode::AUTO && isUsingQuestRuntime) || mode == AngularVelocityFixerMode::FORCED_ON)) {
                         glm::vec3 angularVelocity = ToGLM(spaceVelocity.angularVelocity);
                         glm::fquat fix_angle = glm::fquat(0.924, -0.383, 0, 0);
-                        angularVelocity = (ToGLM(spaceLocation.pose.orientation) * (fix_angle * angularVelocity)); // TODO: Contact other modders for similar issues with angular velocity being not on the grip rotation (quest 2) + Tune the angular velocity based on manually calculated on rotation positions
+                        angularVelocity = (ToGLM(spaceLocation.pose.orientation) * (fix_angle * angularVelocity));
                         spaceVelocity.angularVelocity = { angularVelocity.x, angularVelocity.y, angularVelocity.z };
                     }
 
@@ -585,100 +774,39 @@ std::optional<OpenXR::InputState> OpenXR::UpdateActions(XrTime predictedFrameTim
             "Failed to get aim pose of controller!"
         );
     }
-    // update shared actions
-    XrActionStateGetInfo getInventoryMapInfo = { XR_TYPE_ACTION_STATE_GET_INFO };
-    getInventoryMapInfo.action = newState.shared.in_game ? m_inGame_inventory_mapAction : m_inMenu_inventory_mapAction;
-    getInventoryMapInfo.subactionPath = XR_NULL_PATH;
-    auto& inventory_mapAction = newState.shared.inventory_map;
-    inventory_mapAction = { XR_TYPE_ACTION_STATE_BOOLEAN };
-    checkXRResult(xrGetActionStateBoolean(m_session, &getInventoryMapInfo, &inventory_mapAction), "Failed to get inventory_help action value!");
+    // each action is read from the controller given, or from the other one when a rebinding left nothing for it on the first
+    auto readAction = [&](XrAction action, EyeSide controller, auto& state, XrStructureType type, auto getActionState, const char* errorContext) {
+        for (EyeSide source : { controller, (EyeSide)(1 - controller) }) {
+            XrActionStateGetInfo getInfo = { XR_TYPE_ACTION_STATE_GET_INFO };
+            getInfo.action = action;
+            getInfo.subactionPath = m_handPaths[source];
+            state = { type };
+            checkXRResult(getActionState(m_session, &getInfo, &state), errorContext);
+            if (state.isActive)
+                return;
+        }
+    };
+    auto readBoolean = [&](XrAction action, EyeSide hand, XrActionStateBoolean& state, const char* errorContext) {
+        readAction(action, hand, state, XR_TYPE_ACTION_STATE_BOOLEAN, xrGetActionStateBoolean, errorContext);
+    };
+    auto readVector2f = [&](XrAction action, EyeSide hand, XrActionStateVector2f& state, const char* errorContext) {
+        readAction(action, hand, state, XR_TYPE_ACTION_STATE_VECTOR2F, xrGetActionStateVector2f, errorContext);
+    };
 
-    auto& inventory_mapButtonState = newState.shared.inventory_mapState;
-    if (inventory_mapAction.isActive == XR_TRUE) {
-        auto buttonPressed = inventory_mapAction.currentState == XR_TRUE;
-        CheckButtonState(buttonPressed, inventory_mapButtonState); 
-    }
+    readBoolean(newState.shared.in_game ? m_inGame_inventory_mapAction : m_inMenu_inventory_mapAction, EyeSide::RIGHT, newState.shared.inventory_map, "Failed to get inventory_help action value!");
+    readBoolean(newState.shared.in_game ? m_inGame_modMenuAction : m_inMenu_modMenuAction, EyeSide::LEFT, newState.shared.modMenu, "Failed to get mod menu action value!");
 
-    XrActionStateGetInfo getModMenuInfo = { XR_TYPE_ACTION_STATE_GET_INFO };
-    getModMenuInfo.action = newState.shared.in_game ? m_inGame_modMenuAction : m_inMenu_modMenuAction;
-    getModMenuInfo.subactionPath = XR_NULL_PATH;
-    auto& modMenuAction = newState.shared.modMenu;
-    modMenuAction = { XR_TYPE_ACTION_STATE_BOOLEAN };
-    checkXRResult(xrGetActionStateBoolean(m_session, &getModMenuInfo, &modMenuAction), "Failed to get mod menu action value!");
-
-    auto& modMenuButtonState = newState.shared.modMenuState;
-    if (modMenuAction.isActive == XR_TRUE) {
-        auto buttonPressed = modMenuAction.currentState == XR_TRUE;
-        CheckButtonState(buttonPressed, modMenuButtonState);
-    }
-
-    // update in-menu or in-game actions
     if (inMenu) {
-        XrActionStateGetInfo getScrollInfo = { XR_TYPE_ACTION_STATE_GET_INFO };
-        getScrollInfo.action = m_scrollAction;
-        newState.inMenu.scroll = { XR_TYPE_ACTION_STATE_VECTOR2F };
-        checkXRResult(xrGetActionStateVector2f(m_session, &getScrollInfo, &newState.inMenu.scroll), "Failed to get navigate action value!");
-
-        XrActionStateGetInfo getNavigationInfo = { XR_TYPE_ACTION_STATE_GET_INFO };
-        getNavigationInfo.action = m_navigateAction;
-        newState.inMenu.navigate = { XR_TYPE_ACTION_STATE_VECTOR2F };
-        checkXRResult(xrGetActionStateVector2f(m_session, &getNavigationInfo, &newState.inMenu.navigate), "Failed to get select action value!");
-
-        XrActionStateGetInfo getSelectInfo = { XR_TYPE_ACTION_STATE_GET_INFO };
-        getSelectInfo.action = m_selectAction;
-        newState.inMenu.select = { XR_TYPE_ACTION_STATE_BOOLEAN };
-        checkXRResult(xrGetActionStateBoolean(m_session, &getSelectInfo, &newState.inMenu.select), "Failed to get select action value!");
-
-        XrActionStateGetInfo getBackInfo = { XR_TYPE_ACTION_STATE_GET_INFO };
-        getBackInfo.action = m_backAction;
-        newState.inMenu.back = { XR_TYPE_ACTION_STATE_BOOLEAN };
-        checkXRResult(xrGetActionStateBoolean(m_session, &getBackInfo, &newState.inMenu.back), "Failed to get back action value!");
-
-        XrActionStateGetInfo getSortInfo = { XR_TYPE_ACTION_STATE_GET_INFO };
-        getSortInfo.action = m_sortAction;
-        newState.inMenu.sort = { XR_TYPE_ACTION_STATE_BOOLEAN };
-        checkXRResult(xrGetActionStateBoolean(m_session, &getSortInfo, &newState.inMenu.sort), "Failed to get sort action value!");
-
-        XrActionStateGetInfo getHoldInfo = { XR_TYPE_ACTION_STATE_GET_INFO };
-        getHoldInfo.action = m_holdAction;
-        newState.inMenu.hold = { XR_TYPE_ACTION_STATE_BOOLEAN };
-        checkXRResult(xrGetActionStateBoolean(m_session, &getHoldInfo, &newState.inMenu.hold), "Failed to get hold action value!");
-
-        auto& holdButtonState = newState.inMenu.holdState;
-        if (newState.inMenu.hold.isActive == XR_TRUE) {
-            auto buttonPressed = newState.inMenu.hold.currentState == XR_TRUE;
-            CheckButtonState(buttonPressed, holdButtonState);
-        }
-
-        XrActionStateGetInfo getLeftGripInfo = { XR_TYPE_ACTION_STATE_GET_INFO };
-        getLeftGripInfo.action = m_leftGripAction;
-        newState.inMenu.leftGrip = { XR_TYPE_ACTION_STATE_BOOLEAN };
-        checkXRResult(xrGetActionStateBoolean(m_session, &getLeftGripInfo, &newState.inMenu.leftGrip), "Failed to get left grip action value!");
-
-        if (newState.inMenu.leftGrip.currentState == XR_TRUE) {
-            newState.shared.lastPickupSide = OpenXR::EyeSide::LEFT;
-        }
-
-        XrActionStateGetInfo getRightGripInfo = { XR_TYPE_ACTION_STATE_GET_INFO };
-        getRightGripInfo.action = m_rightGripAction;
-        newState.inMenu.rightGrip = { XR_TYPE_ACTION_STATE_BOOLEAN };
-        checkXRResult(xrGetActionStateBoolean(m_session, &getRightGripInfo, &newState.inMenu.rightGrip), "Failed to get right grip action value!");
-
-        if (newState.inMenu.rightGrip.currentState == XR_TRUE) {
-            newState.shared.lastPickupSide = OpenXR::EyeSide::RIGHT;
-        }
-
-        XrActionStateGetInfo getLeftTriggerInfo = { XR_TYPE_ACTION_STATE_GET_INFO };
-        getLeftTriggerInfo.action = m_leftTriggerAction;
-        getLeftTriggerInfo.subactionPath = XR_NULL_PATH;
-        newState.inMenu.leftTrigger = { XR_TYPE_ACTION_STATE_BOOLEAN };
-        checkXRResult(xrGetActionStateBoolean(m_session, &getLeftTriggerInfo, &newState.inMenu.leftTrigger), "Failed to get left trigger action value!");
-
-        XrActionStateGetInfo getRightTriggerInfo = { XR_TYPE_ACTION_STATE_GET_INFO };
-        getRightTriggerInfo.action = m_rightTriggerAction;
-        getRightTriggerInfo.subactionPath = XR_NULL_PATH;
-        newState.inMenu.rightTrigger = { XR_TYPE_ACTION_STATE_BOOLEAN };
-        checkXRResult(xrGetActionStateBoolean(m_session, &getRightTriggerInfo, &newState.inMenu.rightTrigger), "Failed to get right trigger action value!");
+        readVector2f(m_scrollAction, EyeSide::RIGHT, newState.inMenu.scroll, "Failed to get navigate action value!");
+        readVector2f(m_navigateAction, EyeSide::LEFT, newState.inMenu.navigate, "Failed to get select action value!");
+        readBoolean(m_selectAction, EyeSide::RIGHT, newState.inMenu.select, "Failed to get select action value!");
+        readBoolean(m_backAction, EyeSide::RIGHT, newState.inMenu.back, "Failed to get back action value!");
+        readBoolean(m_sortAction, EyeSide::LEFT, newState.inMenu.sort, "Failed to get sort action value!");
+        readBoolean(m_holdAction, EyeSide::LEFT, newState.inMenu.hold, "Failed to get hold action value!");
+        readBoolean(m_leftGripAction, EyeSide::LEFT, newState.inMenu.leftGrip, "Failed to get left grip action value!");
+        readBoolean(m_rightGripAction, EyeSide::RIGHT, newState.inMenu.rightGrip, "Failed to get right grip action value!");
+        readAction(m_leftTriggerAction, EyeSide::LEFT, newState.inMenu.leftTrigger, XR_TYPE_ACTION_STATE_BOOLEAN, xrGetActionStateBoolean, "Failed to get left trigger action value!");
+        readAction(m_rightTriggerAction, EyeSide::RIGHT, newState.inMenu.rightTrigger, XR_TYPE_ACTION_STATE_BOOLEAN, xrGetActionStateBoolean, "Failed to get right trigger action value!");
     }
     else {
         for (EyeSide side : { EyeSide::LEFT, EyeSide::RIGHT }) {
@@ -687,82 +815,37 @@ std::optional<OpenXR::InputState> OpenXR::UpdateActions(XrTime predictedFrameTim
             getGrabInfo.subactionPath = m_handPaths[side];
             newState.inGame.grab[side] = { XR_TYPE_ACTION_STATE_FLOAT };
             checkXRResult(xrGetActionStateFloat(m_session, &getGrabInfo, &newState.inGame.grab[side]), "Failed to get grab action value!");
-
-            auto& buttonState = newState.inGame.grabState[side];
-            if (newState.inGame.grab[side].isActive == XR_TRUE) {
-                auto buttonPressed = newState.inGame.grab[side].currentState > 0.51f;
-                CheckButtonState(buttonPressed, buttonState);
-            }
         }
 
-        XrActionStateGetInfo getCrouchScopeInfo = { XR_TYPE_ACTION_STATE_GET_INFO };
-        getCrouchScopeInfo.action = m_crouch_scopeAction;
-        getCrouchScopeInfo.subactionPath = XR_NULL_PATH;
-        newState.inGame.crouch_scope = { XR_TYPE_ACTION_STATE_BOOLEAN };
-        checkXRResult(xrGetActionStateBoolean(m_session, &getCrouchScopeInfo, &newState.inGame.crouch_scope), "Failed to get crouch and map action value!");
-
-        auto& crouch_scopeButtonState = newState.inGame.crouch_scopeState;
-        if (newState.inGame.crouch_scope.isActive == XR_TRUE) {
-            auto buttonPressed = newState.inGame.crouch_scope.currentState == XR_TRUE;
-            CheckButtonState(buttonPressed, crouch_scopeButtonState);
-        }
-
-        XrActionStateGetInfo getMoveInfo = { XR_TYPE_ACTION_STATE_GET_INFO };
-        getMoveInfo.action = m_moveAction;
-        newState.inGame.move = { XR_TYPE_ACTION_STATE_VECTOR2F };
-        checkXRResult(xrGetActionStateVector2f(m_session, &getMoveInfo, &newState.inGame.move), "Failed to get move action value!");
-
-        XrActionStateGetInfo getCameraInfo = { XR_TYPE_ACTION_STATE_GET_INFO };
-        getCameraInfo.action = m_cameraAction;
-        newState.inGame.camera = { XR_TYPE_ACTION_STATE_VECTOR2F };
-        checkXRResult(xrGetActionStateVector2f(m_session, &getCameraInfo, &newState.inGame.camera), "Failed to get camera action value!");
-
-        XrActionStateGetInfo getJumpInfo = { XR_TYPE_ACTION_STATE_GET_INFO };
-        getJumpInfo.action = m_jumpAction;
-        getJumpInfo.subactionPath = XR_NULL_PATH;
-        newState.inGame.jump_cancel = { XR_TYPE_ACTION_STATE_BOOLEAN };
-        checkXRResult(xrGetActionStateBoolean(m_session, &getJumpInfo, &newState.inGame.jump_cancel), "Failed to get jump action value!");
-
-        XrActionStateGetInfo getRunInfo = { XR_TYPE_ACTION_STATE_GET_INFO };
-        getRunInfo.action = m_run_interactAction;
-        getRunInfo.subactionPath = XR_NULL_PATH;
-        newState.inGame.run_interact = { XR_TYPE_ACTION_STATE_BOOLEAN };
-        checkXRResult(xrGetActionStateBoolean(m_session, &getRunInfo, &newState.inGame.run_interact), "Failed to get run action value!");
-
-        auto& runButtonState = newState.inGame.runState;
-        if (newState.inGame.run_interact.isActive == XR_TRUE) {
-            auto buttonPressed = newState.inGame.run_interact.currentState == XR_TRUE;
-            CheckButtonState(buttonPressed, runButtonState);
-        }
-
-        XrActionStateGetInfo getUseRuneInfo = { XR_TYPE_ACTION_STATE_GET_INFO };
-        getUseRuneInfo.action = m_useRune_dpadMenu_Action;
-        getUseRuneInfo.subactionPath = XR_NULL_PATH;
-        newState.inGame.useRune_dpadMenu = { XR_TYPE_ACTION_STATE_BOOLEAN };
-        checkXRResult(xrGetActionStateBoolean(m_session, &getUseRuneInfo, &newState.inGame.useRune_dpadMenu), "Failed to get use rune action value!");
-
-        auto& useRuneButtonState = newState.inGame.useRune_runeMenuState;
-        if (newState.inGame.useRune_dpadMenu.isActive == XR_TRUE) {
-            auto buttonPressed = newState.inGame.useRune_dpadMenu.currentState == XR_TRUE;
-            CheckButtonState(buttonPressed, useRuneButtonState);
-        }
-
-        XrActionStateGetInfo getUseRightItemInfo = { XR_TYPE_ACTION_STATE_GET_INFO };
-        getUseRightItemInfo.action = m_useRightItemAction;
-        getUseRightItemInfo.subactionPath = XR_NULL_PATH;
-        newState.inGame.useRightItem = { XR_TYPE_ACTION_STATE_BOOLEAN };
-        checkXRResult(xrGetActionStateBoolean(m_session, &getUseRightItemInfo, &newState.inGame.useRightItem), "Failed to get useRightItem action value!");
-
-        XrActionStateGetInfo getUseLeftItemInfo = { XR_TYPE_ACTION_STATE_GET_INFO };
-        getUseLeftItemInfo.action = m_useLeftItemAction;
-        getUseLeftItemInfo.subactionPath = XR_NULL_PATH;
-        newState.inGame.useLeftItem = { XR_TYPE_ACTION_STATE_BOOLEAN };
-        checkXRResult(xrGetActionStateBoolean(m_session, &getUseLeftItemInfo, &newState.inGame.useLeftItem), "Failed to get useLeftItem action value!");
+        readBoolean(m_crouch_scopeAction, EyeSide::LEFT, newState.inGame.crouch_scope, "Failed to get crouch and map action value!");
+        readVector2f(m_moveAction, EyeSide::LEFT, newState.inGame.move, "Failed to get move action value!");
+        readVector2f(m_cameraAction, EyeSide::RIGHT, newState.inGame.camera, "Failed to get camera action value!");
+        readBoolean(m_jumpAction, EyeSide::RIGHT, newState.inGame.jump_cancel, "Failed to get jump action value!");
+        readBoolean(m_run_interactAction, EyeSide::RIGHT, newState.inGame.run_interact, "Failed to get run action value!");
+        readBoolean(m_useRune_dpadMenu_Action, EyeSide::LEFT, newState.inGame.useRune_dpadMenu, "Failed to get use rune action value!");
+        readBoolean(m_useRightItemAction, EyeSide::RIGHT, newState.inGame.useRightItem, "Failed to get useRightItem action value!");
+        readBoolean(m_useLeftItemAction, EyeSide::LEFT, newState.inGame.useLeftItem, "Failed to get useLeftItem action value!");
     }
     this->m_input.store(newState);
     return newState;
 }
 
+std::optional<glm::fvec3> OpenXR::LocateEyeGaze(XrTime predictedDisplayTime) const {
+    if (m_eyeGazeSpace == XR_NULL_HANDLE) {
+        return std::nullopt;
+    }
+
+    XrSpaceLocation gazeLocation = { XR_TYPE_SPACE_LOCATION };
+    if (XR_FAILED(xrLocateSpace(m_eyeGazeSpace, m_stageSpace, predictedDisplayTime, &gazeLocation))) {
+        return std::nullopt;
+    }
+    // some runtimes keep the last gaze valid after losing track of the eyes
+    constexpr XrSpaceLocationFlags tracked = XR_SPACE_LOCATION_ORIENTATION_VALID_BIT | XR_SPACE_LOCATION_ORIENTATION_TRACKED_BIT;
+    if ((gazeLocation.locationFlags & tracked) != tracked) {
+        return std::nullopt;
+    }
+    return ToGLM(gazeLocation.pose.orientation) * glm::fvec3(0.0f, 0.0f, -1.0f);
+}
 
 std::optional<XrSpaceLocation> OpenXR::UpdateSpaces(XrTime predictedDisplayTime) {
     BetterVRProfiler::Scope profile(BetterVRProfiler::Section::XRUpdateSpaces);
@@ -813,10 +896,7 @@ void OpenXR::ProcessEvents() {
                 break;
             case XR_SESSION_STATE_EXITING:
                 Log::print<VERBOSE>("OpenXR has indicated that the session should be destroyed!");
-                // an exception is thrown here instead of using exit() to allow Cemu to ideally gracefully shutdown
-                //throw std::runtime_error("BetterVR mod has been requested to exit by OpenXR!");
-                //this->m_renderer.reset();
-                PostMessage(CemuHooks::m_cemuTopWindow, WM_CLOSE, 0, 0);
+                HostWindow::RequestShutdown();
                 break;
             case XR_SESSION_STATE_LOSS_PENDING:
                 Log::print<VERBOSE>("OpenXR has indicated that the session is going to be lost!");

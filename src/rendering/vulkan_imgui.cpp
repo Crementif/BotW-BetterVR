@@ -1,20 +1,40 @@
 #include "pch.h"
 
 #include "vulkan.h"
-#include "hooking/cemu_hooks.h"
-#include "hooking/imgui_menus.h"
+#include "game/game.h"
+#include "cemu/host_window.h"
+#include "rendering/imgui_menus.h"
 #include "instance.h"
 #include "utils/vulkan_utils.h"
 #include "utils/mod_settings.h"
+#include "imgui_internal.h"
 
 #undef __cpuid
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
-// include font and assets
 #include "imgui_assets.h"
 #include "font_kenney.h"
 #include "font_roboto.h"
+
+using namespace BetterVRImGui;
+
+// Cemu sets its own ImGui context before drawing its overlays, so ours has to be set every time
+class ScopedImGuiContext {
+public:
+    explicit ScopedImGuiContext(ImGuiContext* context): m_previous(ImGui::GetCurrentContext()) {
+        ImGui::SetCurrentContext(context);
+    }
+    ~ScopedImGuiContext() {
+        ImGui::SetCurrentContext(m_previous);
+    }
+
+    ScopedImGuiContext(const ScopedImGuiContext&) = delete;
+    void operator=(const ScopedImGuiContext&) = delete;
+
+private:
+    ImGuiContext* m_previous;
+};
 
 
 struct ExtraMenuGlyph {
@@ -33,9 +53,15 @@ static const ExtraMenuGlyph kExtraMenuGlyphs[] = {
     { (ImWchar)ICON_KI_PATREON_CODEPOINT, patreon_glyph_body, patreon_glyph_title },
 };
 
-static bool OpenLinkInShell(ImGuiContext*, const char* url) {
-    ImGuiMenus::OpenLinkInBrowser(url);
-    return true;
+// ImGui times key repeat and navigation by DeltaTime, which otherwise stays at its 1/60 default
+static void BeginImGuiFrame() {
+    static std::chrono::steady_clock::time_point s_lastFrame = std::chrono::steady_clock::now();
+    const std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
+    ImGui::GetIO().DeltaTime = std::clamp(std::chrono::duration<float>(now - s_lastFrame).count(), 0.0001f, 0.25f);
+    s_lastFrame = now;
+
+    ImGui_ImplVulkan_NewFrame();
+    ImGui::NewFrame();
 }
 
 static void FillCustomGlyphRect(ImFontAtlas* atlas, int rectIndex, const unsigned char* alphaPixels) {
@@ -58,12 +84,13 @@ static void FillCustomGlyphRect(ImFontAtlas* atlas, int rectIndex, const unsigne
 }
 
 RND_Renderer::ImGuiOverlay::ImGuiOverlay(VkCommandBuffer cb, VkExtent2D fbRes, VkFormat fbFormat): m_outputRes(fbRes) {
-    ImGui::CreateContext();
-    ImGui::GetPlatformIO().Platform_OpenInShellFn = &OpenLinkInShell;
-    Log::print<INFO>("Installed the ImGui link handler, links in the mod menu can open a browser");
-    ImGui::GetIO().IniFilename = "BetterVR_settings.ini";
+    m_context = ImGui::CreateContext();
+    ScopedImGuiContext imguiContext(m_context);
+    // ImGui keeps the pointer, so the path has to outlive the context
+    static const std::string s_iniPath = (CemuHost::GetUserDataPath() / "BetterVR_settings.ini").string();
+    ImGui::GetIO().IniFilename = s_iniPath.c_str();
     InitSettings();
-    ImGui::LoadIniSettingsFromDisk("BetterVR_settings.ini");
+    ImGui::LoadIniSettingsFromDisk(s_iniPath.c_str());
     ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
 
     ImFontConfig fontCfg{};
@@ -117,8 +144,8 @@ RND_Renderer::ImGuiOverlay::ImGuiOverlay(VkCommandBuffer cb, VkExtent2D fbRes, V
     ImGui::GetIO().BackendFlags |= ImGuiBackendFlags_HasGamepad;
     ImPlot::CreateContext();
 
-    VkQueue queue = nullptr;
-    VRManager::instance().VK->GetDeviceDispatch()->GetDeviceQueue(VRManager::instance().VK->GetDevice(), 0, 0, &queue);
+    // ImGui submits its font upload itself, so it gets the mod's own queue
+    RND_VkBackend* backend = VRManager::instance().Backend.get();
 
     VkDescriptorPoolSize poolSizes[] = {
         { VK_DESCRIPTOR_TYPE_SAMPLER, 1000 },
@@ -143,7 +170,6 @@ RND_Renderer::ImGuiOverlay::ImGuiOverlay(VkCommandBuffer cb, VkExtent2D fbRes, V
     };
     checkVkResult(VRManager::instance().VK->GetDeviceDispatch()->CreateDescriptorPool(VRManager::instance().VK->GetDevice(), &poolInfo, nullptr, &m_descriptorPool), "Failed to create descriptor pool for ImGui");
 
-    // create render pass to render imgui to a texture which we'll copy to the swapchain
     VkAttachmentDescription colorAttachment = {
         .format = fbFormat,
         .samples = VK_SAMPLE_COUNT_1_BIT,
@@ -187,10 +213,8 @@ RND_Renderer::ImGuiOverlay::ImGuiOverlay(VkCommandBuffer cb, VkExtent2D fbRes, V
     };
     checkVkResult(VRManager::instance().VK->GetDeviceDispatch()->CreateRenderPass(VRManager::instance().VK->GetDevice(), &renderPassInfo, nullptr, &m_renderPass), "Failed to create render pass for ImGui");
 
-    // // initialize imgui for vulkan
     ImGui::GetIO().DisplaySize = ImVec2((float)fbRes.width, (float)fbRes.height);
 
-    // load vulkan functions
     checkAssert(ImGui_ImplVulkan_LoadFunctions(VRManager::instance().vkVersion, [](const char* funcName, void* data_queue) {
         VkInstance instance = VRManager::instance().VK->GetInstance();
         VkDevice device = VRManager::instance().VK->GetDevice();
@@ -211,8 +235,8 @@ RND_Renderer::ImGuiOverlay::ImGuiOverlay(VkCommandBuffer cb, VkExtent2D fbRes, V
         .Instance = VRManager::instance().VK->GetInstance(),
         .PhysicalDevice = VRManager::instance().VK->GetPhysicalDevice(),
         .Device = VRManager::instance().VK->GetDevice(),
-        .QueueFamily = 0,
-        .Queue = queue,
+        .QueueFamily = backend->GetQueueBinding().familyIndex,
+        .Queue = backend->GetQueue(),
         .DescriptorPool = m_descriptorPool,
         .RenderPass = m_renderPass,
         .MinImageCount = 6,
@@ -235,7 +259,6 @@ RND_Renderer::ImGuiOverlay::ImGuiOverlay(VkCommandBuffer cb, VkExtent2D fbRes, V
     Log::print<VERBOSE>("Initializing font textures for ImGui...");
     ImGui_ImplVulkan_CreateFontsTexture();
 
-    // create sampler
     VkSamplerCreateInfo samplerInfo = { VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
     samplerInfo.magFilter = VK_FILTER_LINEAR;
     samplerInfo.minFilter = VK_FILTER_LINEAR;
@@ -273,18 +296,16 @@ RND_Renderer::ImGuiOverlay::ImGuiOverlay(VkCommandBuffer cb, VkExtent2D fbRes, V
         frame.hudWithoutAlphaFramebufferDS = ImGui_ImplVulkan_AddTexture(m_sampler, frame.hudWithoutAlphaFramebuffer->GetImageView(), VK_IMAGE_LAYOUT_GENERAL);
     }
 
-    // create VulkanTexture
-    auto createHelpImage = [&](stbi_uc const* imageData, int imageSize) {
-        // load png image using stb_image
+    // uploaded on the mod's queue and waited for, so the staging buffers can go right after
+    auto createHelpImage = [&](VkCommandBuffer uploadCb, stbi_uc const* imageData, int imageSize) {
         int width, height, channels;
         unsigned char* img = stbi_load_from_memory(imageData, imageSize, &width, &height, &channels, STBI_rgb_alpha);
 
-        // create VulkanTexture from image data
         HelpImage image;
         image.m_image = new VulkanTexture{ (uint32_t)width, (uint32_t)height, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT };
-        image.m_image->vkTransitionLayout(cb, VK_IMAGE_LAYOUT_GENERAL);
-        image.m_image->vkUpload(cb, img, width * height * 4);
-        image.m_image->vkTransitionLayout(cb, VK_IMAGE_LAYOUT_GENERAL);
+        image.m_image->vkTransitionLayout(uploadCb, VK_IMAGE_LAYOUT_GENERAL);
+        image.m_image->vkUpload(uploadCb, img, width * height * 4);
+        image.m_image->vkTransitionLayout(uploadCb, VK_IMAGE_LAYOUT_GENERAL);
 
         stbi_image_free(img);
 
@@ -292,20 +313,27 @@ RND_Renderer::ImGuiOverlay::ImGuiOverlay(VkCommandBuffer cb, VkExtent2D fbRes, V
         return image;
     };
 
-    // order matches the How To Play pages in the mod menu's sidebar
-    m_helpImages.emplace_back(createHelpImage((stbi_uc const*)controls, sizeof(controls)));
-    m_helpImages.push_back(createHelpImage((stbi_uc const*)equip, sizeof(equip)));
-    m_helpImages.push_back(createHelpImage((stbi_uc const*)swing, sizeof(swing)));
-    m_helpImages.push_back(createHelpImage((stbi_uc const*)whistle_and_magnesis, sizeof(whistle_and_magnesis)));
+    {
+        RND_VkBackend::CommandContext<true> upload(backend, [&](RND_VkBackend::CommandContext<true>* context) {
+            // order matches the How To Play pages in the mod menu's sidebar
+            m_helpImages.emplace_back(createHelpImage(context->GetCommandBuffer(), (stbi_uc const*)controls, sizeof(controls)));
+            m_helpImages.push_back(createHelpImage(context->GetCommandBuffer(), (stbi_uc const*)equip, sizeof(equip)));
+            m_helpImages.push_back(createHelpImage(context->GetCommandBuffer(), (stbi_uc const*)swing, sizeof(swing)));
+            m_helpImages.push_back(createHelpImage(context->GetCommandBuffer(), (stbi_uc const*)whistle_and_magnesis, sizeof(whistle_and_magnesis)));
+        });
+    }
+    for (HelpImage& helpImage : m_helpImages) {
+        helpImage.m_image->vkReleaseStaging();
+    }
 
     VulkanUtils::DebugPipelineBarrier(cb);
 
-    // start the first frame right away
-    ImGui_ImplVulkan_NewFrame();
-    ImGui::NewFrame();
+    BeginImGuiFrame();
 }
 
 RND_Renderer::ImGuiOverlay::~ImGuiOverlay() {
+    ImGuiContext* previousContext = ImGui::GetCurrentContext();
+    ImGui::SetCurrentContext(m_context);
     auto* renderer = VRManager::instance().XR->GetRenderer();
     for (int i = 0; i < 2; ++i) {
         auto& frame = renderer->GetFrame(i);
@@ -339,7 +367,8 @@ RND_Renderer::ImGuiOverlay::~ImGuiOverlay() {
 
     ImGui_ImplVulkan_Shutdown();
     ImPlot::DestroyContext();
-    ImGui::DestroyContext();
+    ImGui::DestroyContext(m_context);
+    ImGui::SetCurrentContext(previousContext != m_context ? previousContext : nullptr);
 }
 
 static ImVec4 CalculateCenteredAspectRegion(const ImVec2& bounds, float targetAspect = 16.0f / 9.0f) {
@@ -377,22 +406,17 @@ static void TransformDrawList(ImDrawList* drawList, const ImVec2& scale, const I
 
 void RND_Renderer::ImGuiOverlay::Update() {
     BetterVRProfiler::Scope profile(BetterVRProfiler::Section::ImGuiUpdate);
+    ScopedImGuiContext imguiContext(m_context);
 
     ImGui::GetIO().FontGlobalScale = 1.0f;
     auto& io = ImGui::GetIO();
 
-    POINT p;
-    GetCursorPos(&p);
-    ScreenToClient(CemuHooks::m_cemuRenderWindow, &p);
-
-    RECT rect;
-    GetClientRect(CemuHooks::m_cemuRenderWindow, &rect);
-    uint32_t windowWidth = rect.right - rect.left;
-    uint32_t windowHeight = rect.bottom - rect.top;
+    const HostWindow::Pointer pointer = HostWindow::QueryPointer();
+    uint32_t windowWidth = pointer.available ? pointer.clientWidth : m_outputRes.width;
+    uint32_t windowHeight = pointer.available ? pointer.clientHeight : m_outputRes.height;
 
     float fbAspect = (float)m_outputRes.width / (float)m_outputRes.height;
 
-    // calculate the area within the window that Cemu uses to display the VR framebuffer
     uint32_t renderPhysicalWidth = windowWidth;
     uint32_t renderPhysicalHeight = windowHeight;
     if ((float)windowWidth / (float)windowHeight > fbAspect) {
@@ -423,31 +447,33 @@ void RND_Renderer::ImGuiOverlay::Update() {
     ImVec2 physicalMenuScale = ImVec2(physicalUiRegion.z / logicalRes.x, physicalUiRegion.w / logicalRes.y);
 
     // map desktop cursor input into the centered 16:9 menu region
-    p.x = p.x - blackBarWidth - (LONG)physicalUiRegion.x;
-    p.y = p.y - blackBarHeight - (LONG)physicalUiRegion.y;
+    const int32_t cursorX = pointer.cursorX - (int32_t)blackBarWidth - (int32_t)physicalUiRegion.x;
+    const int32_t cursorY = pointer.cursorY - (int32_t)blackBarHeight - (int32_t)physicalUiRegion.y;
 
-    bool isWindowFocused = CemuHooks::m_cemuTopWindow == GetForegroundWindow();
+    bool isWindowFocused = pointer.focused;
     if (isWindowFocused) {
-        io.AddMousePosEvent((float)p.x / physicalMenuScale.x, (float)p.y / physicalMenuScale.y);
+        io.AddMousePosEvent((float)cursorX / physicalMenuScale.x, (float)cursorY / physicalMenuScale.y);
 
-        io.AddMouseButtonEvent(0, GetAsyncKeyState(VK_LBUTTON) & 0x8000);
-        io.AddMouseButtonEvent(1, GetAsyncKeyState(VK_RBUTTON) & 0x8000);
-        io.AddMouseButtonEvent(2, GetAsyncKeyState(VK_MBUTTON) & 0x8000);
+        io.AddMouseButtonEvent(0, pointer.mouseDown[0]);
+        io.AddMouseButtonEvent(1, pointer.mouseDown[1]);
+        io.AddMouseButtonEvent(2, pointer.mouseDown[2]);
     }
 
-    bool isWindowFocusedAndMenuOpen = isWindowFocused && VRManager::instance().XR->m_isMenuOpen;
+    bool isWindowFocusedAndMenuOpen = isWindowFocused && ImGuiMenus::g_isOpen;
     if (isWindowFocusedAndMenuOpen && GetSettings().IsDebuggingToolsEnabled()) {
-        VRManager::instance().Hooks->m_entityDebugger->UpdateKeyboardControls();
+        VRManager::instance().Debugger->UpdateKeyboardControls();
     }
 }
 
 void RND_Renderer::ImGuiOverlay::Render(long frameIdx, bool renderBackground, bool isDesktopView) {
     BetterVRProfiler::Scope profile(BetterVRProfiler::Section::ImGuiRender);
+    ScopedImGuiContext imguiContext(m_context);
 
     auto* renderer = VRManager::instance().XR->GetRenderer();
     auto& frame = renderer->GetFrame(frameIdx);
 
-    const bool shouldHideGameUIInDesktopView = isDesktopView && CemuHooks::s_recordingOutputMode.load(std::memory_order_relaxed) == 2;
+    const Game::Presentation game = Game::GetPresentation();
+    const bool shouldHideGameUIInDesktopView = isDesktopView && game.recordingOutputMode == 2;
 
     ImVec2 windowSize = ImGui::GetIO().DisplaySize;
     ImDrawList* backgroundDrawList = ImGui::GetBackgroundDrawList();
@@ -491,12 +517,12 @@ void RND_Renderer::ImGuiOverlay::Render(long frameIdx, bool renderBackground, bo
         backgroundDrawList->AddImage((ImTextureID)frame.mainFramebufferDS, bgPos, ImVec2(bgPos.x + bgSize.x, bgPos.y + bgSize.y), uvMin, uvMax);
     };
 
-    if (renderBackground || CemuHooks::UseBlackBarsDuringEvents()) {
-        bool shouldRender3DBackground = VRManager::instance().XR->GetRenderer()->IsRendering3D(frameIdx) || CemuHooks::UseBlackBarsDuringEvents();
-        bool shouldRenderHUDWithAlpha = shouldRender3DBackground && !CemuHooks::UseBlackBarsDuringEvents();
+    const bool useBlackBars = game.blackBars;
+    if (renderBackground || useBlackBars) {
+        bool shouldRender3DBackground = VRManager::instance().XR->GetRenderer()->IsRendering3D(frameIdx) || useBlackBars;
+        bool shouldRenderHUDWithAlpha = shouldRender3DBackground && !useBlackBars;
 
         if (shouldRender3DBackground) {
-            // draw 3d first so the hud can blend on top of it
             renderMainBackground(isDesktopView);
         }
 
@@ -508,21 +534,41 @@ void RND_Renderer::ImGuiOverlay::Render(long frameIdx, bool renderBackground, bo
         renderHUDBackground(VRManager::instance().XR->GetRenderer()->IsRendering3D(frameIdx), false);
     }
 
-    ImGuiMenus::DrawWeaponSensitivityOverlays();
+    Game::DrawDebugWindows();
 
-    if (((renderBackground && GetSettings().performanceOverlay == PerformanceOverlayMode::WINDOW_ONLY) || GetSettings().performanceOverlay == PerformanceOverlayMode::WINDOW_AND_VR || GetSettings().performanceOverlay == PerformanceOverlayMode::WINDOW_AND_VR_WITH_PROFILER) && !VRManager::instance().XR->m_isMenuOpen) {
+    if (((renderBackground && GetSettings().performanceOverlay == PerformanceOverlayMode::WINDOW_ONLY) || GetSettings().performanceOverlay == PerformanceOverlayMode::WINDOW_AND_VR || GetSettings().performanceOverlay == PerformanceOverlayMode::WINDOW_AND_VR_WITH_PROFILER) && !ImGuiMenus::g_isOpen) {
         ImGuiMenus::DrawFPSOverlay(renderer);
     }
 
     DrawHelpMenu();
 }
 
+bool ImGuiMenus::ProcessInputs(OpenXR::InputState& inputs, const VPADStatus& vpadStatus) {
+    RND_Renderer* renderer = VRManager::instance().XR->GetRenderer();
+    if (renderer == nullptr || !renderer->m_imguiOverlay) {
+        return false;
+    }
+
+    renderer->m_imguiOverlay->ProcessInputs(inputs, vpadStatus);
+    return true;
+}
+
+bool ImGuiMenus::BlocksGameInput() {
+    RND_Renderer* renderer = VRManager::instance().XR->GetRenderer();
+    return renderer != nullptr && renderer->m_imguiOverlay && renderer->m_imguiOverlay->WantsKeyboard();
+}
+
+bool RND_Renderer::ImGuiOverlay::WantsKeyboard() const {
+    return m_context->IO.WantCaptureKeyboard;
+}
+
+// runs on the game's CPU thread, so it reads the overlay's context directly instead of making it the current one
 void RND_Renderer::ImGuiOverlay::ProcessInputs(OpenXR::InputState& inputs, const VPADStatus& vpadStatus) {
-    auto& isMenuOpen = VRManager::instance().XR->m_isMenuOpen;
+    auto& isMenuOpen = ImGuiMenus::g_isOpen;
     if (!isMenuOpen)
         return;
 
-    auto& io = ImGui::GetIO();
+    ImGuiIO& io = m_context->IO;
     bool inGame = inputs.shared.in_game;
 
     bool backDown;
@@ -563,9 +609,9 @@ void RND_Renderer::ImGuiOverlay::ProcessInputs(OpenXR::InputState& inputs, const
 
     static bool dpadState[4] = { false };
     static double lastRefireTime[8] = { 0.0 }; // 0-3 Dpad, 4 B, 5 A, 6 LB, 7 RB
-    double currentTime = ImGui::GetTime();
+    double currentTime = m_context->Time;
 
-    // a diagonal stick push would otherwise press both axes at once, and imgui only keeps the vertical one of those
+    // a diagonal push would press both, and imgui only keeps the vertical one
     const float stickX = stick.currentState.x;
     const float stickY = stick.currentState.y;
     const bool horizontalDominates = std::abs(stickX) >= std::abs(stickY);
@@ -610,15 +656,13 @@ void RND_Renderer::ImGuiOverlay::ProcessInputs(OpenXR::InputState& inputs, const
     applyInput(ImGuiKey_GamepadDpadLeft, updateDpadState(2, stickX, horizontalDominates, false) || ((hold & VPAD_BUTTON_LEFT) != 0), HORIZONTAL_REFIRE_DELAY, 2);
     applyInput(ImGuiKey_GamepadDpadRight, updateDpadState(3, stickX, horizontalDominates, true) || ((hold & VPAD_BUTTON_RIGHT) != 0), HORIZONTAL_REFIRE_DELAY, 3);
 
-    // convert B/A to ImGui gamepad face buttons
     applyInput(ImGuiKey_GamepadFaceRight, backDown, VERTICAL_REFIRE_DELAY, 4);
     applyInput(ImGuiKey_GamepadFaceDown, confirmDown, VERTICAL_REFIRE_DELAY, 5);
 
-    // triggers for tab switching
     bool l1 = applyInput(ImGuiKey_GamepadL1, pageLeft || ((hold & VPAD_BUTTON_L) != 0), VERTICAL_REFIRE_DELAY, 6);
     bool r1 = applyInput(ImGuiKey_GamepadR1, pageRight || ((hold & VPAD_BUTTON_R) != 0), VERTICAL_REFIRE_DELAY, 7);
 
-    auto& currPage = VRManager::instance().XR->m_currMenuTab;
+    auto& currPage = ImGuiMenus::g_currentPage;
     if (!ImGuiMenus::IsPageAvailable(currPage)) {
         currPage = ImGuiMenus::PLAYSTYLE_PAGE;
     }
@@ -637,7 +681,7 @@ void RND_Renderer::ImGuiOverlay::ProcessInputs(OpenXR::InputState& inputs, const
     }
 
     // prevent exiting menu if a popup or field is being edited
-    if (ImGui::IsAnyItemActive() && ImGui::IsPopupOpen(NULL, ImGuiPopupFlags_AnyPopupId + ImGuiPopupFlags_AnyPopupLevel)) {
+    if (m_context->ActiveId != 0 && m_context->OpenPopupStack.Size > 0) {
         return;
     }
 
@@ -657,7 +701,7 @@ void RND_Renderer::ImGuiOverlay::ProcessInputs(OpenXR::InputState& inputs, const
     }
 
     if (shouldClose || bPressed) {
-        VRManager::instance().XR->m_isMenuOpen = false;
+        ImGuiMenus::g_isOpen = false;
     }
 }
 
@@ -678,6 +722,7 @@ void RND_Renderer::ImGuiOverlay::DrawHUDLayerAsBackground(VkCommandBuffer cb, Vk
 
 void RND_Renderer::ImGuiOverlay::DrawAndCopyToImage(VkCommandBuffer cb, VkImage destImage, long frameIdx, bool isDesktopView) {
     BetterVRProfiler::Scope profile(BetterVRProfiler::Section::ImGuiDrawAndCopy);
+    ScopedImGuiContext imguiContext(m_context);
 
     ImGui::Render();
 
@@ -705,12 +750,6 @@ void RND_Renderer::ImGuiOverlay::DrawAndCopyToImage(VkCommandBuffer cb, VkImage 
 
     frame.imguiFramebuffer->vkClear(cb, { 0.0f, 0.0f, 0.0f, 0.0f });
 
-    // try to delete the staging buffer of the controller scheme textures if possible
-    for (auto& helpImage : m_helpImages) {
-        helpImage.m_image->vkTryToFinishAnyUploads(cb);
-    }
-
-    // draw imgui to framebuffer
     VkClearValue clearValue = { .color = { 0.0f, 0.0f, 0.0f, 0.0f } };
     VkRenderPassBeginInfo renderPassInfo = {
         .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
@@ -731,12 +770,9 @@ void RND_Renderer::ImGuiOverlay::DrawAndCopyToImage(VkCommandBuffer cb, VkImage 
 
     dispatch->CmdEndRenderPass(cb);
 
-    // copy rendered imgui to destination image
     frame.imguiFramebuffer->vkPipelineBarrier(cb);
     frame.imguiFramebuffer->vkCopyToImage(cb, destImage);
     frame.imguiFramebuffer->vkPipelineBarrier(cb);
 
-    // prepare for next frame immediately
-    ImGui_ImplVulkan_NewFrame();
-    ImGui::NewFrame();
+    BeginImGuiFrame();
 }

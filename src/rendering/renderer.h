@@ -1,13 +1,11 @@
 #pragma once
 
 #include "pch.h"
-#include "d3d12.h"
 #include "openxr.h"
 #include "swapchain.h"
 #include "texture.h"
+#include "vk_backend.h"
 #include "utils/debug_draw.h"
-
-class SharedTexture;
 
 class RND_Renderer {
 public:
@@ -34,11 +32,6 @@ public:
         CaptureIssue_UnexpectedSequence = 1u << 4,
     };
 
-    static constexpr uint32_t CaptureIssue_FatalMask =
-        CaptureIssue_CompetingSource |
-        CaptureIssue_MonoCapture |
-        CaptureIssue_MissingPoseSnapshot;
-
     enum class CaptureRecordKind : uint8_t {
         None,
         HudOnly,
@@ -53,6 +46,10 @@ public:
         uint64_t lastActivityOrdinal = 0;
         uint32_t acceptedCaptureMask = CaptureMask_None;
         uint32_t issueFlags = CaptureIssue_None;
+        bool isMonoCapture = false;
+        // the game skipped its clear to copy the composed scene out, so the HUD was drawn over the whole picture
+        bool hudHoldsScene = false;
+        bool isCorrupted = false;
         std::array<VkImage, 2> acceptedColorImages = { VK_NULL_HANDLE, VK_NULL_HANDLE };
         std::array<VkImage, 2> acceptedDepthImages = { VK_NULL_HANDLE, VK_NULL_HANDLE };
         VkImage acceptedHudImage = VK_NULL_HANDLE;
@@ -67,12 +64,9 @@ public:
         float mainFramebufferAspectRatio = 1.0f;
         RenderUtils::UvTransform mainFramebufferUvTransform = {};
 
-        bool ranMotionAnalysis[2] = { false, false };
 
         bool IsStereoRecord() const { return recordKind == CaptureRecordKind::Stereo3D; }
-        bool IsHudOnlyRecord() const { return recordKind == CaptureRecordKind::HudOnly; }
         bool HasAcceptedCapture(uint32_t captureMask) const { return (acceptedCaptureMask & captureMask) == captureMask; }
-        bool HasFatalIssue() const { return (issueFlags & CaptureIssue_FatalMask) != 0; }
         bool Is3DComplete() const { return IsStereoRecord() && HasAcceptedCapture(CaptureMask_ColorLeft | CaptureMask_ColorRight | CaptureMask_DepthLeft | CaptureMask_DepthRight); }
         bool Is2DComplete() const { return HasAcceptedCapture(CaptureMask_Hud); }
 
@@ -100,17 +94,6 @@ public:
             return true;
         }
 
-        void BeginStereoCapture(uint64_t stereoGeneration) {
-            Reset();
-            recordKind = CaptureRecordKind::Stereo3D;
-            activeStereoGeneration = stereoGeneration;
-        }
-
-        void BeginHudCapture() {
-            Reset();
-            recordKind = CaptureRecordKind::HudOnly;
-        }
-
         void Reset() {
             views = std::nullopt;
             cameraReferenceMtx = std::nullopt;
@@ -119,14 +102,14 @@ public:
             lastActivityOrdinal = 0;
             acceptedCaptureMask = CaptureMask_None;
             issueFlags = CaptureIssue_None;
+            isMonoCapture = false;
+            hudHoldsScene = false;
+            isCorrupted = false;
             acceptedColorImages[0] = VK_NULL_HANDLE;
             acceptedColorImages[1] = VK_NULL_HANDLE;
             acceptedDepthImages[0] = VK_NULL_HANDLE;
             acceptedDepthImages[1] = VK_NULL_HANDLE;
             acceptedHudImage = VK_NULL_HANDLE;
-
-            ranMotionAnalysis[0] = false;
-            ranMotionAnalysis[1] = false;
         }
     };
 
@@ -141,16 +124,37 @@ public:
     void EndFrame();
     std::optional<std::array<XrView, 2>> UpdateViews(XrTime predictedDisplayTime);
 
-    bool EnsureFrameViewsLatched() const;
-    bool EnsureFrameInputLatched();
+    bool EnsureFrameInputLatched(bool inMenu);
     std::optional<XrTime> ComputeInputSampleTime() const;
-    bool HasCurrentFrameViewsLatched() const { return !m_frameViewsPending && !m_frameViewLatchFailed && m_currViews.has_value(); }
-    bool DidCurrentFrameViewLatchFail() const { return m_frameViewLatchFailed; }
 
+    // hooks call this from the game's threads and the Vulkan thread, so it returns a copy
     std::optional<std::array<XrView, 2>> GetPoses(long frameIdx = -1) const {
+        std::scoped_lock lock(m_frameLatchMutex);
         if (frameIdx != -1 && m_renderFrames[frameIdx].views.has_value()) return m_renderFrames[frameIdx].views;
-        EnsureFrameViewsLatched();
+        LatchFrameViewsLocked();
         return m_currViews;
+    }
+
+    // located together with this XR frame's views
+    std::optional<glm::fvec3> GetEyeGaze() const {
+        std::scoped_lock lock(m_frameLatchMutex);
+        if (!LatchFrameViewsLocked()) return std::nullopt;
+        return m_currEyeGaze;
+    }
+
+    // also written by LatchFrameViewsLocked on the game's threads, so the Vulkan thread has to use these
+    void LatchCaptureViews(long frameIdx);
+    std::optional<std::array<XrView, 2>> GetCaptureViews(long frameIdx) const {
+        std::scoped_lock lock(m_frameLatchMutex);
+        return m_renderFrames[frameIdx].views;
+    }
+
+    static glm::fmat4 MiddlePoseOf(const std::array<XrView, 2>& views) {
+        const XrPosef& leftPose = views[OpenXR::EyeSide::LEFT].pose;
+        const XrPosef& rightPose = views[OpenXR::EyeSide::RIGHT].pose;
+        glm::fvec3 middlePos = (ToGLM(leftPose.position) + ToGLM(rightPose.position)) * 0.5f;
+        glm::quat middleOri = glm::slerp(ToGLM(leftPose.orientation), ToGLM(rightPose.orientation), 0.5f);
+        return ToMat4(middlePos, middleOri);
     }
 
     std::optional<XrFovf> GetFOV(OpenXR::EyeSide side, long frameIdx = -1) const {
@@ -158,98 +162,63 @@ public:
         return views.transform([side](auto& value) { return value[side].fov; });
     }
 
-    std::optional<XrPosef> GetPose(OpenXR::EyeSide side, long frameIdx = -1) const {
-        auto views = GetPoses(frameIdx);
-        return views.transform([side](auto& value) { return value[side].pose; });
-    }
-
-    std::optional<glm::fmat4> GetPoseAsMatrix(OpenXR::EyeSide side, long frameIdx = -1) const {
-        auto views = GetPoses(frameIdx);
-        return views.transform([side](auto& views) {
-            const XrPosef& pose = views[side].pose;
-            return ToMat4(ToGLM(pose.position), ToGLM(pose.orientation));
-        });
-    };
-
-    std::optional<glm::fmat4> GetMiddlePose(long frameIdx = -1) const {
-        auto views = GetPoses(frameIdx);
-        if (!views.has_value()) return std::nullopt;
-        const XrPosef& leftPose = views->at(OpenXR::EyeSide::LEFT).pose;
-        const XrPosef& rightPose = views->at(OpenXR::EyeSide::RIGHT).pose;
-        glm::fvec3 middlePos = (ToGLM(leftPose.position) + ToGLM(rightPose.position)) * 0.5f;
-        glm::quat middleOri = glm::slerp(ToGLM(leftPose.orientation), ToGLM(rightPose.orientation), 0.5f);
-
-        return ToMat4(middlePos, middleOri);
-    };
-
     // nullopt when the frame never latched one, in which case the live reference matrix applies
     std::optional<glm::fmat4> GetCameraReferenceMtx(long frameIdx) const {
         if (frameIdx != -1) {
+            std::scoped_lock lock(m_frameLatchMutex);
             return m_renderFrames[frameIdx].cameraReferenceMtx;
         }
         return std::nullopt;
     }
 
-    double GetLastFrameWorkTimeMs() const { return m_lastFrameWorkTimeMs; }
-    double GetLastWaitTimeMs() const { return m_lastWaitTimeMs; }
-    double GetLastFrameTimeMs() const { return m_lastFrameTimeMs; }
-    double GetPredictedDisplayPeriodMs() const { return m_predictedDisplayPeriodMs; }
-    double GetLastOverheadMs() const { return m_lastOverheadMs; }
+    double GetAverageFrameTimeMs() const { return m_averageFrameTimeMs; }
 
-    void On3DColorCopied(OpenXR::EyeSide side, long frameIdx) {
-        if (!m_renderFrames[frameIdx].views.has_value() && HasCurrentFrameViewsLatched()) m_renderFrames[frameIdx].views = m_currViews;
-        LatchFrameCameraReference(frameIdx);
-        DebugDraw::instance().SnapshotEyeState(side, frameIdx);
-    }
-
-    void On3DDepthCopied(OpenXR::EyeSide side, long frameIdx) {
-        if (!m_renderFrames[frameIdx].views.has_value() && HasCurrentFrameViewsLatched()) m_renderFrames[frameIdx].views = m_currViews;
-        LatchFrameCameraReference(frameIdx);
-    }
-
-    void On2DCopied(long frameIdx) {
-    }
-
-    void LatchFrameCameraReference(long frameIdx);
     void BeginStereoCaptureGeneration(long frameIdx);
     void BeginHudCaptureGeneration(long frameIdx);
     uint64_t NextCaptureActivityOrdinal() { return m_nextCaptureActivityOrdinal++; }
-    void InvalidateStable3DForFrame(long frameIdx);
-    void PromoteStable3D(long frameIdx);
-    void NoteDuplicateCaptureDropped() { ++m_duplicateCaptureDrops; }
-    void NoteFatalSlotInvalidation() { ++m_fatalSlotInvalidations; }
 
     RenderFrame& GetFrame(long frameIdx) { return m_renderFrames[frameIdx]; }
     const RenderFrame& GetFrame(long frameIdx) const { return m_renderFrames[frameIdx]; }
+
+    struct LayerTarget {
+        std::unique_ptr<VulkanTexture> texture;
+        std::unique_ptr<FrameSync> sync;
+
+        void Create(VkExtent2D res, VkFormat format, VkImageUsageFlags usage) {
+            texture = std::make_unique<VulkanTexture>(res.width, res.height, format, usage);
+            sync = std::make_unique<FrameSync>();
+        }
+    };
 
     class Layer3D {
     public:
         explicit Layer3D(VkExtent2D inputRes, VkExtent2D outputRes);
         ~Layer3D();
 
-        SharedTexture* CopyColorToLayer(OpenXR::EyeSide side, VkCommandBuffer copyCmdBuffer, VkImage image, long frameIdx);
-        SharedTexture* CopyDepthToLayer(OpenXR::EyeSide side, VkCommandBuffer copyCmdBuffer, VkImage image, long frameIdx);
+        void InitTextures(VkCommandBuffer cmdBuffer);
+        FrameSync* CopyColorToLayer(OpenXR::EyeSide side, VkCommandBuffer copyCmdBuffer, VkImage image, long frameIdx, uint32_t layer = 0);
+        FrameSync* CopyDepthToLayer(OpenXR::EyeSide side, VkCommandBuffer copyCmdBuffer, VkImage image, long frameIdx, uint32_t layer = 0);
         void PrepareRendering(OpenXR::EyeSide side);
         void StartRendering();
         void PrepareDebugDraw(const DebugDrawRenderData& debugDrawData);
-        void RecordRender(RND_D3D12::CommandContext<false>* context, OpenXR::EyeSide side, long frameIdx, const std::array<XrView, 2>& views, SharedTexture* fadeTexture, const DebugDrawRenderData& debugDrawData);
+        void RecordRender(RND_VkBackend::CommandContext<false>* context, OpenXR::EyeSide side, long frameIdx, const std::array<XrView, 2>& views, VulkanTexture* fadeTexture, const DebugDrawRenderData& debugDrawData);
         const std::array<XrCompositionLayerProjectionView, 2>& FinishRendering(const std::array<XrView, 2>& views);
 
         float GetAspectRatio(OpenXR::EyeSide side) const { return m_recommendedAspectRatios[side]; }
         const RenderUtils::UvTransform& GetPresentUvTransform(OpenXR::EyeSide side) const { return m_presentUvTransforms[side]; }
         long GetCurrentFrameIdx() const { return m_currentFrameIdx; }
-        auto& GetSharedTextures() { return m_textures; }
-        auto& GetDepthSharedTextures() { return m_depthTextures; }
+        LayerTarget& GetColorTarget(OpenXR::EyeSide side, long frameIdx) { return m_colorTargets[side][frameIdx]; }
+        LayerTarget& GetDepthTarget(OpenXR::EyeSide side, long frameIdx) { return m_depthTargets[side][frameIdx]; }
 
     private:
-        std::array<std::unique_ptr<Swapchain<DXGI_FORMAT_R8G8B8A8_UNORM_SRGB>>, 2> m_swapchains;
-        std::array<std::unique_ptr<Swapchain<DXGI_FORMAT_D32_FLOAT>>, 2> m_depthSwapchains;
-        std::array<std::unique_ptr<RND_D3D12::PresentPipeline<true>>, 2> m_presentPipelines;
-        std::array<std::array<std::unique_ptr<SharedTexture>, 2>, 2> m_textures;
-        std::array<std::array<std::unique_ptr<SharedTexture>, 2>, 2> m_depthTextures;
+        std::array<std::unique_ptr<Swapchain>, 2> m_swapchains;
+        std::array<std::unique_ptr<Swapchain>, 2> m_depthSwapchains;
+        std::array<std::unique_ptr<RND_VkBackend::PresentPipeline<true>>, 2> m_presentPipelines;
+        std::array<std::array<LayerTarget, 2>, 2> m_colorTargets;
+        std::array<std::array<LayerTarget, 2>, 2> m_depthTargets;
         std::array<float, 2> m_recommendedAspectRatios = { 1.0f, 1.0f };
         std::array<RenderUtils::UvTransform, 2> m_presentUvTransforms = {};
-        std::unique_ptr<RND_D3D12::DebugDrawPipeline> m_debugDrawPipeline;
+        std::unique_ptr<RND_VkBackend::DebugDrawPipeline> m_debugDrawPipeline;
 
         std::array<XrCompositionLayerProjectionView, 2> m_projectionViews = {};
         std::array<XrCompositionLayerDepthInfoKHR, 2> m_projectionViewsDepthInfo = {};
@@ -262,28 +231,19 @@ public:
         explicit Layer2D(VkExtent2D inputRes, VkExtent2D outputRes);
         ~Layer2D();
 
-        SharedTexture* CopyColorToLayer(VkCommandBuffer copyCmdBuffer, VkImage image, long frameIdx);
-        // AMD GPU FIX: With incrementing values, Vulkan signals odd values (1,3,5...), D3D12 signals even values (2,4,6...)
-        // Texture is ready for D3D12 when Vulkan has signaled (odd value > 0)
-        bool IsTextureReady(long frameIdx) const {
-            uint64_t lastSignal = m_textures[frameIdx]->GetLastSignalledValue();
-            return lastSignal > 0 && (lastSignal % 2 == 1);
-        };
+        void InitTextures(VkCommandBuffer cmdBuffer);
+        FrameSync* CopyColorToLayer(VkCommandBuffer copyCmdBuffer, VkImage image, long frameIdx);
         void PrepareRendering() const;
         void StartRendering() const;
-        void RecordRender(RND_D3D12::CommandContext<false>* context, long frameIdx);
-        std::vector<XrCompositionLayerQuad> FinishRendering(XrTime predictedDisplayTime, long frameIdx);
+        void RecordRender(RND_VkBackend::CommandContext<false>* context, long frameIdx);
+        std::vector<XrCompositionLayerQuad> FinishRendering(long frameIdx);
         long GetCurrentFrameIdx() const { return m_currentFrameIdx; }
-        auto& GetSharedTextures() { return m_textures; }
-
-        static void SetBowAimingActive(bool isActive) { s_isBowAimingActive = isActive; }
-        static bool IsBowAimingActive() { return s_isBowAimingActive; }
+        LayerTarget& GetTarget(long frameIdx) { return m_targets[frameIdx]; }
 
     private:
-        static std::atomic_bool s_isBowAimingActive;
-        std::unique_ptr<Swapchain<DXGI_FORMAT_R8G8B8A8_UNORM_SRGB>> m_swapchain;
-        std::unique_ptr<RND_D3D12::PresentPipeline<false>> m_presentPipeline;
-        std::array<std::unique_ptr<SharedTexture>, 2> m_textures;
+        std::unique_ptr<Swapchain> m_swapchain;
+        std::unique_ptr<RND_VkBackend::PresentPipeline<false>> m_presentPipeline;
+        std::array<LayerTarget, 2> m_targets;
 
         glm::quat m_currentOrientation = glm::identity<glm::fquat>();
 
@@ -299,8 +259,6 @@ public:
         explicit ImGuiOverlay(VkCommandBuffer cb,VkExtent2D fbRes, VkFormat framebufferFormat);
         ~ImGuiOverlay();
 
-        bool ShouldBlockGameInput() { return ImGui::GetIO().WantCaptureKeyboard; }
-
         void Update();
         static void Draw3DLayerAsBackground(VkCommandBuffer cb, VkImage srcImage, float aspectRatio, const RenderUtils::UvTransform& uvTransform, long frameIdx);
         static void DrawHUDLayerAsBackground(VkCommandBuffer cb, VkImage srcImage, long frameIdx);
@@ -308,7 +266,7 @@ public:
         void DrawAndCopyToImage(VkCommandBuffer cb, VkImage destImage, long frameIdx, bool isDesktopView);
         void DrawHelpMenu();
         void ProcessInputs(OpenXR::InputState& inputs, const VPADStatus& vpadStatus);
-        int GetHelpImagePagesCount() const { return m_helpImages.size(); };
+        bool WantsKeyboard() const;
 
     private:
         void DrawPlaystylePage(bool* changed);
@@ -321,6 +279,8 @@ public:
         void DrawCreditsPage();
         void DrawDebugPage(bool* changed);
 
+        // not necessarily the current one, since Cemu draws its own overlays with ImGui too
+        ImGuiContext* m_context = nullptr;
         VkDescriptorPool m_descriptorPool;
         VkRenderPass m_renderPass;
         struct HelpImage {
@@ -341,10 +301,7 @@ public:
     bool IsRendering3D(long frameIdx) {
         return m_lastPresented3D;
     }
-    bool IsRendering2D() {
-        return m_presented2DLastFrame;
-    }
-    bool IsInitialized() {
+    bool IsInitialized() const {
         return m_isInitialized;
     }
     bool IsGameCapturing3DFrameBuffer() const {
@@ -353,6 +310,7 @@ public:
     void SignalGameCapturing3DFrameBuffer(long frameIdx = -1) {
         if (frameIdx >= 0 && frameIdx < (long)m_renderFrames.size()) {
             m_renderFrames[frameIdx].AddIssue(CaptureIssue_MonoCapture);
+            m_renderFrames[frameIdx].isMonoCapture = true;
         }
         m_cameraIsCapturing3DFrameBuffer = 1;
     }
@@ -386,8 +344,7 @@ public:
     bool IsFadeActive() const { return m_isFadeActive.load(std::memory_order_relaxed); }
 
 private:
-    bool IsCurrent3DPresentationAllowed(const RenderFrame& frame) const;
-    bool IsStable3DReuseAllowed(const RenderFrame& frame) const;
+    bool LatchFrameViewsLocked() const;
     long SelectNewestHudReadyFrame() const;
 
 protected:
@@ -410,9 +367,15 @@ protected:
     bool m_framePumpStopRequested = false;
     bool m_xrFrameActive = false;
     uint64_t m_skippedXrFrameCount = 0;
+    // guards the frame state, views and input sample that a frame latches on first use
+    mutable std::mutex m_frameLatchMutex;
+    uint64_t m_frameSerial = 0;
     mutable std::optional<std::array<XrView, 2>> m_currViews;
+    std::optional<glm::fvec3> m_currEyeGaze;
     std::array<RenderFrame, 2> m_renderFrames;
     Stable3DReference m_stable3D = {};
+    std::array<XrCompositionLayerProjectionView, 2> m_lastLayer3DViews = {};
+    std::vector<XrCompositionLayerQuad> m_lastLayer2DQuads;
 
     std::atomic_bool m_isInitialized = false;
     std::atomic_bool m_presented2DLastFrame = false;
@@ -431,19 +394,12 @@ protected:
     mutable bool m_frameViewsPending = false;
     bool m_frameInputLatched = false;
     mutable bool m_frameViewLatchFailed = false;
-    uint64_t m_current3DPresentedCount = 0;
-    uint64_t m_stable3DReusedCount = 0;
-    uint64_t m_3DSuppressedCount = 0;
-    uint64_t m_duplicateCaptureDrops = 0;
-    uint64_t m_fatalSlotInvalidations = 0;
-
-    std::chrono::high_resolution_clock::time_point m_frameStartTime;
-
-    double m_lastFrameWorkTimeMs = 0.0;
-    double m_lastWaitTimeMs = 0.0;
 
     // Derived from OpenXR timestamps
     double m_lastFrameTimeMs = 0.0;
+    double m_averageFrameTimeMs = 0.0;
+    XrTime m_frameTimeWindowNs = 0;
+    uint32_t m_frameTimeWindowFrames = 0;
     double m_predictedDisplayPeriodMs = 0.0;
     double m_lastOverheadMs = 0.0;
 };

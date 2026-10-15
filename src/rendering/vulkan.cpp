@@ -1,5 +1,5 @@
 #include "vulkan.h"
-#include "hooking/layer.h"
+#include "cemu/vulkan_device.h"
 #include "instance.h"
 #include "utils/logger.h"
 
@@ -46,42 +46,4 @@ uint32_t RND_Vulkan::FindMemoryType(uint32_t memoryTypeBitsRequirement, VkMemory
     }
     checkAssert(false, "Failed to find suitable memory type");
     return 0;
-}
-
-
-static std::optional<VkPresentModeKHR> PickUnthrottledPresentMode(const vkroots::VkDeviceDispatch& pDispatch, VkSurfaceKHR surface) {
-    if (surface == VK_NULL_HANDLE) {
-        return std::nullopt;
-    }
-
-    uint32_t presentModeCount = 0;
-    if (pDispatch.GetPhysicalDeviceSurfacePresentModesKHR(pDispatch.PhysicalDevice, surface, &presentModeCount, nullptr) != VK_SUCCESS || presentModeCount == 0) {
-        return std::nullopt;
-    }
-
-    std::vector<VkPresentModeKHR> supportedPresentModes(presentModeCount);
-    if (pDispatch.GetPhysicalDeviceSurfacePresentModesKHR(pDispatch.PhysicalDevice, surface, &presentModeCount, supportedPresentModes.data()) != VK_SUCCESS) {
-        return std::nullopt;
-    }
-    supportedPresentModes.resize(presentModeCount);
-
-    for (VkPresentModeKHR wantedMode : { VK_PRESENT_MODE_IMMEDIATE_KHR, VK_PRESENT_MODE_MAILBOX_KHR }) {
-        if (std::ranges::find(supportedPresentModes, wantedMode) != supportedPresentModes.end()) {
-            return wantedMode;
-        }
-    }
-    return std::nullopt;
-}
-
-VkResult VRLayer::VkDeviceOverrides::CreateSwapchainKHR(const vkroots::VkDeviceDispatch& pDispatch, VkDevice device, const VkSwapchainCreateInfoKHR* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkSwapchainKHR* pSwapchain) {
-    std::optional<VkPresentModeKHR> unthrottledMode = PickUnthrottledPresentMode(pDispatch, pCreateInfo->surface);
-    if (!unthrottledMode.has_value() || unthrottledMode.value() == pCreateInfo->presentMode) {
-        return pDispatch.CreateSwapchainKHR(device, pCreateInfo, pAllocator, pSwapchain);
-    }
-
-    Log::print<RENDERING>("Replacing Cemu swapchain present mode {} with {} so presenting the mirror window never blocks the thread that drives OpenXR", (uint32_t)pCreateInfo->presentMode, (uint32_t)unthrottledMode.value());
-
-    VkSwapchainCreateInfoKHR createInfo = *pCreateInfo;
-    createInfo.presentMode = unthrottledMode.value();
-    return pDispatch.CreateSwapchainKHR(device, &createInfo, pAllocator, pSwapchain);
 }
