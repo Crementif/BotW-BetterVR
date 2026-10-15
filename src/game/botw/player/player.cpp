@@ -310,7 +310,7 @@ static void hook_OverrideThrowDirection(PPCInterpreter_t* hCPU) {
 
     const float dirYSq = throwDir.y * throwDir.y;
 
-    // Emulate the replaced preamble so ThrowSomething keeps using its original normalization path.
+    // emulate the replaced instructions so ThrowSomething still normalizes it
     hCPU->fpr[10].fp0 = throwDir.x;
     hCPU->fpr[12].fp0 = throwDir.z;
     hCPU->fpr[13].fp0 = dirYSq;
@@ -319,6 +319,61 @@ static void hook_OverrideThrowDirection(PPCInterpreter_t* hCPU) {
     const uint32_t stackBase = hCPU->gpr[1];
     Guest::WriteBE(stackBase + 0x14, &throwDir.x);
     Guest::WriteBE(stackBase + 0x18, &throwDir.y);
+}
+
+struct HandThrowRequest {
+    glm::fvec3 velocity = {};
+    uint64_t expiresAtNs = 0;
+};
+static std::atomic<HandThrowRequest> s_handThrowRequest;
+static std::optional<glm::fvec3> s_handThrowVelocity;
+static uint64_t s_skipAnimationThrowUntilNs = 0;
+
+void Player::RequestHandThrow(const glm::fvec3& worldVelocity) {
+    constexpr uint64_t requestLifetimeNs = 500'000'000;
+    s_handThrowRequest = HandThrowRequest{ worldVelocity, GetTimeStamp() + requestLifetimeNs };
+}
+
+// PlayerGrabThrow::calc_ (0x02C91AB4) asking whether its animation reached the throw frame
+static void hook_TimeGrabThrowRelease(PPCInterpreter_t* hCPU) {
+    constexpr uint64_t skipAnimationThrowNs = 1'500'000'000;
+    const bool animationThrows = hCPU->gpr[3] != 0; // original instruction: cmpwi r3, 0
+    const uint64_t nowNs = GetTimeStamp();
+
+    bool throwNow = animationThrows;
+    if (const HandThrowRequest request = s_handThrowRequest.exchange({}); request.expiresAtNs > nowNs) {
+        s_handThrowVelocity = request.velocity;
+        s_skipAnimationThrowUntilNs = nowNs + skipAnimationThrowNs;
+        throwNow = true;
+    }
+    else if (animationThrows && nowNs < s_skipAnimationThrowUntilNs) {
+        s_skipAnimationThrowUntilNs = 0;
+        throwNow = false;
+    }
+    hCPU->instructionPointer = throwNow ? 0x02C91B2C : 0x02C91B44;
+}
+
+// ThrowSomething (0x02C916E4) with the throw velocity built at sp+0x8, its Y still in f0
+static void hook_OverrideThrowVelocity(PPCInterpreter_t* hCPU) {
+    hCPU->gpr[3] = hCPU->gpr[31]; // original instruction: mr r3, r31
+    hCPU->instructionPointer = 0x02C9182C;
+
+    const uint32_t velocityPtr = hCPU->gpr[1] + 0x8;
+    const std::optional<glm::fvec3> handVelocity = std::exchange(s_handThrowVelocity, std::nullopt);
+    float gameVelocityX = 0.0f;
+    float gameVelocityZ = 0.0f;
+    Guest::ReadBE(velocityPtr, &gameVelocityX);
+    Guest::ReadBE(velocityPtr + 0x8, &gameVelocityZ);
+    const glm::fvec3 gameVelocity = glm::fvec3(gameVelocityX, (float)hCPU->fpr[0].fp0, gameVelocityZ);
+    if (!handVelocity.has_value()) {
+        Log::print<CONTROLS>("[Throw] game velocity {}", gameVelocity);
+        return;
+    }
+
+    Log::print<CONTROLS>("[Throw] hand velocity {} instead of {}", handVelocity.value(), gameVelocity);
+    Guest::WriteBE(velocityPtr, &handVelocity->x);
+    Guest::WriteBE(velocityPtr + 0x8, &handVelocity->z);
+    hCPU->fpr[0].fp0 = handVelocity->y;
 }
 
 static void hook_OverrideGuardDirection(PPCInterpreter_t* hCPU) {
@@ -365,5 +420,7 @@ void Player::RegisterHooks() {
     CemuHost::RegisterHook("hook_SetActorOpacity", &hook_SetActorOpacity);
     CemuHost::RegisterHook("hook_CalculateModelOpacity", &hook_CalculateModelOpacity);
     CemuHost::RegisterHook("hook_OverrideThrowDirection", &hook_OverrideThrowDirection);
+    CemuHost::RegisterHook("hook_TimeGrabThrowRelease", &hook_TimeGrabThrowRelease);
+    CemuHost::RegisterHook("hook_OverrideThrowVelocity", &hook_OverrideThrowVelocity);
     CemuHost::RegisterHook("hook_OverrideGuardDirection", &hook_OverrideGuardDirection);
 }

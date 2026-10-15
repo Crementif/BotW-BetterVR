@@ -23,6 +23,11 @@ static std::array<ButtonState, 2> s_grabButtons;
 enum class PullSlot { None, LeftShoulder, RightShoulder, LeftWaist };
 static std::array<PullSlot, 2> s_pullSlots = {};
 
+struct HandVelocitySample {
+    XrTime time = 0;
+    glm::fvec3 velocity = {};
+};
+
 // only touched by hook_InjectXRInput
 struct ControlState {
     uint32_t previousButtonHold = 0;
@@ -60,6 +65,15 @@ struct ControlState {
     bool isShieldGuarding = false;
     bool triggerPressedOverBodySlot = false;
     float previousLeftHandVelocity = 0.0f;
+
+    bool previousRightTrigger = false;
+    bool previousRightThrowGrip = false;
+    bool handThrowCarrying = false;
+    bool handThrowArmed = false;
+    bool handThrowArmedByGrip = false;
+    uint32_t samplesSinceThrowableSeen = UINT32_MAX;
+    std::array<HandVelocitySample, 4> rightHandVelocities = {};
+    uint32_t nextRightHandVelocity = 0;
 };
 static ControlState s_state;
 
@@ -512,7 +526,7 @@ static void ProcessLeftHandInGameInput(
         }
     }
 
-    // Reach across to the right waist slot to drop whatever is in the left hand.
+    // reach across to the right waist slot to drop what's in the left hand
     if (IsHandOverRightWaistSlot(leftGesture))
     {
         if (isGrabPressedLong) {
@@ -565,7 +579,7 @@ static void ProcessRightHandInGameInput(
             return;
         }
 
-        if (IsHandOverRightShoulderSlot(rightGesture) && state.rightHandEquipType == EquipType::Melee && !inputs.inGame.useRightItem.currentState)
+        if (IsHandOverRightShoulderSlot(rightGesture) && state.rightHandEquipType == EquipType::Melee && !state.handThrowCarrying && !inputs.inGame.useRightItem.currentState)
             Haptics::Play(OverSlotsRumble);
 
         if (!state.preventGrabInputs && isGrabPressedShort) { 
@@ -585,7 +599,7 @@ static void ProcessRightHandInGameInput(
                 buttonHold |= VPAD_BUTTON_ZR;
                 state.triggerPressedOverBodySlot = true;
             }
-            else if (state.rightHandEquipType == EquipType::Melee) {
+            else if (state.rightHandEquipType == EquipType::Melee && !state.handThrowCarrying) {
                 Haptics::Play(rightRumbleInfiniteRaise);
                 buttonHold |= VPAD_BUTTON_R;
                 state.triggerPressedOverBodySlot = true;
@@ -685,6 +699,72 @@ static void ProcessLeftTriggerBindings(
     }    
 }
 
+// the trigger or grip throws, but one that was already held when picking something up (like a bomb) has to be pressed again
+static void ProcessHandThrow(uint32_t& buttonHold, const OpenXR::InputState& inputs, ControlState& state) {
+    constexpr XrDuration releaseVelocityWindowNs = 100'000'000;
+    constexpr uint32_t throwableMissedSamplesTolerated = 3;
+    constexpr float boostStartSpeed = 4.0f;
+    constexpr float boostFullSpeed = 8.0f;
+    constexpr float maxThrowBoost = 1.8f;
+    constexpr RumbleParameters readyRumble = { true, 1, RumbleType::Fixed, 0.5f, false, 0.25, 0.15f, 0.15f };
+    constexpr RumbleParameters throwRumble = { true, 1, RumbleType::Falling, 0.5f, false, 0.3, 0.1f, 0.75f };
+
+    const XrSpaceVelocity& handVelocity = inputs.shared.poseVelocity[OpenXR::EyeSide::RIGHT];
+    if ((handVelocity.velocityFlags & XR_SPACE_VELOCITY_LINEAR_VALID_BIT) != 0) {
+        state.rightHandVelocities[state.nextRightHandVelocity] = { inputs.shared.inputTime, ToGLM(handVelocity.linearVelocity) };
+        state.nextRightHandVelocity = (state.nextRightHandVelocity + 1) % (uint32_t)state.rightHandVelocities.size();
+    }
+
+    const bool triggerHeld = inputs.inGame.useRightItem.currentState;
+    const bool triggerPressed = triggerHeld && !state.previousRightTrigger;
+    const bool triggerReleased = !triggerHeld && state.previousRightTrigger;
+    state.previousRightTrigger = triggerHeld;
+    const bool gripHeld = s_grabButtons[1].IsDown();
+    const bool gripPressed = gripHeld && !state.previousRightThrowGrip;
+    const bool gripReleased = !gripHeld && state.previousRightThrowGrip;
+    state.previousRightThrowGrip = gripHeld;
+
+    if (state.isThrowableObjectHeld)
+        state.samplesSinceThrowableSeen = 0;
+    else if (state.samplesSinceThrowableSeen != UINT32_MAX)
+        state.samplesSinceThrowableSeen++;
+    state.handThrowCarrying = state.samplesSinceThrowableSeen <= throwableMissedSamplesTolerated && GameState::IsFirstPerson();
+    if (!state.handThrowCarrying) {
+        state.handThrowArmed = false;
+        return;
+    }
+
+    if ((triggerPressed || gripPressed) && !state.handThrowArmed) {
+        state.handThrowArmed = true;
+        state.handThrowArmedByGrip = gripPressed;
+        Haptics::Play(readyRumble);
+    }
+    if (!state.handThrowArmed || !(state.handThrowArmedByGrip ? gripReleased : triggerReleased))
+        return;
+    state.handThrowArmed = false;
+
+    // the hand is usually already slowing down when you let go
+    std::optional<glm::fvec3> releaseVelocity;
+    for (const HandVelocitySample& sample : state.rightHandVelocities) {
+        if (sample.time == 0 || inputs.shared.inputTime - sample.time > releaseVelocityWindowNs)
+            continue;
+        if (!releaseVelocity.has_value() || glm::length2(sample.velocity) > glm::length2(releaseVelocity.value()))
+            releaseVelocity = sample.velocity;
+    }
+    // hard throws fly further than the hand alone, so putting effort in pays off
+    if (releaseVelocity.has_value()) {
+        const float handSpeed = glm::length(releaseVelocity.value());
+        const float boost = glm::mix(1.0f, maxThrowBoost, glm::smoothstep(boostStartSpeed, boostFullSpeed, handSpeed));
+        Player::RequestHandThrow(glm::mat3(Camera::GetReferenceMtx()) * releaseVelocity.value() * boost);
+        Log::print<CONTROLS>("[Throw] released with hand speed {:.2f}, boosted {:.2f}x", handSpeed, boost);
+    }
+    else {
+        Log::print<CONTROLS>("[Throw] released without a hand speed");
+    }
+    buttonHold |= VPAD_BUTTON_R;
+    Haptics::Play(throwRumble);
+}
+
 static void ProcessRightTriggerBindings(
     uint32_t& buttonHold,
     OpenXR::InputState& inputs,
@@ -707,6 +787,9 @@ static void ProcessRightTriggerBindings(
     constexpr RumbleParameters rightRumbleFiniteRaise = { true, 1, RumbleType::Raising, 0.5f, false, 0.25, 1.0f, 1.0f };
     
     
+    if (state.handThrowCarrying)
+        return;
+
     if (state.hasSomethingInLeftHand || state.hasSomethingInRightHand) {
         if (state.isThrowableObjectHeld) {
             Haptics::Play(rightRumbleFixed);
@@ -1051,13 +1134,14 @@ static void ProcessGameplayInput(uint32_t& buttonHold, OpenXR::InputState& input
         }
     }
     
-    const bool suppressGrabActionsForTwoHandGrip = Skeleton::IsTwoHandGripActive() || Skeleton::TwoHandGripConsumesGrabInput();
+    const bool suppressGrabActionsForTwoHandGrip = Skeleton::IsTwoHandGripActive() || Skeleton::TwoHandGripConsumesGrabInput() || state.handThrowCarrying;
     ProcessLeftHandInGameInput(buttonHold, inputs, state, leftGesture, rightStickSource, now, dt, suppressGrabActionsForTwoHandGrip);
     ProcessRightHandInGameInput(buttonHold, inputs, state, rightGesture, rightStickSource, now, suppressGrabActionsForTwoHandGrip);
     const bool bothGripInputsReleased = inputs.inGame.grab[OpenXR::EyeSide::LEFT].currentState <= Weapons::TwoHandGripButtonThreshold && inputs.inGame.grab[OpenXR::EyeSide::RIGHT].currentState <= Weapons::TwoHandGripButtonThreshold;
     if (Skeleton::TwoHandGripConsumesGrabInput() && bothGripInputsReleased)
         Skeleton::ReleaseTwoHandGripGrabInput();
     
+    ProcessHandThrow(buttonHold, inputs, state);
     ProcessLeftTriggerBindings(buttonHold, inputs, state);
     ProcessRightTriggerBindings(buttonHold, inputs, state, rightGesture);
 

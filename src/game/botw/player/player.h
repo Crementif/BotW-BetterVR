@@ -15,4 +15,6 @@ namespace Player {
     bool IsClimbingLadder();
 
     bool TrackDamageFloatParam(uint32_t actionPtr, uint32_t destFloatPtr, std::string_view paramName);
+
+    void RequestHandThrow(const glm::fvec3& worldVelocity);
 }

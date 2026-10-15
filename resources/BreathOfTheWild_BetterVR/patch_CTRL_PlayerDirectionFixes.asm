@@ -5,6 +5,8 @@ moduleMatches = 0x6267BFD0
 
 0x02C16EA4 = ba import.coreinit.hook_OverrideGuardDirection
 0x02C91728 = ba import.coreinit.hook_OverrideThrowDirection
+0x02C91828 = ba import.coreinit.hook_OverrideThrowVelocity
+0x02C91B24 = ba import.coreinit.hook_TimeGrabThrowRelease
 
 0x02D5A5D8 = Player__getYawIdx:
 0x02D66930 = Player__setYawIdx:
