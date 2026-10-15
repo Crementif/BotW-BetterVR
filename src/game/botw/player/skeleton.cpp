@@ -92,13 +92,26 @@ enum class ArmPoseState : uint8_t {
     ControllerFollow,
     TwoHandGrip,
     BowDrawSnap,
+    CarryPin,
 };
 
 struct ArmPoseFrame {
     std::array<ArmPoseState, 2> handState = { ArmPoseState::ControllerFollow, ArmPoseState::ControllerFollow };
     float bowSnapWeight = 0.0f;
+    float carryWeight = 0.0f;
 };
 static ArmPoseFrame s_armPoseFrame;
+
+struct GameAnimSnapshot {
+    bool carryingThrowable = false;
+};
+static GameAnimSnapshot s_lastGameAnimSnapshot;
+
+static GameAnimSnapshot ReadGameAnimSnapshot() {
+    GameAnimSnapshot snapshot;
+    snapshot.carryingThrowable = Weapons::IsThrowableHeld() && Weapons::GetHeldActor(OpenXR::EyeSide::RIGHT) != 0;
+    return snapshot;
+}
 
 static float SmoothStep01(float t) {
     return t * t * (3.0f - 2.0f * t);
@@ -117,6 +130,8 @@ struct TimedRamp {
     }
 };
 
+static constexpr float CarryPinRampSeconds = 0.3f;
+static TimedRamp s_carryRamp;
 
 static TimedRamp s_bowSnapRamp;
 
@@ -360,7 +375,33 @@ static std::optional<glm::mat4> CalcBowDrawTargetModel(const BoneFrameContext& c
     return CalcControllerTargetModel(ctx, OpenXR::EyeSide::LEFT) * leftToRightWristMtx.value();
 }
 
+static std::optional<glm::mat4> CalcCarryLeftWristTargetModel(const BoneFrameContext& ctx) {
+    const float carryWeight = s_armPoseFrame.carryWeight;
+    if (carryWeight <= 0.0f)
+        return std::nullopt;
+
+    constexpr XrSpaceLocationFlags requiredFlags = XR_SPACE_LOCATION_POSITION_VALID_BIT | XR_SPACE_LOCATION_ORIENTATION_VALID_BIT;
+    if ((ctx.inputs.shared.poseLocation[OpenXR::EyeSide::RIGHT].locationFlags & requiredFlags) != requiredFlags)
+        return std::nullopt;
+
+    const std::optional<glm::mat4> leftToRightWristMtx = CalcGameLeftToRightHandWristMtx();
+    if (!leftToRightWristMtx.has_value())
+        return std::nullopt;
+
+    // pin the left hand to the carried object using the carry animation's live left-to-right hand relationship
+    const glm::mat4 rightWristTargetMtx = CalcControllerTargetModel(ctx, OpenXR::EyeSide::RIGHT);
+    const glm::mat4 leftWristTargetMtx = rightWristTargetMtx * glm::inverse(leftToRightWristMtx.value());
+
+    if (carryWeight >= 1.0f)
+        return leftWristTargetMtx;
+    return BlendTransforms(CalcControllerTargetModel(ctx, OpenXR::EyeSide::LEFT), leftWristTargetMtx, carryWeight);
+}
+
 static glm::mat4 ResolveArmTargetModel(const BoneFrameContext& ctx, OpenXR::EyeSide arm) {
+    if (arm == OpenXR::EyeSide::LEFT && s_armPoseFrame.handState[arm] == ArmPoseState::CarryPin) {
+        if (const std::optional<glm::mat4> carryTargetMtx = CalcCarryLeftWristTargetModel(ctx); carryTargetMtx.has_value())
+            return carryTargetMtx.value();
+    }
     if (arm == OpenXR::EyeSide::RIGHT && s_armPoseFrame.handState[arm] == ArmPoseState::BowDrawSnap) {
         if (const std::optional<glm::mat4> bowTargetMtx = CalcBowDrawTargetModel(ctx); bowTargetMtx.has_value()) {
             // keep the game's draw grip so the arrow lies on the bow, only pulled back along it as far as the controller is
@@ -637,12 +678,21 @@ static void hook_ModifyBoneMatrix(PPCInterpreter_t* hCPU) {
         s_bowSnapTriggerHeld = bowTriggerHeld;
         s_liveBowPullPower = CalcBowPullPower();
 
+        const GameAnimSnapshot animSnapshot = ReadGameAnimSnapshot();
+        if (animSnapshot.carryingThrowable != s_lastGameAnimSnapshot.carryingThrowable)
+            Log::print<CONTROLS>("GameAnim: carrying throwable {}", animSnapshot.carryingThrowable ? "started" : "ended");
+        s_lastGameAnimSnapshot = animSnapshot;
+
+        s_armPoseFrame.carryWeight = SmoothStep01(s_carryRamp.Advance(Weapons::CarryHandPinEnabled && animSnapshot.carryingThrowable, CarryPinRampSeconds));
+
         s_armPoseFrame.bowSnapWeight = GetBowDrawSnapWeight();
         if (s_armPoseFrame.bowSnapWeight > 0.0f)
             s_armPoseFrame.handState[OpenXR::EyeSide::RIGHT] = ArmPoseState::BowDrawSnap;
         else if (s_twoHandGrip.engaged)
             s_armPoseFrame.handState[OpenXR::EyeSide::RIGHT] = ArmPoseState::TwoHandGrip;
-        if (s_twoHandGrip.engaged)
+        if (s_armPoseFrame.carryWeight > 0.0f)
+            s_armPoseFrame.handState[OpenXR::EyeSide::LEFT] = ArmPoseState::CarryPin;
+        else if (s_twoHandGrip.engaged)
             s_armPoseFrame.handState[OpenXR::EyeSide::LEFT] = ArmPoseState::TwoHandGrip;
 
         s_lastAppliedRightWristRot = s_twoHandGrip.engaged ? s_twoHandGrip.rightGripRotWorld : rightHandRotWorld;

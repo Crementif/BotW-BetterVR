@@ -54,6 +54,10 @@ void Weapons::ResetHandObservations() {
     s_observedThrowable = false;
 }
 
+bool Weapons::IsThrowableHeld() {
+    return s_observedThrowable;
+}
+
 struct PendingWeaponDrop {
     uint32_t actor = 0;
     uint32_t actorId = 0;
@@ -79,8 +83,7 @@ void Weapons::CancelDrops() {
 }
 
 
-// Must be driven once per game frame, since hook_ChangeWeaponMtx rebinds a held weapon at that same
-// rate. Ticking it on a rendering hook instead evicts a live weapon within the frame that bound it.
+// has to run once per game frame like hook_ChangeWeaponMtx, or held weapons get dropped
 void Weapons::OnGameFrame() {
     if (!Tracking::IsSessionRunning()) {
         return;
@@ -101,7 +104,6 @@ static float ComputeAttackDamageMultiplier(float swingPower) {
     const float normalizedPower = glm::clamp((swingPower - 0.15f) / 0.85f, 0.0f, 1.0f);
     const float rampedPower = normalizedPower * normalizedPower * (3.0f - 2.0f * normalizedPower);
 
-    // Keep incidental motion weak, then ramp into full damage once the swing is committed.
     return 0.20f + 1.15f * rampedPower;
 }
 

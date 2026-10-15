@@ -4,6 +4,7 @@
 
 namespace Weapons {
     constexpr bool TwoHandGripEnabled = true;
+    constexpr bool CarryHandPinEnabled = true;
     constexpr float TwoHandGripButtonThreshold = 0.5f;
 
     void RegisterHooks();
@@ -24,6 +25,7 @@ namespace Weapons {
     };
     HandObservations ReadHandObservations();
     void ResetHandObservations();
+    bool IsThrowableHeld();
 
     void RequestDrop(uint32_t side);
     void CancelDrops();
