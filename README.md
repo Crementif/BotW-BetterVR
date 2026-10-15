@@ -47,4 +47,4 @@ WunderbarVR: Made cool trailers
 ### Licenses
 
 BetterVR is licensed under the MIT license. Cemu is licensed under the MPL 2.0.
-BetterVR also uses [vkroots](https://github.com/Joshua-Ashton/vkroots/blob/main/LICENSES/MIT.txt), [imgui](https://github.com/ocornut/imgui/blob/master/LICENSE.txt) and [ImPlot](https://github.com/epezent/implot/blob/master/LICENSE), all MIT licensed.
+BetterVR also uses [vkroots](https://github.com/Joshua-Ashton/vkroots/blob/main/LICENSES/MIT.txt), [imgui](https://github.com/ocornut/imgui/blob/master/LICENSE.txt) and [ImPlot](https://github.com/epezent/implot/blob/master/LICENSE), all MIT licensed, and the [OpenXR loader](https://github.com/KhronosGroup/OpenXR-SDK/blob/main/LICENSE), which is Apache 2.0 licensed.
