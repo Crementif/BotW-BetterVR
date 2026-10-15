@@ -211,6 +211,16 @@ static void hook_FixLadder(PPCInterpreter_t* hCPU) {
     }
 }
 
+static bool IsStickPushed(uint32_t playerPtr) {
+    return Guest::Get<float>(playerPtr + 0x1AC4).getLE() > 0.0f;
+}
+
+// with the stick let go the target yaw is just the camera's, and snapping to it would turn Link and his slide around
+static void hook_ShouldSnapToStickDirection(PPCInterpreter_t* hCPU) {
+    hCPU->instructionPointer = hCPU->sprNew.LR;
+    hCPU->gpr[3] = GameState::IsFirstPerson() && IsStickPushed(hCPU->gpr[3]) ? 1 : 0;
+}
+
 static void hook_SetActorOpacity(PPCInterpreter_t* hCPU) {
     hCPU->instructionPointer = hCPU->sprNew.LR;
 
@@ -351,6 +361,7 @@ void Player::RegisterHooks() {
     CemuHost::RegisterHook("hook_PlayerNormalChangeState", &hook_PlayerNormalChangeState);
     CemuHost::RegisterHook("hook_StoreLadderState", &hook_StoreLadderState);
     CemuHost::RegisterHook("hook_FixLadder", &hook_FixLadder);
+    CemuHost::RegisterHook("hook_ShouldSnapToStickDirection", &hook_ShouldSnapToStickDirection);
     CemuHost::RegisterHook("hook_SetActorOpacity", &hook_SetActorOpacity);
     CemuHost::RegisterHook("hook_CalculateModelOpacity", &hook_CalculateModelOpacity);
     CemuHost::RegisterHook("hook_OverrideThrowDirection", &hook_OverrideThrowDirection);
