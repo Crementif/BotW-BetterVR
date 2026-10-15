@@ -27,7 +27,7 @@ if (ENABLE_VCPKG)
 endif ()
 set(THREADS_PREFER_PTHREAD_FLAG true)
 
-project(BetterVR VERSION 0.9.23 LANGUAGES C CXX)
+project(BetterVR VERSION 0.9.24 LANGUAGES C CXX)
 
 set(CEMU_EXTERNAL_MODULES "${CMAKE_CURRENT_SOURCE_DIR}/src" CACHE STRING "Source directories of modules to compile into Cemu")
 add_subdirectory("${BETTERVR_CEMU_DIR}" cemu)
