@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "bow.h"
 #include "hand_aim.h"
+#include "player.h"
 #include "skeleton.h"
 #include "weapon.h"
 #include "roomscale.h"
@@ -1435,7 +1436,285 @@ static void hook_ArrowFpsScale(PPCInterpreter_t* hCPU) {
     }
 }
 
+static constexpr uint32_t kActorGsysModelOffset = 0x330;
+static constexpr uint32_t kGsysModelRootMtxOffset = 0x34;
+static constexpr uint32_t kGsysModelUnitArrayOffset = 0x24;
+static constexpr uint32_t kModelUnitVtableOffset = 0x74;
+static constexpr uint32_t kModelUnitVtableAddress = 0x1034AB98;
+static constexpr uint32_t kModelUnitStateFlagsOffset = 0xC4;
+static constexpr uint8_t kModelUnitWorldUpdatedFlags = 0x22;
+static constexpr uint32_t kModelUnitSkeletonOffset = 0x9C;
+static constexpr uint32_t kSkeletonResOffset = 0x00;
+static constexpr uint32_t kSkeletonFlagsOffset = 0x04;
+static constexpr uint16_t kSkeletonWorldUpdatedFlag = 0x10;
+static constexpr uint32_t kSkeletonBoneArrayOffset = 0x08;
+static constexpr uint32_t kSkeletonWorldMtxArrayOffset = 0x10;
+static constexpr uint32_t kSkeletonBoneCountOffset = 0x2C;
+static constexpr uint32_t kResBoneStride = 0x40;
+static constexpr uint32_t kWorldMtxStride = 0x30;
+static constexpr uint16_t kMaxBowBoneCount = 64;
+static constexpr int32_t kMaxResNameRelativeOffset = 0x04000000;
+// Weapon_Arrow_001 runs along +Z with its nock notch just behind the fletching
+static constexpr glm::vec3 kArrowNockLocalPos = { 0.0f, 0.0f, -0.086f };
+// the bow animation pulls the string to 1.42x, so this leaves room to pull further
+static constexpr float kMaxStringStretchPerHalfSpan = 2.0f;
+static constexpr float kStringFollowRampSeconds = 0.1f;
+static constexpr uint32_t kPlayerBowStateOffset = 0x19B4;
+static constexpr uint32_t kPlayerBowStateCharging = 2;
+static constexpr uint32_t kPlayerBowStateCharged = 3;
+// from Weapon_Bow_Attack_Draw at rest and fully drawn, the right side mirrors the left
+static constexpr float kLimbBaseEulerX = 1.5707964f;
+static constexpr float kLimbBaseRestEulerY = 1.3614f;
+static constexpr float kLimbBaseDrawnEulerY = 1.0969f;
+static constexpr float kLimbTipRestEulerZ = 0.1579f;
+static constexpr float kLimbTipDrawnEulerZ = 0.6322f;
+// the same animation pulls the nock 0.639 from the rest string, whose half-span is 0.6065
+static constexpr float kFullDrawPullPerHalfSpan = 1.054f;
+static constexpr std::array<std::array<std::string_view, 4>, 2> kBowSideBoneNames = { {
+    { "Bow_L_1", "Bow_L_2", "String_L_1", "String_L_2" },
+    { "Bow_R_1", "Bow_R_2", "String_R_1", "String_R_2" },
+} };
+
+struct BowStringBones {
+    uint32_t resSkeleton = 0;
+    bool valid = false;
+    uint16_t root = 0;
+    std::array<uint16_t, 2> limbBase = {};
+    std::array<uint16_t, 2> limbTip = {};
+    std::array<uint16_t, 2> stringTip = {};
+    std::array<uint16_t, 2> nock = {};
+};
+
+struct BowLimbPose {
+    glm::mat4 limbBase;
+    glm::mat4 limbTip;
+    glm::mat4 stringTip;
+};
+
+static std::atomic_uint32_t s_bowStringSlotAddress = 0;
+static BowStringBones s_bowStringBones = {};
+static float s_bowStringFollowWeight = 0.0f;
+static std::chrono::steady_clock::time_point s_lastBowStringPoseTime = {};
+
+static uint32_t ResolveFirstModelUnit(uint32_t actorPtr) {
+    const uint32_t gsysModelPtr = Guest::Get<uint32_t>(actorPtr + kActorGsysModelOffset).getLE();
+    if (gsysModelPtr == 0)
+        return 0;
+    const uint32_t unitArray = Guest::Get<uint32_t>(gsysModelPtr + kGsysModelUnitArrayOffset).getLE();
+    if (unitArray == 0)
+        return 0;
+    const uint32_t unitHolder = Guest::Get<uint32_t>(unitArray).getLE();
+    if (unitHolder == 0)
+        return 0;
+    const uint32_t unitPtr = Guest::Get<uint32_t>(unitHolder).getLE();
+    if (unitPtr == 0 || Guest::Get<uint32_t>(unitPtr + kModelUnitVtableOffset).getLE() != kModelUnitVtableAddress)
+        return 0;
+    return unitPtr;
+}
+
+static std::string_view GetResBoneName(uint32_t boneArray, uint16_t boneIdx) {
+    const uint32_t bonePtr = boneArray + boneIdx * kResBoneStride;
+    const int32_t nameOffset = (int32_t)Guest::Get<uint32_t>(bonePtr).getLE();
+    if (nameOffset == 0 || nameOffset > kMaxResNameRelativeOffset || nameOffset < -kMaxResNameRelativeOffset)
+        return {};
+    const char* name = Guest::CString(bonePtr + nameOffset);
+    return std::string_view(name, strnlen(name, 32));
+}
+
+static const BowStringBones& ResolveBowStringBones(uint32_t skeletonPtr) {
+    const uint32_t resSkeleton = Guest::Get<uint32_t>(skeletonPtr + kSkeletonResOffset).getLE();
+    if (resSkeleton == s_bowStringBones.resSkeleton)
+        return s_bowStringBones;
+
+    s_bowStringBones = { resSkeleton };
+    const uint32_t boneArray = Guest::Get<uint32_t>(skeletonPtr + kSkeletonBoneArrayOffset).getLE();
+    const uint16_t boneCount = Guest::Get<uint16_t>(skeletonPtr + kSkeletonBoneCountOffset).getLE();
+    if (resSkeleton == 0 || boneArray == 0 || boneCount > kMaxBowBoneCount)
+        return s_bowStringBones;
+
+    const std::array<std::array<uint16_t*, 4>, 2> sideSlots = { {
+        { &s_bowStringBones.limbBase[0], &s_bowStringBones.limbTip[0], &s_bowStringBones.stringTip[0], &s_bowStringBones.nock[0] },
+        { &s_bowStringBones.limbBase[1], &s_bowStringBones.limbTip[1], &s_bowStringBones.stringTip[1], &s_bowStringBones.nock[1] },
+    } };
+    uint32_t foundMask = 0;
+    for (uint16_t boneIdx = 0; boneIdx < boneCount; boneIdx++) {
+        const std::string_view name = GetResBoneName(boneArray, boneIdx);
+        if (name == "Bow_Root") {
+            s_bowStringBones.root = boneIdx;
+            foundMask |= 1;
+            continue;
+        }
+        for (uint32_t side = 0; side < 2; side++) {
+            for (uint32_t slot = 0; slot < 4; slot++) {
+                if (name == kBowSideBoneNames[side][slot]) {
+                    *sideSlots[side][slot] = boneIdx;
+                    foundMask |= 2u << (side * 4 + slot);
+                }
+            }
+        }
+    }
+    s_bowStringBones.valid = foundMask == 0x1FF;
+    Log::print<ARROW_SHOT_CAPTURE>("[BowString] Skeleton 0x{:08X} with {} bones: string bones {}", resSkeleton, boneCount, s_bowStringBones.valid ? "found" : "missing");
+    return s_bowStringBones;
+}
+
+static glm::mat4 ReadWorldBoneMtx(uint32_t worldArray, uint16_t boneIdx) {
+    BEMatrix34 mtx = {};
+    Guest::Read(worldArray + boneIdx * kWorldMtxStride, &mtx);
+    return glm::mat4(mtx.getLEMatrix());
+}
+
+static void WriteWorldBoneMtx(uint32_t worldArray, uint16_t boneIdx, const glm::mat4& mtx) {
+    BEMatrix34 beMtx = {};
+    beMtx.setLEMatrix(glm::mat4x3(mtx));
+    Guest::Write(worldArray + boneIdx * kWorldMtxStride, &beMtx);
+}
+
+static glm::mat4 EulerXYZToMtx(float x, float y, float z) {
+    return glm::rotate(glm::rotate(glm::rotate(glm::identity<glm::mat4>(), z, glm::vec3(0.0f, 0.0f, 1.0f)), y, glm::vec3(0.0f, 1.0f, 0.0f)), x, glm::vec3(1.0f, 0.0f, 0.0f));
+}
+
+static BowLimbPose PoseBowLimb(const glm::mat4& rootWorld, const glm::vec3& limbBaseOffset, const glm::vec3& limbTipOffset, const glm::mat4& stringTipLocal, float sideSign, float bend) {
+    BowLimbPose pose = {};
+    const float baseEulerY = glm::mix(kLimbBaseRestEulerY, kLimbBaseDrawnEulerY, bend);
+    const float tipEulerZ = glm::mix(kLimbTipRestEulerZ, kLimbTipDrawnEulerZ, bend);
+    pose.limbBase = rootWorld * glm::translate(glm::identity<glm::mat4>(), limbBaseOffset) * EulerXYZToMtx(sideSign * kLimbBaseEulerX, sideSign * baseEulerY, 0.0f);
+    pose.limbTip = pose.limbBase * glm::translate(glm::identity<glm::mat4>(), limbTipOffset) * EulerXYZToMtx(0.0f, 0.0f, tipEulerZ);
+    pose.stringTip = pose.limbTip * stringTipLocal;
+    return pose;
+}
+
+static bool TryResolveArrowNockWorldPos(uint32_t arrowPtr, glm::vec3& outPos) {
+    const uint32_t gsysModelPtr = Guest::Get<uint32_t>(arrowPtr + kActorGsysModelOffset).getLE();
+    if (gsysModelPtr == 0)
+        return false;
+    BEMatrix34 rootMtx = {};
+    Guest::Read(gsysModelPtr + kGsysModelRootMtxOffset, &rootMtx);
+    outPos = rootMtx.getLEMatrix() * glm::vec4(kArrowNockLocalPos, 1.0f);
+    return IsFiniteVec3(outPos);
+}
+
+static float AdvanceBowStringFollowWeight(bool following) {
+    const auto now = std::chrono::steady_clock::now();
+    const float dt = glm::clamp(std::chrono::duration<float>(now - s_lastBowStringPoseTime).count(), 0.0f, 0.1f);
+    s_lastBowStringPoseTime = now;
+    s_bowStringFollowWeight = following ? glm::min(s_bowStringFollowWeight + dt / kStringFollowRampSeconds, 1.0f) : 0.0f;
+    return s_bowStringFollowWeight;
+}
+
+static bool IsPlayerDrawingBow() {
+    const uint32_t playerPtr = Player::GetAddress();
+    if (playerPtr == 0)
+        return false;
+    const uint32_t bowState = Guest::Get<uint32_t>(playerPtr + kPlayerBowStateOffset).getLE();
+    return bowState == kPlayerBowStateCharging || bowState == kPlayerBowStateCharged;
+}
+
+static void hook_RegisterBowStringSlot(PPCInterpreter_t* hCPU) {
+    hCPU->instructionPointer = hCPU->sprNew.LR;
+
+    s_bowStringSlotAddress = hCPU->gpr[3];
+    Guest::Set<uint32_t>(hCPU->gpr[3], 0);
+}
+
+// r3 = the held bow's gsys::ModelNW, at the entry of m_78_postCalcWorld
+static void hook_PoseBowString(PPCInterpreter_t* hCPU) {
+    hCPU->instructionPointer = hCPU->sprNew.LR;
+
+    const uint32_t unitPtr = hCPU->gpr[3];
+    const bool following = GameState::IsFirstPerson() && Weapons::IsArrowNockedInRightHand() && IsPlayerDrawingBow();
+    const float weight = AdvanceBowStringFollowWeight(following);
+    if (weight <= 0.0f)
+        return;
+
+    const uint32_t bowPtr = GetHeldLeftBowWeaponPtr();
+    const uint32_t arrowPtr = Weapons::GetHeldActor(OpenXR::EyeSide::RIGHT);
+    if (bowPtr == 0 || arrowPtr == 0 || ResolveFirstModelUnit(bowPtr) != unitPtr)
+        return;
+
+    const uint32_t skeletonPtr = Guest::Get<uint32_t>(unitPtr + kModelUnitSkeletonOffset).getLE();
+    if (skeletonPtr == 0)
+        return;
+    const BowStringBones& bones = ResolveBowStringBones(skeletonPtr);
+    const uint32_t worldArray = Guest::Get<uint32_t>(skeletonPtr + kSkeletonWorldMtxArrayOffset).getLE();
+    if (!bones.valid || worldArray == 0)
+        return;
+
+    glm::vec3 arrowNock = glm::vec3(0.0f);
+    if (!TryResolveArrowNockWorldPos(arrowPtr, arrowNock))
+        return;
+
+    const glm::mat4 rootWorld = ReadWorldBoneMtx(worldArray, bones.root);
+    const glm::mat4 rootWorldInverse = glm::inverse(rootWorld);
+    std::array<glm::vec3, 2> limbBaseOffsets = {};
+    std::array<glm::vec3, 2> limbTipOffsets = {};
+    std::array<glm::mat4, 2> stringTipLocals = {};
+    std::array<glm::vec3, 2> animatedNocks = {};
+    for (uint32_t side = 0; side < 2; side++) {
+        const glm::mat4 limbBaseWorld = ReadWorldBoneMtx(worldArray, bones.limbBase[side]);
+        const glm::mat4 limbTipWorld = ReadWorldBoneMtx(worldArray, bones.limbTip[side]);
+        limbBaseOffsets[side] = glm::vec3((rootWorldInverse * limbBaseWorld)[3]);
+        limbTipOffsets[side] = glm::vec3((glm::inverse(limbBaseWorld) * limbTipWorld)[3]);
+        stringTipLocals[side] = glm::inverse(limbTipWorld) * ReadWorldBoneMtx(worldArray, bones.stringTip[side]);
+        animatedNocks[side] = glm::vec3(ReadWorldBoneMtx(worldArray, bones.nock[side])[3]);
+    }
+
+    auto poseLimbs = [&](float bend) {
+        return std::array<BowLimbPose, 2>{
+            PoseBowLimb(rootWorld, limbBaseOffsets[0], limbTipOffsets[0], stringTipLocals[0], 1.0f, bend),
+            PoseBowLimb(rootWorld, limbBaseOffsets[1], limbTipOffsets[1], stringTipLocals[1], -1.0f, bend),
+        };
+    };
+
+    const std::array<BowLimbPose, 2> restLimbs = poseLimbs(0.0f);
+    const glm::vec3 restTipL = glm::vec3(restLimbs[0].stringTip[3]);
+    const glm::vec3 restTipR = glm::vec3(restLimbs[1].stringTip[3]);
+    const glm::vec3 restTipMid = 0.5f * (restTipL + restTipR);
+    const float restHalfSpan = 0.5f * glm::distance(restTipL, restTipR);
+    if (!std::isfinite(restHalfSpan) || restHalfSpan < 0.001f)
+        return;
+    const float bend = glm::clamp(glm::distance(arrowNock, restTipMid) / (kFullDrawPullPerHalfSpan * restHalfSpan), 0.0f, 1.0f) * weight;
+
+    const std::array<BowLimbPose, 2> limbs = poseLimbs(bend);
+    const glm::vec3 tipL = glm::vec3(limbs[0].stringTip[3]);
+    const glm::vec3 tipR = glm::vec3(limbs[1].stringTip[3]);
+    const glm::vec3 tipMid = 0.5f * (tipL + tipR);
+    const float halfSpan = 0.5f * glm::distance(tipL, tipR);
+
+    glm::vec3 offset = arrowNock - tipMid;
+    const float maxStretch = kMaxStringStretchPerHalfSpan * halfSpan;
+    const float stretch = glm::length(offset);
+    if (stretch > maxStretch)
+        offset *= maxStretch / stretch;
+    const glm::vec3 target = tipMid + offset;
+
+    for (uint32_t side = 0; side < 2; side++) {
+        WriteWorldBoneMtx(worldArray, bones.limbBase[side], limbs[side].limbBase);
+        WriteWorldBoneMtx(worldArray, bones.limbTip[side], limbs[side].limbTip);
+        WriteWorldBoneMtx(worldArray, bones.stringTip[side], limbs[side].stringTip);
+        glm::mat4 nockWorld = limbs[side].stringTip;
+        nockWorld[3] = glm::vec4(glm::mix(animatedNocks[side], target, weight), 1.0f);
+        WriteWorldBoneMtx(worldArray, bones.nock[side], nockWorld);
+    }
+
+    const uint16_t skeletonFlags = Guest::Get<uint16_t>(skeletonPtr + kSkeletonFlagsOffset).getLE();
+    Guest::Set<uint16_t>(skeletonPtr + kSkeletonFlagsOffset, skeletonFlags | kSkeletonWorldUpdatedFlag);
+    const uint8_t unitFlags = Guest::Get<uint8_t>(unitPtr + kModelUnitStateFlagsOffset).getLE();
+    Guest::Set<uint8_t>(unitPtr + kModelUnitStateFlagsOffset, unitFlags | kModelUnitWorldUpdatedFlags);
+}
+
+void Bow::OnGameFrame() {
+    const uint32_t slotAddress = s_bowStringSlotAddress;
+    if (slotAddress == 0)
+        return;
+
+    const uint32_t bowPtr = Tracking::IsSessionRunning() && GameState::IsFirstPerson() ? GetHeldLeftBowWeaponPtr() : 0;
+    Guest::Set<uint32_t>(slotAddress, bowPtr != 0 ? ResolveFirstModelUnit(bowPtr) : 0);
+}
+
 void Bow::RegisterHooks() {
+    CemuHost::RegisterHook("hook_RegisterBowStringSlot", &hook_RegisterBowStringSlot);
+    CemuHost::RegisterHook("hook_PoseBowString", &hook_PoseBowString);
     CemuHost::RegisterHook("hook_LoadDynamicBool", &hook_LoadDynamicBool);
     CemuHost::RegisterHook("hook_LoadDynamicVec3", &hook_LoadDynamicVec3);
     CemuHost::RegisterHook("hook_CaptureArrowShootDecision", &hook_CaptureArrowShootDecision);

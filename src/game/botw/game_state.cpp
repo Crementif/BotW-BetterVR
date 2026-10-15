@@ -3,6 +3,7 @@
 #include "game/game.h"
 #include "cemu/cemu_host.h"
 #include "game/botw/camera/camera.h"
+#include "game/botw/player/bow.h"
 #include "game/botw/player/player.h"
 #include "game/botw/player/weapon.h"
 #include "instance.h"
@@ -286,6 +287,7 @@ static void hook_UpdateSettings(PPCInterpreter_t* hCPU) {
     Camera::OnGameFrame();
     Player::OnGameFrame();
     Weapons::OnGameFrame();
+    Bow::OnGameFrame();
     LogScreenChanges();
     PublishPresentation();
 
