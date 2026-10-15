@@ -2,13 +2,13 @@
 titleIds = 00050000101C9300,00050000101C9400,00050000101C9500
 name = Better VR
 path = "The Legend of Zelda: Breath of the Wild/Better VR"
+# for Cemu builds with BetterVR compiled in, which provide this pack themselves
+supersedes = "The Legend of Zelda: Breath of the Wild/Better VR, The Legend of Zelda: Breath of the Wild/Mods/Deferred GPU Readbacks, The Legend of Zelda: Breath of the Wild/Mods/Mirror Mode"
 description = Used to enable BetterVR.||||Most settings will be found inside the in-game menu by long-pressing the inventory button (right thumbstick).||Made by Crementif.
 version = 7
 default = 1
 
 [Default]
-$enableDebugOverlay:int = 0
-
 $accessibilityUIColor:int = 0
 $accessibilityUIColor_x = 0.000
 $accessibilityUIColor_y = 0.804
@@ -40,7 +40,3 @@ $accessibilityUIColor_x = 0.6728
 $accessibilityUIColor_y = 0.0
 $accessibilityUIColor_z = 0.3272
 $accessibilityUIColor_w = 1.000
-
-# Overwrite FPS++'s FPS limit
-[Control]
-vsyncFrequency = 180

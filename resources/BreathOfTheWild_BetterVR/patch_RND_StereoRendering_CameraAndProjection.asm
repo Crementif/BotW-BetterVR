@@ -4,7 +4,6 @@ moduleMatches = 0x6267BFD0
 .origin = codecave
 
 0x1046CF88 = Camera__sInstance:
-0x03191B70 = Camera__getLookAtCamera:
 
 const_0:
 .float 0.0
@@ -20,9 +19,6 @@ modifiedCopy_seadLookAtCamera:
 .float 10,2,-20 ; pos
 .float 10,4,-19 ; target
 .float 0,1,0    ; up
-
-testForOverflow:
-.int 0x60000000
 
 agl__lyr__Layer__getRenderCamera:
 lhz r0, 0x52(r3)
@@ -64,24 +60,19 @@ lfs f13, const_epsilon@l(r12)
 fcmpu cr0, f12, f13
 bltlr ; return layer->renderCamera
 
-lis r12, useStubHooks@ha
-lwz r12, useStubHooks@l(r12)
+lis r12, sMonoWithoutSession@ha
+lwz r12, sMonoWithoutSession@l(r12)
 cmpwi r12, 1
-lis r12, stub_hook_GetRenderCamera@ha
-addi r12, r12, stub_hook_GetRenderCamera@l
-mtctr r12
-beq getRenderCamera
+beqlr ; no VR session: return the plain render camera
+
 lis r12, import.coreinit.hook_GetRenderCamera@ha
 addi r12, r12, import.coreinit.hook_GetRenderCamera@l
 mtctr r12
-getRenderCamera:
-
 lis r11, currentEyeSide@ha
 lwz r11, currentEyeSide@l(r11)
 lis r12, modifiedCopy_seadLookAtCamera@ha
 addi r12, r12, modifiedCopy_seadLookAtCamera@l
-bctr ; jump to hook_GetRenderCamera
-blr
+bctr ; jump to DLL hook_GetRenderCamera
 
 returnDefaultCamera:
 addi r3, r12, 4
@@ -141,24 +132,19 @@ lwz r12, 0x90(r3)
 cmpw r12, r11
 bnelr
 
-lis r12, useStubHooks@ha
-lwz r12, useStubHooks@l(r12)
+lis r12, sMonoWithoutSession@ha
+lwz r12, sMonoWithoutSession@l(r12)
 cmpwi r12, 1
-lis r12, stub_hook_GetRenderProjection@ha
-addi r12, r12, stub_hook_GetRenderProjection@l
-mtctr r12
-beq getRenderProjection
+beqlr ; no VR session: return the plain projection
+
 lis r12, import.coreinit.hook_GetRenderProjection@ha
 addi r12, r12, import.coreinit.hook_GetRenderProjection@l
 mtctr r12
-getRenderProjection:
-
 lis r12, currentEyeSide@ha
 lwz r0, currentEyeSide@l(r12)
 lis r12, modifiedCopy_seadPerspectiveProjection@ha
 addi r12, r12, modifiedCopy_seadPerspectiveProjection@l
-bctr ; jump to hook_GetRenderProjection
-blr
+bctr ; jump to DLL hook_GetRenderProjection
 
 useSpecialProjection:
 lwz r3, 0xEC(r12)
@@ -167,158 +153,30 @@ blr
 0x03AE4AEC = ba agl__lyr__Layer__getRenderProjection
 
 ; =================================================================================
-; most rendering functions use getRenderProjection to get the projection matrix
-; however, the light pre-pass ALSO uses sead::Projection::getProjectionMatrix
-; the patch below fixes the lights not lighting up objects/walls correctly in VR
+; captures the light UniformBlock at the dcbz call in updateLightUniformBuffers (0x33DC1D8), r3 = the block
 ; =================================================================================
 
-0x030C0F4C = sead_projection_updateMatrixImpl:
-0x033DBBB8 = returnAddress_lightPrePassProjectionMatrix:
+0x03A83CBC = agl__UniformBlock__dcbz:
 
-custom_sead__Projection__getProjectionMatrix:
-mflr r0
+capturedXLow:
+.int 0
+
+capture_dcbz_wrapper:
 stwu r1, -0x20(r1)
-stw r31, 0x0C(r1)
+mflr r0
 stw r0, 0x24(r1)
-stw r11, 0x18(r1)
-stw r12, 0x14(r1)
 
-; random crash fix where the projection is null
-cmpwi r3, 0
-beq returnDefaultProjectionMatrix
+lis r12, capturedXLow@ha
+stw r3, capturedXLow@l(r12)
 
-; prevent modifying anything but sead::PerspectiveProjection
-lwz r12, 0x90(r3)
-lis r11, seadPerspectiveProjection_vtbl@ha
-addi r11, r11, seadPerspectiveProjection_vtbl@l
-cmpw r12, r11
-bne continue_sead__Projection__getProjectionMatrix
+lis r12, agl__UniformBlock__dcbz@ha
+addi r12, r12, agl__UniformBlock__dcbz@l
+mtctr r12
+bctrl
 
-; only hook the light pre-pass projection matrix change
-lis r11, returnAddress_lightPrePassProjectionMatrix@ha
-addi r11, r11, returnAddress_lightPrePassProjectionMatrix@l
-cmpw r0, r11
-bne continue_sead__Projection__getProjectionMatrix
-
-; use custom modified projection matrix for light pre-pass while stubbed hooks are enabled, instead of running C++ hooks
-lis r12, useStubHooks@ha
-lwz r12, useStubHooks@l(r12)
-cmpwi r12, 1
-beq returnDefaultProjectionMatrix
-
-; call C++ code to modify the projection matrix to use the VR projection matrices for each eye
-lis r11, currentEyeSide@ha
-lwz r11, currentEyeSide@l(r11)
-bla import.coreinit.hook_ModifyLightPrePassProjectionMatrix
-
-continue_sead__Projection__getProjectionMatrix:
-lis r31, sead_projection_updateMatrixImpl@ha
-addi r31, r31, sead_projection_updateMatrixImpl@l
-mtctr r31
-mr r31, r3
-bctrl ; bl sead::Projection::updateMatrix
-b exit_custom_sead__Projection__getProjectionMatrix
-
-returnDefaultProjectionMatrix:
-lis r31, example_PerspectiveProjectionMatrix@ha
-addi r31, r31, example_PerspectiveProjectionMatrix@l
-
-exit_custom_sead__Projection__getProjectionMatrix:
-addi r3, r31, 4
-lwz r12, 0x14(r1)
-lwz r11, 0x18(r1)
 lwz r0, 0x24(r1)
-lwz r31, 0x0C(r1)
 mtlr r0
 addi r1, r1, 0x20
 blr
 
-0x030C1008 = ba custom_sead__Projection__getProjectionMatrix
-
-; =================================================================================
-
-0x030C1958 = ba import.coreinit.hook_OverwriteSeadPerspectiveProjectionSet
-
-0x03191BA0 = Camera__getPerspectiveProjection:
-0x030C18F0 = sead__PerspectiveProjection__set:
-
-custom_ModifyProjectionUsingCamera:
-mflr r0
-stwu r1, -0x20(r1)
-stw r0, 0x24(r1)
-stw r3, 0x1C(r1)
-stw r4, 0x18(r1)
-stw r5, 0x14(r1)
-stw r6, 0x08(r1)
-stw r7, 0x04(r1)
-stw r30, 0x10(r1)
-stw r31, 0x0C(r1)
-
-mr. r31, r4
-mr r30, r3
-beq exit_custom_ModifyProjectionUsingCamera
-
-lis r3, Camera__getPerspectiveProjection@ha
-addi r3, r3, Camera__getPerspectiveProjection@l
-mtctr r3
-lis r3, Camera__sInstance@ha
-lwz r3, Camera__sInstance@l(r3)
-bctrl ; bl Camera__getPerspectiveProjection
-
-lwz r12, 0x90(r3)
-lwz r0, 0x3C(r12)
-mtctr r0
-bctrl ; sead__PerspectiveProjection__getAspect
-
-lfs f3, 0x68(r30)
-fmr f4, f1
-lfs f2, 0x64(r30)
-lfs f1, 0x60(r30)
-lis r3, sead__PerspectiveProjection__set@ha
-addi r3, r3, sead__PerspectiveProjection__set@l
-mtctr r3
-mr r3, r31
-bctrl ; bl sead__PerspectiveProjection__set
-lfs f0, 0x6C(r30)
-li r11, 1
-stfs f0, 0xB0(r31)
-lfs f0, 0x70(r30)
-stb r11, 0(r31)
-stfs f0, 0xB4(r31)
-
-;lwz r3, 0x1C(r1)
-;lwz r3, 0x30(r3) ; load vtable address
-;lwz r3, 0x24(r3) ; load updateMatrix address
-;mtctr r3
-;lwz r3, 0x1C(r1)
-;mr r4, r3
-;bctrl ; bl sead::Projection::updateMatrix
-
-lwz r3, 0x1C(r1)
-lwz r4, 0x18(r1)
-lis r5, currentEyeSide@ha
-lwz r5, currentEyeSide@l(r5)
-lwz r6, 0x24(r1)
-
-lwz r7, 0x10(r1)
-lwz r7, 0x128(r7)
-
-bla import.coreinit.hook_ModifyProjectionUsingCamera
-
-exit_custom_ModifyProjectionUsingCamera:
-lwz r3, 0x1C(r1)
-lwz r4, 0x18(r1)
-lwz r5, 0x14(r1)
-lwz r6, 0x08(r1)
-lwz r7, 0x04(r1)
-lwz r30, 0x10(r1)
-lwz r31, 0x0C(r1)
-lwz r0, 0x24(r1)
-addi r1, r1, 0x20
-mtlr r0
-blr
-
-0x02C43450 = bla custom_ModifyProjectionUsingCamera
-
-;0x0318FE7C = ba custom_ModifyProjectionUsingCamera
-;0x0318FEFC = ba import.coreinit.hook_ModifyProjectionUsingCamera
+0x33DC1D8 = bla capture_dcbz_wrapper

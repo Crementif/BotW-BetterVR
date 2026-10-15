@@ -285,6 +285,61 @@ bctr
 
 0x0344DCF8 = bla ApplyRoomscaleAfterPlayerVelocity
 
+; aim the magnesis hold point with the controller before AppearMagneForce derives it from the sticks
+0x020D858C = bla import.coreinit.hook_DriveMagnesisAim
+
+; turn the magnesis-held object with the glove hand, right after the game has pushed it toward the hold point
+0x03488AEC = ksys__phys__RigidBody__getLinearVelocity:
+0x03488A30 = ksys__phys__RigidBody__getTransform:
+0x03489868 = ksys__phys__RigidBody__setAngularVelocity:
+
+MagnesisSpinEpsilon:
+.float 0.00000011920929
+
+SpinMagnesisHeldBody:
+mflr r0
+stwu r1, -0x60(r1)
+stw r0, 0x64(r1)
+stw r31, 0x5C(r1)
+mr r31, r3
+
+lis r12, ksys__phys__RigidBody__getLinearVelocity@ha
+addi r12, r12, ksys__phys__RigidBody__getLinearVelocity@l
+mtctr r12
+bctrl
+
+mr r3, r31
+addi r4, r1, 0x10 ; sead::Matrix34 of the body
+lis r12, ksys__phys__RigidBody__getTransform@ha
+addi r12, r12, ksys__phys__RigidBody__getTransform@l
+mtctr r12
+bctrl
+
+addi r3, r1, 0x10
+addi r4, r1, 0x40 ; angular velocity to apply
+bl import.coreinit.hook_GetMagnesisHeldBodySpin
+cmpwi r3, 0
+beq skipSpinMagnesisHeldBody
+
+mr r3, r31
+addi r4, r1, 0x40
+lis r12, MagnesisSpinEpsilon@ha
+lfs f1, MagnesisSpinEpsilon@l(r12)
+lis r12, ksys__phys__RigidBody__setAngularVelocity@ha
+addi r12, r12, ksys__phys__RigidBody__setAngularVelocity@l
+mtctr r12
+bctrl
+
+skipSpinMagnesisHeldBody:
+lwz r31, 0x5C(r1)
+lwz r0, 0x64(r1)
+addi r1, r1, 0x60
+mtlr r0
+blr
+
+0x02B0117C = bla SpinMagnesisHeldBody
+0x02B011C8 = bla SpinMagnesisHeldBody
+
 ; align the real player-fired arrow launch transform to the headset pose
 0x02706270 = bla import.coreinit.hook_OverrideArrowShotTransform
 

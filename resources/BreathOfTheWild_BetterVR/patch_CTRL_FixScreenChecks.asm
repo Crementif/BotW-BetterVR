@@ -33,7 +33,6 @@ lwz r7, 0x0C(r1)
 lwz r6, 0x10(r1)
 lwz r5, 0x14(r1)
 lwz r4, 0x18(r1)
-;lwz r3, 0x1C(r1) ; r3 should be the return value of GX2SetPixelUniformBlock
 lwz r0, 0x24(r1)
 addi r1, r1, 0x20
 mtlr r0

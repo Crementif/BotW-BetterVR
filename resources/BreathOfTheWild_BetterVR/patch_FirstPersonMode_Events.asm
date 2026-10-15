@@ -20,7 +20,6 @@ bla import.coreinit.hook_ShouldSkipEventCamera
 cmpwi r3, 0
 bne skipEventCamera
 
-; run regular camera update
 lwz r3, 0x0C(r1)
 lis r4, act__getCamera@ha
 addi r4, r4, act__getCamera@l
@@ -48,8 +47,6 @@ blr
 0x02BA3214 = bla hook_calcCameraDuringEvent_trampoline
 ; patch CameraEventMovePos (teleport for example)
 0x02BB9D30 = bla hook_calcCameraDuringEvent_trampoline
-; patch CameraEventMovePos (specifically CameraEventMovePos::m_42)
-; 0x02BB7034 = bla hook_calcCameraDuringEvent_trampoline
 ; patch CameraEventMove (enter shrine elevator from overworld)
 0x02BB1F68 = bla hook_calcCameraDuringEvent_trampoline
 ; patch CameraEventGameOver
@@ -116,15 +113,6 @@ lwz r5, 0x0C(r1) ; entrypoint name
 bla import.coreinit.hook_GetEventName
 
 skipGetEventName:
-; ; spawn check
-; li r3, 0
-; bl import.coreinit.hook_CreateNewActor
-; cmpwi r3, 1
-; bne notSpawnActor
-; ;bl vr_spawnEquipment
-; notSpawnActor:
-; 
-; ;bl checkIfDropWeapon
 lwz r6, 0x10(r1)
 lwz r5, 0x14(r1)
 lwz r4, 0x18(r1)
@@ -137,6 +125,3 @@ li r4, -1 ; Execute the instruction that got replaced
 blr
 
 0x031FAAF0 = bla vr_updateSettings
-
-;0x031CA268 = ba import.coreinit.hook_GetEventName
-;0x031CA288 = ba import.coreinit.hook_GetEventName

@@ -4,7 +4,7 @@ moduleMatches = 0x6267BFD0
 .origin = codecave
 
 0x03191BA8 = Camera__getAltPerspectiveProjection:
-;0x03191BA0 = Camera__getPerspectiveProjection:
+0x03191BA0 = Camera__getPerspectiveProjection:
 
 custom_checkIfCameraCanSeePos:
 mflr r11
@@ -45,7 +45,6 @@ lwz r8, 0x0C(r1)
 lwz r7, 0x10(r1)
 lwz r6, 0x14(r1)
 lwz r5, 0x18(r1)
-;lwz r3, 0x1C(r1) ; r3 should be the return value of CheckIfCameraCanSeePos
 lwz r0, 0x24(r1)
 addi r1, r1, 0x20
 mtlr r0
@@ -57,7 +56,3 @@ blr
 
 0x03190118 = li r0, 1
 0x0319011C = ba custom_checkIfCameraCanSeePos
-
-
-; always make AttCheck::ScreenRelated check return true
-;0x035D67BC = li r3, 1

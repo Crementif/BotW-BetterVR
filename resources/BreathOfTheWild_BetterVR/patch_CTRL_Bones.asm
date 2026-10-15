@@ -13,7 +13,6 @@ gsys_ModelUnit_setXluAlpha = 0x039E4E08
 0x03821B64 = ksys_phys_ModelBoneAccessor_getBoneName:
 
 custom_gsys_ModelUnit_getBoneLocalMatrix:
-; original function prologue
 stwu r1, -0x30(r1)
 mflr r0
 stw r0, 0x34(r1)
@@ -63,10 +62,10 @@ lwz r6, 0x20(r1) ; load name
 
 lwz r3, 0x0C(r1) ; r31 = ksys::phys::ModelBoneAccessor*
 lwz r3, 0x10(r3) ; ModelBoneAccessor::gsysModel
+mr r7, r29 ; pass the source gsys::ModelUnit* to the HLE hook
 
 bla import.coreinit.hook_ModifyBoneMatrix
 
-; restore bone index finally
 mr r6, r27
 
 mr r27, r7 ; r7 is volatile, keep the face-material flag across the vtable call below
@@ -137,7 +136,6 @@ b custom_gsys_ModelUnit_getBoneLocalMatrix_LoopBody
 
 custom_gsys_ModelUnit_getBoneLocalMatrix_Restore:
 
-; prologue
 lwz r0, 0x34(r1)
 mtlr r0
 

@@ -6,7 +6,6 @@ moduleMatches = 0x6267BFD0
 
 spawnString:
 .string "Weapon_Sword_022"
-;.string "Weapon_Sword_056" ; this is the broken master sword, an item you can't normally obtain in the game
 .align 1
 .byte 0
 .align 40*4
@@ -18,11 +17,8 @@ spawnString:
 0x02A15998 = requestCreateWeapon:
 
 vr_spawnEquipment:
-; function epilogue
 stwu r1, -0x3C(r1)
 stw r0, 0x04(r1)
-; stw r1, 0x44(r1)
-; stw r2, 0x40(r1)
 stw r3, 0x08(r1)
 stw r4, 0x0C(r1)
 stw r5, 0x10(r1)
@@ -72,12 +68,9 @@ li r6, 160
 ; r7 is a pointer to the weapons's modifier. Can use 0 for none.
 li r7, 0
 
-;bl requestCreateWeapon
 
-; LR
 lwz r3, 0x40(r1)
 mtlr r3
-; function prologue
 lwz r0, 0x04(r1)
 lwz r3, 0x08(r1)
 lwz r4, 0x0C(r1)

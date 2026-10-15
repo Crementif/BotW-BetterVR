@@ -9,7 +9,6 @@ moduleMatches = 0x6267BFD0
 0x037B13A8 = ba import.coreinit.hook_CalculateModelOpacity
 
 ; hooks Actor::setOpacity() and replace it with a custom C++ function
-; TODO: technically this might not be required anymore
 0x037B13AC = ba import.coreinit.hook_SetActorOpacity
 
 ; sets distance from the camera

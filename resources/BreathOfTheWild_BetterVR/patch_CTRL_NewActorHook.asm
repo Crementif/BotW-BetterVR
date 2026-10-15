@@ -6,7 +6,6 @@ moduleMatches = 0x6267BFD0
 vr_createActorHook:
 stw r7, 0x20(r28) ; original instruction
 
-; function epilogue
 mflr r0
 stwu r1, -0x0C(r1)
 stw r0, 0x10(r1)
@@ -35,7 +34,6 @@ addi r5, r5, 1
 cmpw r5, r7
 blt startOfLoop
 
-; function prologue
 lwz r6, 0x04(r1)
 lwz r5, 0x08(r1)
 lwz r0, 0x10(r1)
