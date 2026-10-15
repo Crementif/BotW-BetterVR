@@ -1,10 +1,10 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="BotW w/ MetaXRSim, RenderDoc, Dump" type="CMakeRunConfiguration" factoryName="Application" folderName="Simulator" PROGRAM_PARAMS="-t 00050000101C9500" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="true" EMULATE_TERMINAL="false" WORKING_DIR="file://$PROJECT_DIR$/Cemu" PASS_PARENT_ENVS_2="true" PROJECT_NAME="BetterVR_Layer" TARGET_NAME="BetterVR_Layer" CONFIG_NAME="Debug" RUN_PATH="$PROJECT_DIR$/Cemu/Cemu.exe">
+  <configuration default="false" name="BotW w/ MetaXRSim, RenderDoc, Dump" type="CMakeRunConfiguration" factoryName="Application" folderName="Simulator" PROGRAM_PARAMS="-t 00050000101C9500" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="true" EMULATE_TERMINAL="false" WORKING_DIR="file://$PROJECT_DIR$/Cemu" PASS_PARENT_ENVS_2="true" PROJECT_NAME="BetterVR" TARGET_NAME="CemuBin" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="BetterVR" RUN_TARGET_NAME="CemuBin">
     <envs>
       <env name="ENABLE_VULKAN_RENDERDOC_CAPTURE" value="0" />
       <env name="VK_APIDUMP_LOG_FILENAME" value="API_DUMP.txt" />
-      <env name="VK_INSTANCE_LAYERS" value="VK_LAYER_CREMENTIF_bettervr;VK_LAYER_RENDERDOC_Capture;VK_LAYER_LUNARG_api_dump;" />
-      <env name="VK_LAYER_PATH" value=".\;C:\Program Files\RenderDoc\x86\;C:\Programs\VulkanSDK\Bin\;" />
+      <env name="VK_INSTANCE_LAYERS" value="VK_LAYER_RENDERDOC_Capture;VK_LAYER_LUNARG_api_dump;" />
+      <env name="VK_LAYER_PATH" value="C:\Program Files\RenderDoc\x86\;C:\Programs\VulkanSDK\Bin\;" />
       <env name="VK_LOADER_DEBUG" value="error" />
       <env name="VK_LUNARG_API_DUMP_FILE" value="1" />
       <env name="VK_LUNARG_API_DUMP_SHOW_THREAD_AND_FRAME" value="1" />

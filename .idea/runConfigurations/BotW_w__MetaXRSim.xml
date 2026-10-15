@@ -1,8 +1,6 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="BotW w/ MetaXRSim" type="CMakeRunConfiguration" factoryName="Application" folderName="Simulator" PROGRAM_PARAMS="-t 00050000101C9500" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="true" EMULATE_TERMINAL="false" WORKING_DIR="file://$PROJECT_DIR$/Cemu" PASS_PARENT_ENVS_2="true" PROJECT_NAME="BetterVR_Layer" TARGET_NAME="BetterVR_Layer" CONFIG_NAME="Debug" RUN_PATH="$PROJECT_DIR$/Cemu/Cemu_relwithdebinfo.exe">
+  <configuration default="false" name="BotW w/ MetaXRSim" type="CMakeRunConfiguration" factoryName="Application" folderName="Simulator" PROGRAM_PARAMS="-t 00050000101C9500" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="true" EMULATE_TERMINAL="false" WORKING_DIR="file://$PROJECT_DIR$/Cemu" PASS_PARENT_ENVS_2="true" PROJECT_NAME="BetterVR" TARGET_NAME="CemuBin" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="BetterVR" RUN_TARGET_NAME="CemuBin">
     <envs>
-      <env name="VK_INSTANCE_LAYERS" value="VK_LAYER_CREMENTIF_bettervr" />
-      <env name="VK_LAYER_PATH" value=".\;" />
       <env name="VK_LOADER_DEBUG" value="all" />
       <env name="XR_RUNTIME_JSON" value=".\..\MetaXRSimulator\meta_openxr_simulator.json" />
     </envs>

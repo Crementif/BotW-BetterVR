@@ -2,5 +2,15 @@
 <project version="4">
   <component name="VcsDirectoryMappings">
     <mapping directory="" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/cemu-src" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/cemu-src/dependencies/Vulkan-Headers" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/cemu-src/dependencies/ZArchive" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/cemu-src/dependencies/cubeb" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/cemu-src/dependencies/cubeb/cmake/sanitizers-cmake" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/cemu-src/dependencies/cubeb/googletest" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/cemu-src/dependencies/imgui" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/cemu-src/dependencies/metal-cpp" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/cemu-src/dependencies/vcpkg" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/cemu-src/dependencies/xbyak_aarch64" vcs="Git" />
   </component>
 </project>

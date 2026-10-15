@@ -49,6 +49,8 @@ CemuTest/
 !/MetaXRSimulator/config/sim_core_configuration.json
 !/MetaXRSimulator/config/sim_core_configuration_ci.json
 
+# Build output of the desktop OpenXR simulator, installed here by that project's
+# build_simulator.ps1. The simulator itself lives in its own repository.
 /OpenXRSimulator/*
 
 ReverseEngineering/
@@ -63,3 +65,10 @@ enc_temp_folder/
 BetterVR.zip
 
 compile_commands.json
+re-notes/shaders/
+
+# RenderDoc captures (large, user-supplied)
+*.rdc
+renderdoc-mcp-export/
+
+__pycache__/

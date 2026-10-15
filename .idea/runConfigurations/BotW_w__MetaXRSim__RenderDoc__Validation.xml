@@ -1,12 +1,12 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="BotW w/ MetaXRSim, RenderDoc, Validation" type="CMakeRunConfiguration" factoryName="Application" folderName="Simulator" PROGRAM_PARAMS="-t 00050000101C9500" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="true" EMULATE_TERMINAL="false" WORKING_DIR="file://$PROJECT_DIR$/Cemu" PASS_PARENT_ENVS_2="true" PROJECT_NAME="BetterVR_Layer" TARGET_NAME="BetterVR_Layer" CONFIG_NAME="Debug" RUN_PATH="$PROJECT_DIR$/Cemu/Cemu.exe">
+  <configuration default="false" name="BotW w/ MetaXRSim, RenderDoc, Validation" type="CMakeRunConfiguration" factoryName="Application" folderName="Simulator" PROGRAM_PARAMS="-t 00050000101C9500" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="true" EMULATE_TERMINAL="false" WORKING_DIR="file://$PROJECT_DIR$/Cemu" PASS_PARENT_ENVS_2="true" PROJECT_NAME="BetterVR" TARGET_NAME="CemuBin" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="BetterVR" RUN_TARGET_NAME="CemuBin">
     <envs>
       <env name="adsasd" value="" />
       <env name="ENABLE_VULKAN_RENDERDOC_CAPTURE" value="0" />
-      <env name="VK_INSTANCE_LAYERS" value="VK_LAYER_CREMENTIF_bettervr;VK_LAYER_RENDERDOC_Capture;VK_LAYER_KHRONOS_validation;" />
+      <env name="VK_INSTANCE_LAYERS" value="VK_LAYER_RENDERDOC_Capture;VK_LAYER_KHRONOS_validation;" />
       <env name="VK_LAYER_DEBUG_ACTION" value="VK_DBG_LAYER_ACTION_LOG_MSG,VK_DBG_LAYER_ACTION_DEBUG_OUTPUT" />
       <env name="VK_LAYER_LOG_FILENAME" value="C:\Projects\Cemu\BotW-BetterVR\Cemu\vulkan_validation_log.txt" />
-      <env name="VK_LAYER_PATH" value=".\;C:\Program Files\RenderDoc\x86\;C:\Programs\VulkanSDK\Bin;" />
+      <env name="VK_LAYER_PATH" value="C:\Program Files\RenderDoc\x86\;C:\Programs\VulkanSDK\Bin;" />
       <env name="VK_LAYER_REPORT_FLAGS" value="error" />
       <env name="VK_LOADER_DEBUG" value="error" />
       <env name="XR_RUNTIME_JSON" value=".\..\MetaXRSimulator\meta_openxr_simulator.json" />
