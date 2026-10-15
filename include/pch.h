@@ -580,7 +580,7 @@ struct data_VRProjectionMatrixOut {
     BEType<float> offsetY;
 };
 
-#include "game_structs.h"
+#include "game/botw/game_structs.h"
 #include "cemu.h"
 #include "utils/logger.h"
 #include "utils/profiler.h"
