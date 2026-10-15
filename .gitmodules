@@ -1,0 +1,4 @@
+[submodule "cemu-src"]
+	path = cemu-src
+	url = https://github.com/Crementif/Cemu.git
+	branch = bettervr
