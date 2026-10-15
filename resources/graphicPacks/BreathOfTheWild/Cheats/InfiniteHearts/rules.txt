@@ -1,0 +1,6 @@
+[Definition]
+titleIds = 00050000101C9300,00050000101C9400,00050000101C9500
+name = Infinite Hearts
+path = "The Legend of Zelda: Breath of the Wild/Cheats/Infinite Hearts"
+description = Prevents you from taking any damage. Doesn't increase the amount of hearts you have so it doesn't affect your save file.||Made by C313571N and Xalphenos.
+version = 6

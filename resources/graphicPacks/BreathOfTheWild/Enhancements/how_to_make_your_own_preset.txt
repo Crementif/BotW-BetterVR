@@ -1,0 +1,53 @@
+
+	-- How to set up your own Clarity Preset -- 
+	
+===================================================================
+	
+	Hey, it's Serfrost.  I'm writing this out because it's come to our attention that no matter what we really do for presets, it won't really matter in the long run.  Every user has a unique monitor / display they use with their PC, yeah?  A lot of them are calibrated differently, and they often come with numerous presets that alter colors, brightness, contrast, you name it.  Because of this, the presets that look good to me might not look good to you--the presets that look good to Jamie might not look good to you; you get the idea.  So I'm writing this hoping you'll take the time to do a few short steps to get you on your way to making the game look the way YOU want it to look on YOUR display!
+	
+	Jamie has coded this faithfully and diligently, and he's added a lot of different functions that were previously unavailable with these newer updates. We hope you enjoy this and use it to it's fullest potential.
+	
+	This tutorial has been shortened by M&M in order to make use of the new graphic pack to its full potential.
+
+===================================================================	
+	
+	There are 6 steps total. Please read very carefully and with your full attention. As long as you do that, it's relatively just "point and click" and the rest is changing the numbers on your own and testing them to see what they do.
+
+===================================================================	
+	
+	
+1) Open up Cemu that's at least version 1.13.0.
+
+
+2) After Cemu opens itself, load the game and your save file.
+
+
+3) Open up the graphic pack menu and select Clarity under Breath of the Wild.
+
+
+4) Open up 37040a485a29d54e_00000000000003c9_ps.txt in the Clarity graphic pack folder.
+
+
+5) You may now edit all the variables in realtime. To view your changes hit "Reload shaders"
+
+
+===============\
+
+	Note: "Realtime", as in, you can view your changes by using the button. You do not have to stop the game, etc.
+
+	Pro Tip: If time changes too fast for you, you can use Cemuhook's custom timer option (Debug > Custom Timer) to slow down time to 0.125x!  
+	
+	MAKE SURE YOU CHECK VARIOUS AREAS IN THE GAME TO MAKE SURE YOUR COLOR / SHADOW BALANCING IS CORRECT.
+	
+===============/
+	
+	
+6) When you have your variables for your preset where you want them, you don't have to do anything! The file with your preset is already saved.
+
+	-- Make backups of files before making changes. Keep track of your work! --
+
+	===
+	
+	MAKE SURE YOU CHECK VARIOUS AREAS IN THE GAME TO MAKE SURE YOUR COLOR / SHADOW BALANCING IS CORRECT.
+	
+	===

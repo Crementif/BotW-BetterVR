@@ -1,0 +1,6 @@
+[Definition]
+titleIds = 00050000101C9300,00050000101C9400,00050000101C9500
+name = Infinite Daruk's Protection
+path = "The Legend of Zelda: Breath of the Wild/Cheats/Infinite Daruk's Protection"
+description = Lets you use Daruk's protection without a time limit.||Made by C313571N and Xalphenos.
+version = 6

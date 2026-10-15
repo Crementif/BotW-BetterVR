@@ -1,0 +1,64 @@
+[Definition]
+titleIds = 00050000101C9300,00050000101C9400,00050000101C9500
+name = Remove HUD elements
+path = "The Legend of Zelda: Breath of the Wild/Mods/Remove HUD elements"
+description = Hides HUD elements like the master mode icon, hearts, stamina wheel and subtitles.|This mod only aims to remove things that the game's Pro HUD mode doesn't already remove.
+version = 6
+
+[Default]
+$hideSubtitles:int = 0
+$hideHearts:int = 0
+$hideStamina:int = 0
+$hideMasterModeIcon:int = 0
+$hideCameraGUI:int = 0
+
+[Preset]
+name = Enabled (Default)
+category = Master Mode Icon
+default = 1
+
+[Preset]
+name = Disabled
+category = Master Mode Icon
+$hideMasterModeIcon:int = 1
+
+[Preset]
+name = Enabled (Default)
+category = Hearts
+default = 1
+
+[Preset]
+name = Disabled
+category = Hearts
+$hideHearts:int = 1
+
+[Preset]
+name = Enabled (Default)
+category = Stamina
+default = 1
+
+[Preset]
+name = Disabled
+category = Stamina
+$hideStamina:int = 1
+
+[Preset]
+name = Enabled (Default)
+category = Camera HUD (for screenshots)
+default = 1
+
+[Preset]
+name = Disabled (messes with text and hearts)
+category = Camera HUD (for screenshots)
+$hideCameraGUI:int = 1
+$hideHearts:int = 1
+
+[Preset]
+name = Enabled (Default)
+category = Subtitles (for screenshots)
+default = 1
+
+[Preset]
+name = Disabled (messes with text)
+category = Subtitles (for screenshots)
+$hideSubtitles:int = 1

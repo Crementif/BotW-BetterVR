@@ -1,0 +1,108 @@
+[Definition]
+titleIds = 00050000101C9300,00050000101C9400,00050000101C9500
+name = Prevent Random Spawns
+path = "The Legend of Zelda: Breath of the Wild/Cheats/Prevent Random Spawns"
+description = Allows you to individually toggle which enemies can randomly spawn. You can also use it to disable all animals.
+version = 6
+
+[Default]
+$preventYigaClan:int = 0
+$preventStalkoblin:int = 0
+$preventStalmoblin:int = 0
+$preventStalizalfos:int = 0
+$preventChuchu:int = 0
+$preventKeese:int = 0
+
+$preventOctarock:int = 0
+$preventLizalfos:int = 0
+
+$preventEnemies:int = 0
+$preventAnimals:int = 0
+
+
+[Preset]
+category = Prevent Yiga Clan Spawns
+name = Disabled (Default)
+default = 1
+$preventYigaClan:int = 0
+
+[Preset]
+category = Prevent Yiga Clan Spawns
+name = Enabled
+$preventYigaClan:int = 1
+
+
+[Preset]
+category = Prevent Skeleton-Type Enemy Spawns
+name = Disabled (Default)
+default = 1
+$preventStalkoblin:int = 0
+$preventStalmoblin:int = 0
+$preventStalizalfos:int = 0
+
+[Preset]
+category = Prevent Skeleton-Type Enemy Spawns
+name = Enabled (Stalkoblin, Stalmoblin & Stalizalfos)
+$preventStalkoblin:int = 1
+$preventStalmoblin:int = 1
+$preventStalizalfos:int = 1
+
+
+[Preset]
+category = Prevent Keese Spawns
+name = Disabled (Default)
+default = 1
+$preventKeese:int = 0
+
+[Preset]
+category = Prevent Keese Spawns
+name = Enabled
+$preventKeese:int = 1
+
+
+[Preset]
+category = Prevent Chuchu Jelly Spawns
+name = Disabled (Default)
+default = 1
+$preventChuchu:int = 0
+
+[Preset]
+category = Prevent Chuchu Jelly Spawns
+name = Enabled
+$preventChuchu:int = 1
+
+
+[Preset]
+category = Prevent Octarock Spawns
+name = Disabled (Default)
+default = 1
+$preventOctarock:int = 0
+
+[Preset]
+category = Prevent Octarock Spawns
+name = Enabled
+$preventOctarock:int = 1
+
+
+[Preset]
+category = Prevent Lizalfos Spawns
+name = Disabled (Default)
+default = 1
+$preventLizalfos:int = 0
+
+[Preset]
+category = Prevent Lizalfos Spawns
+name = Enabled
+$preventLizalfos:int = 1
+
+
+[Preset]
+category = Prevent All Animals, Insects and Fish Spawns
+name = Disabled (Default)
+default = 1
+$preventAnimals:int = 0
+
+[Preset]
+category = Prevent All Animals, Insects and Fish Spawns
+name = Enabled
+$preventAnimals:int = 1

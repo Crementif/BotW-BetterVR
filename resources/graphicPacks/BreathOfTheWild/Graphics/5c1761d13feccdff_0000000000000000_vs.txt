@@ -1,0 +1,103 @@
+#version 420
+#extension GL_ARB_texture_gather : enable
+#ifdef VULKAN
+#define ATTR_LAYOUT(__vkSet, __location) layout(set = __vkSet, location = __location)
+#define UNIFORM_BUFFER_LAYOUT(__glLocation, __vkSet, __vkLocation) layout(set = __vkSet, binding = __vkLocation, std140)
+#define TEXTURE_LAYOUT(__glLocation, __vkSet, __vkLocation) layout(set = __vkSet, binding = __vkLocation)
+#define SET_POSITION(_v) gl_Position = _v; gl_Position.z = (gl_Position.z + gl_Position.w) / 2.0
+#define GET_FRAGCOORD() vec4(gl_FragCoord.xy*uf_fragCoordScale.xy,gl_FragCoord.zw)
+#define gl_VertexID gl_VertexIndex
+#define gl_InstanceID gl_InstanceIndex
+#else
+#define ATTR_LAYOUT(__vkSet, __location) layout(location = __location)
+#define UNIFORM_BUFFER_LAYOUT(__glLocation, __vkSet, __vkLocation) layout(binding = __glLocation, std140) 
+#define TEXTURE_LAYOUT(__glLocation, __vkSet, __vkLocation) layout(binding = __glLocation)
+#define SET_POSITION(_v) gl_Position = _v
+#define GET_FRAGCOORD() vec4(gl_FragCoord.xy*uf_fragCoordScale,gl_FragCoord.zw)
+#endif
+// This shader was automatically converted to be cross-compatible with Vulkan and OpenGL.
+
+// shader 5c1761d13feccdff
+// Used for: Vertical+Horizontal Fullscreen Blur
+const float resXScale = float($width)/float($gameWidth);
+const float resYScale = float($height)/float($gameHeight);
+
+#ifdef VULKAN
+layout(set = 0, binding = 0) uniform ufBlock
+{
+uniform ivec4 uf_remappedVS[1];
+// uniform vec2 uf_windowSpaceToClipSpaceTransform; // Cemu optimized this uf_variable away in Cemu 1.15.7
+};
+#else
+uniform ivec4 uf_remappedVS[1];
+// uniform vec2 uf_windowSpaceToClipSpaceTransform; // Cemu optimized this uf_variable away in Cemu 1.15.7
+#endif
+// uf_windowSpaceToClipSpaceTransform was moved to the ufBlock
+ATTR_LAYOUT(0, 0) in uvec4 attrDataSem0;
+ATTR_LAYOUT(0, 1) in uvec4 attrDataSem1;
+out gl_PerVertex
+{
+	vec4 gl_Position;
+	float gl_PointSize;
+};
+layout(location = 0) out vec4 passParameterSem3;
+int clampFI32(int v)
+{
+if( v == 0x7FFFFFFF )
+	return floatBitsToInt(1.0);
+else if( v == 0xFFFFFFFF )
+	return floatBitsToInt(0.0);
+return floatBitsToInt(clamp(intBitsToFloat(v), 0.0, 1.0));
+}
+float mul_nonIEEE(float a, float b){ if( a == 0.0 || b == 0.0 ) return 0.0; return a*b; }
+void main()
+{
+vec4 R0f = vec4(0.0);
+vec4 R1f = vec4(0.0);
+vec4 R2f = vec4(0.0);
+uvec4 attrDecoder;
+float backupReg0f, backupReg1f, backupReg2f, backupReg3f, backupReg4f;
+vec4 PV0f = vec4(0.0), PV1f = vec4(0.0);
+float PS0f = 0.0, PS1f = 0.0;
+vec4 tempf = vec4(0.0);
+float tempResultf;
+int tempResulti;
+ivec4 ARi = ivec4(0);
+bool predResult = true;
+vec3 cubeMapSTM;
+int cubeMapFaceId;
+R0f = floatBitsToInt(ivec4(gl_VertexID, 0, 0, gl_InstanceID));
+attrDecoder.xyz = attrDataSem0.xyz;
+attrDecoder.xyz = (attrDecoder.xyz>>24)|((attrDecoder.xyz>>8)&0xFF00)|((attrDecoder.xyz<<8)&0xFF0000)|((attrDecoder.xyz<<24));
+attrDecoder.w = 0;
+R1f = vec4(intBitsToFloat(int(attrDecoder.x)), intBitsToFloat(int(attrDecoder.y)), intBitsToFloat(int(attrDecoder.z)), intBitsToFloat(floatBitsToInt(1.0)));
+attrDecoder.xy = attrDataSem1.xy;
+attrDecoder.xy = (attrDecoder.xy>>24)|((attrDecoder.xy>>8)&0xFF00)|((attrDecoder.xy<<8)&0xFF0000)|((attrDecoder.xy<<24));
+attrDecoder.z = 0;
+attrDecoder.w = 0;
+R2f = vec4(intBitsToFloat(int(attrDecoder.x)), intBitsToFloat(int(attrDecoder.y)), intBitsToFloat(floatBitsToInt(0.0)), intBitsToFloat(floatBitsToInt(1.0)));
+// 0
+backupReg0f = R1f.x;
+backupReg1f = R1f.y;
+R1f.x = backupReg0f;
+R1f.x *= 2.0;
+R1f.y = backupReg1f;
+R1f.y *= 2.0;
+R1f.z = intBitsToFloat(0xbf800000);
+R1f.w = 1.0;
+PS0f = R2f.x + -(intBitsToFloat(uf_remappedVS[0].x)/resXScale);
+// 1
+backupReg0f = R2f.y;
+backupReg1f = R2f.x;
+PV1f.x = R2f.y + -(intBitsToFloat(uf_remappedVS[0].y)/resYScale);
+R2f.y = backupReg0f + intBitsToFloat(uf_remappedVS[0].y)/resYScale;
+R2f.z = PS0f;
+R2f.x = backupReg1f + intBitsToFloat(uf_remappedVS[0].x)/resXScale;
+PS1f = R2f.x;
+// 2
+R2f.w = PV1f.x;
+// export
+SET_POSITION(vec4(R1f.x, R1f.y, R1f.z, R1f.w));
+// export
+passParameterSem3 = vec4(R2f.x, R2f.y, R2f.z, R2f.w);
+}

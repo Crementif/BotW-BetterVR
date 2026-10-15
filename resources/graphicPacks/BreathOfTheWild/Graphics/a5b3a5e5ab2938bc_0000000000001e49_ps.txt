@@ -1,0 +1,127 @@
+#version 420
+#extension GL_ARB_texture_gather : enable
+#ifdef VULKAN
+#define ATTR_LAYOUT(__vkSet, __location) layout(set = __vkSet, location = __location)
+#define UNIFORM_BUFFER_LAYOUT(__glLocation, __vkSet, __vkLocation) layout(set = __vkSet, binding = __vkLocation, std140)
+#define TEXTURE_LAYOUT(__glLocation, __vkSet, __vkLocation) layout(set = __vkSet, binding = __vkLocation)
+#define SET_POSITION(_v) gl_Position = _v; gl_Position.z = (gl_Position.z + gl_Position.w) / 2.0
+#define GET_FRAGCOORD() vec4(gl_FragCoord.xy*uf_fragCoordScale.xy,gl_FragCoord.zw)
+#define gl_VertexID gl_VertexIndex
+#define gl_InstanceID gl_InstanceIndex
+#else
+#define ATTR_LAYOUT(__vkSet, __location) layout(location = __location)
+#define UNIFORM_BUFFER_LAYOUT(__glLocation, __vkSet, __vkLocation) layout(binding = __glLocation, std140) 
+#define TEXTURE_LAYOUT(__glLocation, __vkSet, __vkLocation) layout(binding = __glLocation)
+#define SET_POSITION(_v) gl_Position = _v
+#define GET_FRAGCOORD() vec4(gl_FragCoord.xy*uf_fragCoordScale,gl_FragCoord.zw)
+#endif
+// This shader was automatically converted to be cross-compatible with Vulkan and OpenGL.
+
+// shader a5b3a5e5ab2938bc
+// Used for: Restoring the native BotW Anti-Aliasing implementation
+const float resXScale = float($width)/float($gameWidth);
+const float resYScale = float($height)/float($gameHeight);
+
+#ifdef VULKAN
+layout(set = 1, binding = 3) uniform ufBlock
+{
+uniform ivec4 uf_remappedPS[3];
+uniform vec4 uf_fragCoordScale;
+};
+#else
+uniform ivec4 uf_remappedPS[3];
+uniform vec2 uf_fragCoordScale;
+#endif
+TEXTURE_LAYOUT(0, 1, 0) uniform sampler2D textureUnitPS0;
+TEXTURE_LAYOUT(1, 1, 1) uniform sampler2D textureUnitPS1;
+TEXTURE_LAYOUT(2, 1, 2) uniform sampler2D textureUnitPS2;
+layout(location = 0) in vec4 passParameterSem0;
+layout(location = 1) in vec4 passParameterSem1;
+layout(location = 0) out vec4 passPixelColor0;
+// uf_fragCoordScale was moved to the ufBlock
+int clampFI32(int v)
+{
+if( v == 0x7FFFFFFF )
+	return floatBitsToInt(1.0);
+else if( v == 0xFFFFFFFF )
+	return floatBitsToInt(0.0);
+return floatBitsToInt(clamp(intBitsToFloat(v), 0.0, 1.0));
+}
+float mul_nonIEEE(float a, float b){ if( a == 0.0 || b == 0.0 ) return 0.0; return a*b; }
+void main()
+{
+vec4 R0f = vec4(0.0);
+vec4 R1f = vec4(0.0);
+vec4 R2f = vec4(0.0);
+vec4 R123f = vec4(0.0);
+vec4 R125f = vec4(0.0);
+vec4 R126f = vec4(0.0);
+vec4 R127f = vec4(0.0);
+float backupReg0f, backupReg1f, backupReg2f, backupReg3f, backupReg4f;
+vec4 PV0f = vec4(0.0), PV1f = vec4(0.0);
+float PS0f = 0.0, PS1f = 0.0;
+vec4 tempf = vec4(0.0);
+float tempResultf;
+int tempResulti;
+ivec4 ARi = ivec4(0);
+bool predResult = true;
+vec3 cubeMapSTM;
+int cubeMapFaceId;
+R0f = passParameterSem0;
+R1f = passParameterSem1;
+R2f.w = (texture(textureUnitPS1, R0f.xy).x);
+R0f.xyzw = (textureGather(textureUnitPS2, R0f.xy).xyzw);
+// 0
+backupReg0f = R0f.y;
+backupReg1f = R0f.x;
+PV0f.x = -(R2f.w) + R0f.w;
+PV0f.y = -(R2f.w) + R0f.z;
+PV0f.z = -(R2f.w) + backupReg0f;
+PV0f.w = -(R2f.w) + backupReg1f;
+PS0f = R2f.w + intBitsToFloat(uf_remappedPS[0].x);
+// 1
+R127f.x = max(PV0f.w, -(PV0f.w));
+PV1f.y = max(PV0f.z, -(PV0f.z));
+R127f.z = max(PV0f.y, -(PV0f.y));
+R127f.w = max(PV0f.x, -(PV0f.x));
+PS1f = 1.0 / PS0f;
+// 2
+R126f.x = intBitsToFloat(uf_remappedPS[1].w) * PS1f;
+R127f.y = PV1f.y * -(1.0);
+R126f.z = floor(R1f.y);
+R125f.w = floor(R1f.x);
+PV0f.w = R125f.w;
+PS0f = PV1f.y * -(1.0);
+// 3
+tempf.x = dot(vec4(R127f.w,R127f.z,R127f.x,PS0f),vec4(1.0,-(1.0),1.0,1.0));
+PV1f.x = tempf.x;
+PV1f.y = tempf.x;
+PV1f.z = tempf.x;
+PV1f.w = tempf.x;
+R126f.w = tempf.x;
+R126f.y = R1f.x + -(PV0f.w);
+PS1f = R126f.y;
+// 4
+tempf.x = dot(vec4(R127f.w,R127f.x,R127f.z,R127f.y),vec4(1.0,-(1.0),1.0,1.0));
+PV0f.x = tempf.x;
+PV0f.y = tempf.x;
+PV0f.z = tempf.x;
+PV0f.w = tempf.x;
+PS0f = R1f.y + -(R126f.z);
+// 5
+R123f.x = (mul_nonIEEE(R126f.x,PV0f.x) + PS0f);
+R123f.x = clamp(R123f.x, 0.0, 1.0);
+PV1f.x = R123f.x;
+R123f.y = (mul_nonIEEE(R126f.x,R126f.w) + R126f.y);
+R123f.y = clamp(R123f.y, 0.0, 1.0);
+PV1f.y = R123f.y;
+// 6
+PV0f.z = R126f.z + PV1f.x;
+PV0f.w = R125f.w + PV1f.y;
+// 7
+R1f.x = (mul_nonIEEE(PV0f.w,intBitsToFloat(uf_remappedPS[2].z)/resXScale) + R1f.z);
+R1f.y = (mul_nonIEEE(PV0f.z,intBitsToFloat(uf_remappedPS[2].w)/resYScale) + R1f.w);
+R1f.xyzw = (texture(textureUnitPS0, R1f.xy).xyzw);
+// export
+passPixelColor0 = vec4(R1f.x, R1f.y, R1f.z, R1f.w);
+}

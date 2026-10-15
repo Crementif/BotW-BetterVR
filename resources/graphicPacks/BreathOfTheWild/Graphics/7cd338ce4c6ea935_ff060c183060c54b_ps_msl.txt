@@ -1,0 +1,125 @@
+#include <metal_stdlib>
+using namespace metal;
+
+// shader 7cd338ce4c6ea935
+// Shader dumped from BotW 208, using Cemu 2193a8c
+// Based on 75a85b0cbcab764b_0000000000000000_vs.txt
+// Used for: Ultrawide cutscenes (when enabled)
+
+constant float aspectRatio =
+    float(($gameWidth / $gameHeight) / ($width / $height));
+constant float reverseAspectRatio =
+    float(($width / $height) / ($gameWidth / $gameHeight));
+#define ultrawideHUDMode $ultrawideHUDMode
+
+#define SET_POSITION(_v)                                                       \
+    out.position = _v;                                                         \
+    out.position.z = (out.position.z + out.position.w) / 2.0
+// start of shader inputs/outputs, predetermined by Cemu. Do not touch
+struct SupportBuffer {
+    int4 remapped[1];
+    float2 fragCoordScale;
+};
+
+#define GET_FRAGCOORD()                                                        \
+    float4(in.position.xy *supportBuffer.fragCoordScale.xy, in.position.z,     \
+           1.0 / in.position.w)
+struct FragmentIn {
+    float4 position [[position]];
+    float4 passParameterSem0 [[user(locn0)]];
+};
+
+struct FragmentOut {
+    float4 passPixelColor0 [[color(0)]];
+};
+
+// end of shader inputs/outputs
+template <typename TextureT, typename CoordT>
+float sampleCompareEmulate(TextureT tex, sampler samplr, CoordT coord,
+                           float compareValue) {
+    return compareValue < tex.sample(samplr, coord).x ? 1.0 : 0.0;
+}
+template <typename TextureT, typename CoordT>
+float2 textureCalculateLod(TextureT tex, sampler samplr, CoordT coord) {
+    float lod = tex.calculate_unclamped_lod(samplr, coord);
+    return float2(floor(lod), fract(lod));
+}
+int clampFI32(int v) {
+    if (v == 0x7FFFFFFF)
+        return as_type<int>(1.0);
+    else if (v == 0xFFFFFFFF)
+        return as_type<int>(0.0);
+    return as_type<int>(clamp(as_type<float>(v), 0.0, 1.0));
+}
+float mul_nonIEEE(float a, float b) {
+    if (a == 0.0 || b == 0.0)
+        return 0.0;
+    return a * b;
+}
+fragment FragmentOut main0(FragmentIn in [[stage_in]],
+                           float2 pointCoord [[point_coord]],
+                           bool frontFacing [[front_facing]],
+                           constant SupportBuffer &supportBuffer [[buffer(0)]],
+                           texture2d<float> tex0 [[texture(0)]],
+                           sampler samplr0 [[sampler(0)]]) {
+    FragmentOut out;
+    float4 R0f = float4(0.0);
+    float4 R127f = float4(0.0);
+    float backupReg0f, backupReg1f, backupReg2f, backupReg3f, backupReg4f;
+    float PV0fx = 0.0, PV0fy = 0.0, PV0fz = 0.0, PV0fw = 0.0, PV1fx = 0.0,
+          PV1fy = 0.0, PV1fz = 0.0, PV1fw = 0.0;
+    float PS0f = 0.0, PS1f = 0.0;
+    float4 tempf = float4(0.0);
+    float tempResultf;
+    int tempResulti;
+    int4 ARi = int4(0);
+    bool predResult = true;
+    R0f = in.passParameterSem0;
+
+#if (ultrawideHUDMode != 0)
+    float uv_x = 0.5 + (R0f.x - 0.5) / aspectRatio;
+    R0f.xyzw = (tex0.sample(samplr0, float2(uv_x, R0f.y)).xyzw);
+#else
+    R0f.xyzw = (tex0.sample(samplr0, float2(R0f.x, R0f.y)).xyzw);
+#endif
+    // 0
+    tempResultf = max(0.0, R0f.x);
+    tempResultf = log2(tempResultf);
+    if (isinf(tempResultf) == true)
+        tempResultf = -3.40282347E+38F;
+    PS0f = tempResultf;
+    // 1
+    R127f.z = mul_nonIEEE(PS0f, as_type<float>(supportBuffer.remapped[0].x));
+    tempResultf = max(0.0, R0f.y);
+    tempResultf = log2(tempResultf);
+    if (isinf(tempResultf) == true)
+        tempResultf = -3.40282347E+38F;
+    PS1f = tempResultf;
+    // 2
+    R127f.w = mul_nonIEEE(PS1f, as_type<float>(supportBuffer.remapped[0].x));
+    tempResultf = max(0.0, R0f.z);
+    tempResultf = log2(tempResultf);
+    if (isinf(tempResultf) == true)
+        tempResultf = -3.40282347E+38F;
+    PS0f = tempResultf;
+    // 3
+    R127f.x = mul_nonIEEE(PS0f, as_type<float>(supportBuffer.remapped[0].x));
+    PS1f = exp2(R127f.z);
+    // 4
+    R0f.x = PS1f;
+    PS0f = exp2(R127f.w);
+    // 5
+    R0f.y = PS0f;
+    PS1f = exp2(R127f.x);
+    // 6
+    R0f.z = PS1f;
+    // export
+
+#if (ultrawideHUDMode != 0)
+    bool isBorder = uv_x < 0 || uv_x > 1.0;
+    out.passPixelColor0 = as_type<float4>(isBorder ? float4(0.0) : R0f.xyzw);
+#else
+    out.passPixelColor0 = as_type<float4>(float4(R0f.x, R0f.y, R0f.z, R0f.w));
+#endif
+    return out;
+}

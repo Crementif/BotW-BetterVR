@@ -1,0 +1,248 @@
+#version 420
+#extension GL_ARB_texture_gather : enable
+#extension GL_ARB_separate_shader_objects : enable
+#ifdef VULKAN
+#define ATTR_LAYOUT(__vkSet, __location) layout(set = __vkSet, location = __location)
+#define UNIFORM_BUFFER_LAYOUT(__glLocation, __vkSet, __vkLocation) layout(set = __vkSet, binding = __vkLocation, std140)
+#define TEXTURE_LAYOUT(__glLocation, __vkSet, __vkLocation) layout(set = __vkSet, binding = __vkLocation)
+#define SET_POSITION(_v) gl_Position = _v; gl_Position.z = (gl_Position.z + gl_Position.w) / 2.0
+#define GET_FRAGCOORD() vec4(gl_FragCoord.xy*uf_fragCoordScale.xy,gl_FragCoord.zw)
+#define gl_VertexID gl_VertexIndex
+#define gl_InstanceID gl_InstanceIndex
+#else
+#define ATTR_LAYOUT(__vkSet, __location) layout(location = __location)
+#define UNIFORM_BUFFER_LAYOUT(__glLocation, __vkSet, __vkLocation) layout(binding = __glLocation, std140) 
+#define TEXTURE_LAYOUT(__glLocation, __vkSet, __vkLocation) layout(binding = __glLocation)
+#define SET_POSITION(_v) gl_Position = _v
+#define GET_FRAGCOORD() vec4(gl_FragCoord.xy*uf_fragCoordScale,gl_FragCoord.zw)
+#endif
+/* This shaders was auto-converted from OpenGL to Cemu.
+Conversion output:
+*/
+
+
+// shader f4e1147ab34a1677 -- Vertex Shader where links gets drawn in the menu
+
+#ifdef VULKAN
+layout(set = 0, binding = 0) uniform ufBlock
+{
+uniform ivec4 uf_remappedVS[5];
+// uniform vec2 uf_windowSpaceToClipSpaceTransform; // Cemu optimized this uf_variable away in Cemu 1.15.7
+};
+#else
+uniform ivec4 uf_remappedVS[5];
+// uniform vec2 uf_windowSpaceToClipSpaceTransform; // Cemu optimized this uf_variable away in Cemu 1.15.7
+#endif
+
+#define menuWrkrnd $menuWrkrnd
+#define mode $mode
+
+// uf_windowSpaceToClipSpaceTransform was moved to the ufBlock
+ATTR_LAYOUT(0, 0) in uvec4 attrDataSem0;
+ATTR_LAYOUT(0, 1) in uvec4 attrDataSem1;
+out gl_PerVertex
+{
+	vec4 gl_Position;
+	float gl_PointSize;
+};
+layout(location = 0) out vec4 passParameterSem0;
+layout(location = 2) out vec4 passParameterSem4;
+layout(location = 3) out vec4 passParameterSem5;
+layout(location = 1) out vec4 passParameterSem1;
+layout(location = 4) out vec4 passParameterSem6;
+int clampFI32(int v)
+{
+if( v == 0x7FFFFFFF )
+	return floatBitsToInt(1.0);
+else if( v == 0xFFFFFFFF )
+	return floatBitsToInt(0.0);
+return floatBitsToInt(clamp(intBitsToFloat(v), 0.0, 1.0));
+}
+float mul_nonIEEE(float a, float b){ if( a == 0.0 || b == 0.0 ) return 0.0; return a*b; }
+void main()
+{
+ivec4 R0i = ivec4(0);
+ivec4 R1i = ivec4(0);
+ivec4 R2i = ivec4(0);
+ivec4 R3i = ivec4(0);
+ivec4 R4i = ivec4(0);
+ivec4 R5i = ivec4(0);
+ivec4 R6i = ivec4(0);
+ivec4 R123i = ivec4(0);
+ivec4 R124i = ivec4(0);
+ivec4 R125i = ivec4(0);
+ivec4 R126i = ivec4(0);
+ivec4 R127i = ivec4(0);
+uvec4 attrDecoder;
+int backupReg0i, backupReg1i, backupReg2i, backupReg3i, backupReg4i;
+ivec4 PV0i = ivec4(0), PV1i = ivec4(0);
+int PS0i = 0, PS1i = 0;
+ivec4 tempi = ivec4(0);
+float tempResultf;
+int tempResulti;
+ivec4 ARi = ivec4(0);
+bool predResult = true;
+vec3 cubeMapSTM;
+int cubeMapFaceId;
+
+R0i = ivec4(gl_VertexID, 0, 0, gl_InstanceID);
+
+attrDecoder.xyzw = attrDataSem0.xyzw;
+attrDecoder = ((attrDecoder>>8)&0xFF)|((attrDecoder<<8)&0xFF00);
+attrDecoder.xyzw = floatBitsToInt(vec4(unpackHalf2x16(attrDecoder.x|(attrDecoder.y<<16)),unpackHalf2x16(attrDecoder.z|(attrDecoder.w<<16))));
+R1i = ivec4(int(attrDecoder.x), int(attrDecoder.y), int(attrDecoder.z), int(attrDecoder.w));
+
+attrDecoder.x = attrDataSem1.x;
+attrDecoder.x = (attrDecoder.x>>24)|((attrDecoder.x>>8)&0xFF00)|((attrDecoder.x<<8)&0xFF0000)|((attrDecoder.x<<24));
+attrDecoder.y = 0;
+attrDecoder.z = 0;
+attrDecoder.w = 0;
+attrDecoder.xyzw = uvec4((attrDecoder.x>>0)&0x3FF,(attrDecoder.x>>10)&0x3FF,(attrDecoder.x>>20)&0x3FF,(attrDecoder.x>>30)&0x3);
+if( (attrDecoder.x&0x200) != 0 ) attrDecoder.x |= 0xFFFFFC00;
+if( (attrDecoder.y&0x200) != 0 ) attrDecoder.y |= 0xFFFFFC00;
+if( (attrDecoder.z&0x200) != 0 ) attrDecoder.z |= 0xFFFFFC00;
+attrDecoder.x = floatBitsToUint(max(float(int(attrDecoder.x))/511.0,-1.0));
+attrDecoder.y = floatBitsToUint(max(float(int(attrDecoder.y))/511.0,-1.0));
+attrDecoder.z = floatBitsToUint(max(float(int(attrDecoder.z))/511.0,-1.0));
+attrDecoder.w = floatBitsToUint(float(attrDecoder.w));
+R2i = ivec4(int(attrDecoder.x), int(attrDecoder.y), int(attrDecoder.z), int(attrDecoder.w));
+
+// 0
+backupReg0i = R0i.x;
+PV0i.x = (backupReg0i == int(1))?int(0xFFFFFFFF):int(0x0);
+R127i.y = 0x3f800000; // subtracting brings the black box top side down
+PV0i.z = 0x3f800000; // subtracting slants down diagonally
+PV0i.w = 0x40400000;
+R127i.z = 0xbf800000; // unnecssary left side, extends the black box
+PS0i = R127i.z;
+
+// 1
+PV1i.x = floatBitsToInt(intBitsToFloat(uf_remappedVS[0].z) * intBitsToFloat(0x3b808081));
+R123i.y = ((PV0i.x == 0)?(PV0i.w):(0xbf800000));
+PV1i.y = R123i.y;
+R126i.z = uf_remappedVS[1].z;
+R126i.z = floatBitsToInt(intBitsToFloat(R126i.z) / 2.0);
+R123i.w = ((PV0i.x == 0)?(PV0i.z):(0xc0400000));
+PV1i.w = R123i.w;
+R1i.w = 0x3f800000;
+PS1i = R1i.w;
+
+// 2
+R1i.x = ((R0i.x == 0)?(R127i.z):(PV1i.y));
+PV0i.x = R1i.x;
+R1i.y = ((R0i.x == 0)?(R127i.y):(PV1i.w));
+PV0i.y = R1i.y;
+R1i.z = floatBitsToInt(intBitsToFloat(PV1i.x) + -(0.5));
+R1i.z = floatBitsToInt(intBitsToFloat(R1i.z) * 2.0);
+R125i.w = floatBitsToInt(-(intBitsToFloat(uf_remappedVS[2].z)));
+R125i.w = floatBitsToInt(intBitsToFloat(R125i.w) / 2.0);
+R4i.x = floatBitsToInt(-(intBitsToFloat(uf_remappedVS[3].x)));
+R4i.x = floatBitsToInt(intBitsToFloat(R4i.x) * 2.0);
+PS0i = R4i.x;
+
+// 3 -- links lighting
+R2i.x = floatBitsToInt((intBitsToFloat(PV0i.x) * 0.5 + 0.5));
+PV1i.x = R2i.x;
+R4i.y = uf_remappedVS[3].y;
+R4i.y = floatBitsToInt(intBitsToFloat(R4i.y) * 2.0);
+PV1i.z = floatBitsToInt(-(intBitsToFloat(PV0i.y)));
+R127i.w = PV0i.x;
+R127i.w = floatBitsToInt(intBitsToFloat(R127i.w) / 2.0);
+R127i.x = floatBitsToInt(-(intBitsToFloat(PV0i.y)));
+R127i.x = floatBitsToInt(intBitsToFloat(R127i.x) / 2.0);
+PS1i = R127i.x;
+// 4 -- links lighting
+R126i.x = floatBitsToInt(intBitsToFloat(R125i.w) + -(0.5));
+R2i.y = floatBitsToInt((intBitsToFloat(PV1i.z) * 0.5 + 0.5));
+PV0i.y = R2i.y;
+R6i.z = PV1i.x;
+PV0i.z = R6i.z;
+R124i.w = floatBitsToInt(intBitsToFloat(R126i.z) + -(0.5));
+R126i.w = floatBitsToInt(-(intBitsToFloat(R4i.x)));
+R126i.w = floatBitsToInt(intBitsToFloat(R126i.w) / 2.0);
+PS0i = R126i.w;
+// 5 -- links lighting
+backupReg0i = R127i.x;
+R127i.x = floatBitsToInt(intBitsToFloat(backupReg0i) + intBitsToFloat(R125i.w));
+PV1i.y = floatBitsToInt(intBitsToFloat(R127i.w) + intBitsToFloat(R126i.z));
+PV1i.z = floatBitsToInt(-(intBitsToFloat(R4i.y)));
+PV1i.z = floatBitsToInt(intBitsToFloat(PV1i.z) / 2.0);
+R6i.w = PV0i.y;
+PV1i.w = R6i.w;
+R127i.y = floatBitsToInt(intBitsToFloat(PV0i.z) + intBitsToFloat(uf_remappedVS[4].z));
+PS1i = R127i.y;
+
+// 6
+PV0i.x = floatBitsToInt(intBitsToFloat(PV1i.w) + intBitsToFloat(uf_remappedVS[4].w));
+R126i.y = floatBitsToInt((mul_nonIEEE(intBitsToFloat(R4i.x),intBitsToFloat(R126i.z)) + intBitsToFloat(R126i.w)));
+R126i.z = floatBitsToInt((mul_nonIEEE(intBitsToFloat(R4i.y),intBitsToFloat(R125i.w)) + intBitsToFloat(PV1i.z)));
+R126i.w = floatBitsToInt(intBitsToFloat(R2i.x) + intBitsToFloat(R124i.w));
+R127i.w = floatBitsToInt(mul_nonIEEE(intBitsToFloat(R4i.x), intBitsToFloat(PV1i.y)));
+PS0i = R127i.w;
+// 7
+backupReg0i = R127i.x;
+R127i.x = floatBitsToInt(mul_nonIEEE(intBitsToFloat(R4i.y), intBitsToFloat(backupReg0i)));
+R125i.y = uf_remappedVS[4].x;
+R125i.y = floatBitsToInt(intBitsToFloat(R125i.y) / 2.0);
+PV1i.z = floatBitsToInt(intBitsToFloat(PV0i.x) + intBitsToFloat(R126i.x));
+R125i.w = uf_remappedVS[4].y;
+R125i.w = floatBitsToInt(intBitsToFloat(R125i.w) / 2.0);
+R0i.w = uf_remappedVS[4].z;
+R0i.w = floatBitsToInt(intBitsToFloat(R0i.w) * 2.0);
+PS1i = R0i.w;
+// 8
+backupReg0i = R126i.x;
+backupReg1i = R127i.y;
+backupReg2i = R126i.w;
+R126i.x = floatBitsToInt(intBitsToFloat(R2i.y) + intBitsToFloat(backupReg0i));
+R127i.y = floatBitsToInt(intBitsToFloat(backupReg1i) + intBitsToFloat(R124i.w));
+R127i.z = uf_remappedVS[4].w;
+R127i.z = floatBitsToInt(intBitsToFloat(R127i.z) * 2.0);
+R126i.w = floatBitsToInt(mul_nonIEEE(intBitsToFloat(R4i.x), intBitsToFloat(backupReg2i)));
+R125i.x = floatBitsToInt(mul_nonIEEE(intBitsToFloat(R4i.y), intBitsToFloat(PV1i.z)));
+PS0i = R125i.x;
+// 9
+R3i.x = floatBitsToInt((mul_nonIEEE(intBitsToFloat(R2i.x),intBitsToFloat(R125i.y)) + 0.5));
+R3i.y = floatBitsToInt((mul_nonIEEE(intBitsToFloat(R2i.y),intBitsToFloat(R125i.w)) + 0.5));
+R4i.z = R126i.y;
+R5i.w = floatBitsToInt(1.0);
+R4i.w = R126i.z;
+PS1i = R4i.w;
+// 10
+R0i.x = floatBitsToInt(mul_nonIEEE(intBitsToFloat(R4i.x), intBitsToFloat(R127i.y)));
+R0i.y = floatBitsToInt(mul_nonIEEE(intBitsToFloat(R4i.y), intBitsToFloat(R126i.x)));
+R2i.z = R127i.w;
+R2i.w = R127i.x;
+R3i.z = R0i.w;
+PS0i = R3i.z;
+// 11
+R0i.z = R126i.w;
+R3i.w = R127i.z;
+R0i.w = R125i.x;
+PS1i = R0i.w;
+
+// export
+
+#if (mode == 4 && menuWrkrnd == 1)
+
+SET_POSITION(vec4(intBitsToFloat(R1i.x), intBitsToFloat(R1i.y), intBitsToFloat(R1i.z), intBitsToFloat(R1i.w)) * 0);
+
+#else
+
+SET_POSITION(vec4(intBitsToFloat(R1i.x), intBitsToFloat(R1i.y), intBitsToFloat(R1i.z), intBitsToFloat(R1i.w)));
+
+#endif
+
+// export
+passParameterSem0 = vec4(intBitsToFloat(R2i.x), intBitsToFloat(R2i.y), intBitsToFloat(R2i.z), intBitsToFloat(R2i.w));
+// export
+passParameterSem4 = vec4(intBitsToFloat(R3i.x), intBitsToFloat(R3i.y), intBitsToFloat(R3i.z), intBitsToFloat(R3i.w));
+// export
+passParameterSem5 = vec4(intBitsToFloat(R0i.x), intBitsToFloat(R0i.y), intBitsToFloat(R0i.z), intBitsToFloat(R0i.w));
+// export
+passParameterSem1 = vec4(intBitsToFloat(R4i.x), intBitsToFloat(R4i.y), intBitsToFloat(R4i.z), intBitsToFloat(R4i.w));
+// export
+// skipped export to semanticId 255
+// export
+passParameterSem6 = vec4(intBitsToFloat(R6i.x), intBitsToFloat(R6i.x), intBitsToFloat(R6i.z), intBitsToFloat(R6i.w)); // z= moves link left, w= moves link right, affects link cut out in menu
+}

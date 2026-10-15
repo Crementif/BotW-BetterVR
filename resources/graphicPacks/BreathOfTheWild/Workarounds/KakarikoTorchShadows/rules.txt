@@ -1,0 +1,7 @@
+[Definition]
+titleIds = 00050000101C9300,00050000101C9400,00050000101C9500
+name = Kakariko Torch Shadows workaround (OpenGL)
+path = "The Legend of Zelda: Breath of the Wild/Workarounds/Kakariko Torch Shadows (OpenGL)"
+description = Workaround for the square shadows seen around torches in Kakariko Village when using OpenGL.||Made by Kiri.
+rendererFilter = opengl
+version = 6

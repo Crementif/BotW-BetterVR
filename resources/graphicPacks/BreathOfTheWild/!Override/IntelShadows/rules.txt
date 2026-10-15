@@ -1,0 +1,8 @@
+[Definition]
+titleIds = 00050000101C9300,00050000101C9400,00050000101C9500
+name = Shadows for Intel GPUs (Vulkan)
+path = "The Legend of Zelda: Breath of the Wild/Workarounds/Shadows for Intel GPUs (Vulkan)"
+description = Reduces the severity of the bugged shadows on Intel integrated GPUs when using Vulkan.||Made by ethrillo and Cypher.
+vendorFilter = intel
+rendererFilter = vulkan
+version = 6

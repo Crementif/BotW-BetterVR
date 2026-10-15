@@ -1,0 +1,460 @@
+[Definition]
+titleIds = 00050000101C9300,00050000101C9400,00050000101C9500
+name = FPS++
+path = "The Legend of Zelda: Breath of the Wild/Mods/FPS++"
+description = Allows you to change the FPS and the speed that most things run at.|Some bugs might still occur if you run at high FPS.||Made by Xalphenos, rajkosto, epigramx, Crementif, leoetlino, Pig and Exzap.
+version = 6
+
+[Default]
+$fpsLockMode:int = 0
+$advancedMode:int = 0
+$staticFPSMode:int = 0
+
+$fpsLimitNormal = 60
+$fpsLimitAdvanced = 60
+$keepVsync:int = 0
+
+$frameAverageAmount = 8
+$fenceMethod = 1
+$deferGpuReadbacks:int = 1
+$lowFPSLimit = 20
+$cutsceneFPSLimitMode:int = 1
+$roundUpModifier = 0.8
+
+$showDebugModeOptions:int = 0
+$debugMode:int = 0
+$debugMultiplier = 1
+
+
+# Settings Mode
+
+[Preset]
+name = Normal Settings
+category = Mode
+default = 1
+$advancedMode:int = 0
+
+[Preset]
+name = Advanced Settings
+category = Mode
+$advancedMode:int = 1
+
+
+# Simple FPS Limit
+
+[Preset]
+name = 240FPS Limit
+category = FPS Limit
+condition = $advancedMode == 0
+$fpsLimitNormal = 240
+$keepVsync:int = 0
+
+[Preset]
+name = 165FPS Limit
+category = FPS Limit
+condition = $advancedMode == 0
+$fpsLimitNormal = 165
+$keepVsync:int = 0
+
+[Preset]
+name = 144FPS Limit
+category = FPS Limit
+condition = $advancedMode == 0
+$fpsLimitNormal = 144
+$keepVsync:int = 0
+
+[Preset]
+name = 120FPS Limit
+category = FPS Limit
+condition = $advancedMode == 0
+$fpsLimitNormal = 120
+$keepVsync:int = 0
+
+[Preset]
+name = 90FPS Limit
+category = FPS Limit
+condition = $advancedMode == 0
+$fpsLimitNormal = 90
+$keepVsync:int = 0
+
+[Preset]
+name = 75FPS Limit
+category = FPS Limit
+condition = $advancedMode == 0
+$fpsLimitNormal = 75
+$keepVsync:int = 0
+
+[Preset]
+name = 72FPS Limit
+category = FPS Limit
+condition = $advancedMode == 0
+$fpsLimitNormal = 72
+$keepVsync:int = 0
+
+[Preset]
+name = 60FPS Limit (Default)
+category = FPS Limit
+condition = $advancedMode == 0
+default = 1
+$fpsLimitNormal = 60
+$keepVsync:int = 0
+
+[Preset]
+name = 55FPS Limit
+category = FPS Limit
+condition = $advancedMode == 0
+$fpsLimitNormal = 55
+$keepVsync:int = 0
+
+[Preset]
+name = 45FPS Limit
+category = FPS Limit
+condition = $advancedMode == 0
+$fpsLimitNormal = 45
+$keepVsync:int = 0
+
+[Preset]
+name = 30FPS Limit
+category = FPS Limit
+condition = $advancedMode == 0
+$fpsLimitNormal = 30
+$keepVsync:int = 0
+
+[Preset]
+name = 20FPS Limit
+category = FPS Limit
+condition = $advancedMode == 0
+$fpsLimitNormal = 20
+$keepVsync:int = 0
+
+
+# Advanced Settings
+
+# Framerate Limit
+
+[Preset]
+name = No FPS Limit (for benchmarking)
+category = Framerate Limit
+condition = $advancedMode == 1
+$fpsLimitAdvanced = 500
+$keepVsync:int = 0
+
+[Preset]
+name = 244FPS (ideal for 244Hz displays)
+category = Framerate Limit
+condition = $advancedMode == 1
+$fpsLimitAdvanced = 244
+$keepVsync:int = 0
+
+[Preset]
+name = 240FPS (ideal for 240Hz displays)
+category = Framerate Limit
+condition = $advancedMode == 1
+$fpsLimitAdvanced = 240
+$keepVsync:int = 0
+
+[Preset]
+name = 165FPS (ideal for 165Hz displays)
+category = Framerate Limit
+condition = $advancedMode == 1
+$fpsLimitAdvanced = 165
+$keepVsync:int = 0
+
+[Preset]
+name = 144FPS (ideal for 144Hz displays)
+category = Framerate Limit
+condition = $advancedMode == 1
+$fpsLimitAdvanced = 144
+$keepVsync:int = 0
+
+[Preset]
+name = 120FPS (ideal for 240/120/60Hz displays)
+category = Framerate Limit
+condition = $advancedMode == 1
+$fpsLimitAdvanced = 120
+$keepVsync:int = 0
+
+[Preset]
+name = 90FPS (ideal for 360/180/90Hz displays)
+category = Framerate Limit
+condition = $advancedMode == 1
+$fpsLimitAdvanced = 90
+$keepVsync:int = 0
+
+[Preset]
+name = 75FPS (ideal for 75Hz displays)
+category = Framerate Limit
+condition = $advancedMode == 1
+$fpsLimitAdvanced = 75
+$keepVsync:int = 0
+
+[Preset]
+name = 72FPS (ideal for 144Hz displays)
+category = Framerate Limit
+condition = $advancedMode == 1
+$fpsLimitAdvanced = 72
+$keepVsync:int = 0
+
+[Preset]
+name = 60FPS (ideal for 240/120/60Hz displays)
+category = Framerate Limit
+condition = $advancedMode == 1
+default = 1
+$fpsLimitAdvanced = 60
+$keepVsync:int = 0
+
+[Preset]
+name = 55FPS (ideal for 165Hz displays)
+category = Framerate Limit
+condition = $advancedMode == 1
+$fpsLimitAdvanced = 55
+$keepVsync:int = 0
+
+[Preset]
+name = 48FPS (ideal for 144Hz displays)
+category = Framerate Limit
+condition = $advancedMode == 1
+$fpsLimitAdvanced = 48
+$keepVsync:int = 0
+
+[Preset]
+name = 40FPS (ideal for 240/120/60Hz displays)
+category = Framerate Limit
+condition = $advancedMode == 1
+$fpsLimitAdvanced = 40
+$keepVsync:int = 0
+
+[Preset]
+name = 33FPS (ideal for 165Hz displays)
+category = Framerate Limit
+condition = $advancedMode == 1
+$fpsLimitAdvanced = 33
+$keepVsync:int = 0
+
+[Preset]
+name = 30FPS (ideal for 240/120/60Hz displays)
+category = Framerate Limit
+condition = $advancedMode == 1
+$fpsLimitAdvanced = 30
+$keepVsync:int = 0
+
+[Preset]
+name = 20FPS (ideal for 240/120/60Hz displays)
+category = Framerate Limit
+condition = $advancedMode == 1
+$fpsLimitAdvanced = 20
+$keepVsync:int = 0
+
+# Double-Buffered VSync
+
+# [Preset]
+# name = Enabled (Recommended, Uses Cemu's Vsync)
+# category = Override Double-Buffered Vsync
+# condition = (($advancedMode == 1) + ($fpsLimitAdvanced != 30)) == 2
+# default = 1
+# $keepVsync:int = 0
+# 
+# [Preset]
+# name = Disabled (Not Recommended)
+# category = Override Double-Buffered Vsync
+# condition = (($advancedMode == 1) + ($fpsLimitAdvanced != 30)) == 2
+# $keepVsync:int = 1
+# 
+# [Preset]
+# name = Enabled (Default)
+# category = Override Double-Buffered Vsync
+# condition = (($advancedMode == 1) + ($fpsLimitAdvanced == 30)) == 2
+# $keepVsync:int = 0
+# 
+# [Preset]
+# name = Disabled (Can Improve Frame Pacing At 30FPS)
+# category = Override Double-Buffered Vsync
+# condition = (($advancedMode == 1) + ($fpsLimitAdvanced == 30)) == 2
+# default = 1
+# $keepVsync:int = 1
+
+
+# Cutscene FPS Limit Mode
+
+[Preset]
+name = Automatically Limit In Few Cutscenes (Recommended)
+category = Cutscene FPS Limit
+condition = $advancedMode == 1
+default = 1
+$cutsceneFPSLimitMode:int = 1
+
+[Preset]
+name = Limit all cutscenes to 60FPS
+category = Cutscene FPS Limit
+condition = $advancedMode == 1
+$cutsceneFPSLimitMode:int = 2
+
+[Preset]
+name = Limit all cutscenes to 30FPS
+category = Cutscene FPS Limit
+condition = $advancedMode == 1
+$cutsceneFPSLimitMode:int = 3
+
+[Preset]
+name = Disabled (Causes Crashes Above 30-60FPS)
+category = Cutscene FPS Limit
+condition = $advancedMode == 1
+$cutsceneFPSLimitMode:int = 0
+
+# Static Mode
+
+[Preset]
+name = Enabled (slowdown when under framerate limit)
+category = Static Mode
+condition = $advancedMode == 1
+$staticFPSMode:int = 1
+
+[Preset]
+name = Disabled (Default, dynamically adjust game speed)
+category = Static Mode
+condition = $advancedMode == 1
+default = 1
+$staticFPSMode:int = 0
+
+
+# Frame Average
+
+[Preset]
+name = 16 Frames Averaged
+category = Frame Average
+condition = ($advancedMode-$staticFPSMode == 1)
+$frameAverageAmount = 16
+
+[Preset]
+name = 8 Frames Averaged (Default)
+category = Frame Average
+condition = ($advancedMode-$staticFPSMode == 1)
+default = 1
+$frameAverageAmount = 8
+
+[Preset]
+name = 6 Frames Averaged
+category = Frame Average
+condition = ($advancedMode-$staticFPSMode == 1)
+$frameAverageAmount = 6
+
+[Preset]
+name = 4 Frames Averaged (juddery animations)
+category = Frame Average
+condition = ($advancedMode-$staticFPSMode == 1)
+$frameAverageAmount = 4
+
+[Preset]
+name = 3 Frames Averaged (juddery animations)
+category = Frame Average
+condition = ($advancedMode-$staticFPSMode == 1)
+$frameAverageAmount = 3
+
+
+# Fence Type
+
+[Preset]
+name = Performance Fence (Default)
+category = Fence Type
+condition = $advancedMode == 1
+default = 1
+$fenceMethod = 1
+
+[Preset]
+name = Accurate Fence
+category = Fence Type
+condition = $advancedMode == 1
+$fenceMethod = 2
+
+[Preset]
+name = Fence Skip
+category = Fence Type
+condition = $advancedMode == 1
+$fenceMethod = 3
+
+
+# GPU Readbacks
+
+[Preset]
+name = Read Back A Frame Later (Default, Faster)
+category = GPU Readbacks
+condition = $advancedMode == 1
+default = 1
+$deferGpuReadbacks:int = 1
+
+[Preset]
+name = Wait Every Frame (Slower)
+category = GPU Readbacks
+condition = $advancedMode == 1
+$deferGpuReadbacks:int = 0
+
+
+# Debug Menu Options
+
+[Preset]
+name = Disabled (Default)
+category = Debug Options
+condition = ($advancedMode + $showDebugModeOptions == 2)
+default = 1
+$debugMode:int = 0
+$debugMultiplier = 1
+
+[Preset]
+name = Multiply Debug Address By 100x
+category = Debug Options
+condition = ($advancedMode + $showDebugModeOptions == 2)
+$debugMode:int = 1
+$debugMultiplier = 100
+
+[Preset]
+name = Multiply Debug Address By 50x
+category = Debug Options
+condition = ($advancedMode + $showDebugModeOptions == 2)
+$debugMode:int = 1
+$debugMultiplier = 50
+
+[Preset]
+name = Multiply Debug Address By 10x
+category = Debug Options
+condition = ($advancedMode + $showDebugModeOptions == 2)
+$debugMode:int = 1
+$debugMultiplier = 10
+
+[Preset]
+name = Tied To Framerate
+category = Debug Options
+condition = ($advancedMode + $showDebugModeOptions == 2)
+$debugMode:int = 1
+$debugMultiplier = 1
+
+[Preset]
+name = Divide Debug Value By 10x
+category = Debug Options
+condition = ($advancedMode + $showDebugModeOptions == 2)
+$debugMode:int = 1
+$debugMultiplier = -10
+
+[Preset]
+name = Divide Debug Value By 30x
+category = Debug Options
+condition = ($advancedMode + $showDebugModeOptions == 2)
+$debugMode:int = 1
+$debugMultiplier = -30
+
+[Preset]
+name = Divide Debug Value By 50x
+category = Debug Options
+condition = ($advancedMode + $showDebugModeOptions == 2)
+$debugMode:int = 1
+$debugMultiplier = -50
+
+[Preset]
+name = Divide Debug Value By 100x
+category = Debug Options
+condition = ($advancedMode + $showDebugModeOptions == 2)
+$debugMode:int = 1
+$debugMultiplier = -100
+
+
+[Control]
+vsyncFrequency = (($keepVsync == 1) * 60) + (($keepVsync == 0) * ((($advancedMode == 1) * $fpsLimitAdvanced) + (($advancedMode == 0) * $fpsLimitNormal)))

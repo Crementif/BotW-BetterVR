@@ -1,0 +1,342 @@
+[Definition]
+titleIds = 00050000101C9300,00050000101C9400,00050000101C9500
+name = Day Time
+path = "The Legend of Zelda: Breath of the Wild/Mods/Day Time"
+description = Allows you to set a fixed time or change the length of the day-night cycle.|This could alter blood moon frequency or other time-related mechanics.||Made by chrispurnell.
+version = 6
+
+[Default]
+$timeCycleMode:int = 0
+$timeMultiplier = 1.0
+$cloudMultiplier = 1.0
+$dayTimeEnum:int = 0
+$clockAdjust:int = 1
+$bloodMoonTime = 2520
+
+
+[Preset]
+name = Enabled (Default)
+category = Day/Night Cycle
+default = 1
+$timeCycleMode:int = 1
+
+[Preset]
+name = Disabled (Fixed Time Of Day)
+category = Day/Night Cycle
+$timeCycleMode:int = 0
+
+
+[Preset]
+name = 15 seconds
+category = Day Length
+condition = ($timeCycleMode == 1)
+$timeMultiplier = 96
+
+[Preset]
+name = 30 seconds
+category = Day Length
+condition = ($timeCycleMode == 1)
+$timeMultiplier = 48
+
+[Preset]
+name = 1 minute
+category = Day Length
+condition = ($timeCycleMode == 1)
+$timeMultiplier = 24
+
+[Preset]
+name = 6 minutes
+category = Day Length
+condition = ($timeCycleMode == 1)
+$timeMultiplier = 4
+
+[Preset]
+name = 12 minutes
+category = Day Length
+condition = ($timeCycleMode == 1)
+$timeMultiplier = 2
+
+[Preset]
+name = 24 minutes (Default)
+category = Day Length
+condition = ($timeCycleMode == 1)
+default = 1
+$timeMultiplier = 1.0
+
+[Preset]
+name = 36 minutes
+category = Day Length
+condition = ($timeCycleMode == 1)
+$timeMultiplier = 0.75
+
+[Preset]
+name = 48 minutes
+category = Day Length
+condition = ($timeCycleMode == 1)
+$timeMultiplier = 0.5
+
+[Preset]
+name = 72 minutes
+category = Day Length
+condition = ($timeCycleMode == 1)
+$timeMultiplier = (1/3)
+
+[Preset]
+name = 96 minutes
+category = Day Length
+condition = ($timeCycleMode == 1)
+$timeMultiplier = 0.25
+
+[Preset]
+name = 2 hours
+category = Day Length
+condition = ($timeCycleMode == 1)
+$timeMultiplier = 0.2
+
+[Preset]
+name = 4 hours
+category = Day Length
+condition = ($timeCycleMode == 1)
+$timeMultiplier = 0.1
+
+[Preset]
+name = 12 hours
+category = Day Length
+condition = ($timeCycleMode == 1)
+$timeMultiplier = (1/30)
+
+[Preset]
+name = 24 hours
+category = Day Length
+condition = ($timeCycleMode == 1)
+$timeMultiplier = (1/60)
+
+
+[Preset]
+name = Normal (No Speedup/Slowdown)
+category = Cloud Speed
+condition = ($timeCycleMode == 1)
+$cloudMultiplier = 1.0
+
+[Preset]
+name = Scaled with day length (Default)
+category = Cloud Speed
+condition = ($timeCycleMode == 1)
+default = 1
+$cloudMultiplier = 0
+
+
+[Preset]
+name = Update every 5 minutes (Default)
+category = Clock Increment Frequency
+condition = ($timeCycleMode == 1)
+default = 1
+$clockAdjust:int = 1
+
+[Preset]
+name = Update every minute
+category = Clock Increment Frequency
+condition = ($timeCycleMode == 1)
+$clockAdjust:int = 0
+
+
+[Preset]
+name = 28 days
+category = Time between Blood Moons
+condition = ($timeCycleMode == 1)
+$bloodMoonTime = (28*360)
+
+[Preset]
+name = 14 days
+category = Time between Blood Moons
+condition = ($timeCycleMode == 1)
+$bloodMoonTime = (14*360)
+
+[Preset]
+name = 7 days (Default)
+category = Time between Blood Moons
+condition = ($timeCycleMode == 1)
+default = 1
+$bloodMoonTime = (7*360)
+
+[Preset]
+name = 6 days
+category = Time between Blood Moons
+condition = ($timeCycleMode == 1)
+$bloodMoonTime = (6*360-1)
+
+[Preset]
+name = 5 days
+category = Time between Blood Moons
+condition = ($timeCycleMode == 1)
+$bloodMoonTime = (5*360-1)
+
+[Preset]
+name = 4 days
+category = Time between Blood Moons
+condition = ($timeCycleMode == 1)
+$bloodMoonTime = (4*360-1)
+
+[Preset]
+name = 3 days
+category = Time between Blood Moons
+condition = ($timeCycleMode == 1)
+$bloodMoonTime = (3*360-1)
+
+[Preset]
+name = 2 days
+category = Time between Blood Moons
+condition = ($timeCycleMode == 1)
+$bloodMoonTime = (2*360-1)
+
+[Preset]
+name = 1 day
+category = Time between Blood Moons
+condition = ($timeCycleMode == 1)
+$bloodMoonTime = (1*360-1)
+
+
+[Preset]
+name = 00:00
+category = Fixed Time Of Day
+condition = ($timeCycleMode == 0)
+$dayTimeEnum = 0x2A
+
+[Preset]
+name = 01:00
+category = Fixed Time Of Day
+condition = ($timeCycleMode == 0)
+$dayTimeEnum = 0xA
+
+[Preset]
+name = 02:00
+category = Fixed Time Of Day
+condition = ($timeCycleMode == 0)
+$dayTimeEnum = 0xB
+
+[Preset]
+name = 03:00
+category = Fixed Time Of Day
+condition = ($timeCycleMode == 0)
+$dayTimeEnum = 0xC
+
+[Preset]
+name = 04:00
+category = Fixed Time Of Day
+condition = ($timeCycleMode == 0)
+$dayTimeEnum = 0xD
+
+[Preset]
+name = 05:00
+category = Fixed Time Of Day
+condition = ($timeCycleMode == 0)
+$dayTimeEnum = 0xE
+
+[Preset]
+name = 06:00
+category = Fixed Time Of Day
+condition = ($timeCycleMode == 0)
+$dayTimeEnum = 0xF
+
+[Preset]
+name = 07:00
+category = Fixed Time Of Day
+condition = ($timeCycleMode == 0)
+$dayTimeEnum = 0x10
+
+[Preset]
+name = 08:00
+category = Fixed Time Of Day
+condition = ($timeCycleMode == 0)
+$dayTimeEnum = 0x11
+
+[Preset]
+name = 09:00
+category = Fixed Time Of Day
+condition = ($timeCycleMode == 0)
+$dayTimeEnum = 0x12
+
+[Preset]
+name = 10:00
+category = Fixed Time Of Day
+condition = ($timeCycleMode == 0)
+$dayTimeEnum = 0x13
+
+[Preset]
+name = 11:00
+category = Fixed Time Of Day
+condition = ($timeCycleMode == 0)
+$dayTimeEnum = 0x14
+
+[Preset]
+name = 12:00
+category = Fixed Time Of Day
+condition = ($timeCycleMode == 0)
+default = 1
+$dayTimeEnum = 0x15
+
+[Preset]
+name = 13:00
+category = Fixed Time Of Day
+condition = ($timeCycleMode == 0)
+$dayTimeEnum = 0x16
+
+[Preset]
+name = 14:00
+category = Fixed Time Of Day
+condition = ($timeCycleMode == 0)
+$dayTimeEnum = 0x17
+
+[Preset]
+name = 15:00
+category = Fixed Time Of Day
+condition = ($timeCycleMode == 0)
+$dayTimeEnum = 0x18
+
+[Preset]
+name = 16:00
+category = Fixed Time Of Day
+condition = ($timeCycleMode == 0)
+$dayTimeEnum = 0x19
+
+[Preset]
+name = 17:00
+category = Fixed Time Of Day
+condition = ($timeCycleMode == 0)
+$dayTimeEnum = 0x1A
+
+[Preset]
+name = 18:00
+category = Fixed Time Of Day
+condition = ($timeCycleMode == 0)
+$dayTimeEnum = 0x1B
+
+[Preset]
+name = 19:00
+category = Fixed Time Of Day
+condition = ($timeCycleMode == 0)
+$dayTimeEnum = 0x1C
+
+[Preset]
+name = 20:00
+category = Fixed Time Of Day
+condition = ($timeCycleMode == 0)
+$dayTimeEnum = 0x1D
+
+[Preset]
+name = 21:00
+category = Fixed Time Of Day
+condition = ($timeCycleMode == 0)
+$dayTimeEnum = 0x1E
+
+[Preset]
+name = 22:00
+category = Fixed Time Of Day
+condition = ($timeCycleMode == 0)
+$dayTimeEnum = 0x1F
+
+[Preset]
+name = 23:00
+category = Fixed Time Of Day
+condition = ($timeCycleMode == 0)
+$dayTimeEnum = 0x20

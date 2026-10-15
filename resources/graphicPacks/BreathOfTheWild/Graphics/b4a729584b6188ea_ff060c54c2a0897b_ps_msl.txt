@@ -1,0 +1,128 @@
+#include <metal_stdlib>
+using namespace metal;
+
+// shader b4a729584b6188ea
+// Shader dumped from BotW 208, using Cemu 2193a8c
+// Based on b4a729584b6188ea_0000000000001e49_ps.txt
+// Used for: Restoring the native BotW Anti-Aliasing implementation for distant
+// trees
+
+constant float resXScale = float($width) / float($gameWidth);
+constant float resYScale = float($height) / float($gameHeight);
+#define fxaa $fxaa
+
+#define SET_POSITION(_v)                                                       \
+    out.position = _v;                                                         \
+    out.position.z = (out.position.z + out.position.w) / 2.0
+// start of shader inputs/outputs, predetermined by Cemu. Do not touch
+struct SupportBuffer {
+    int4 remapped[3];
+    float2 fragCoordScale;
+};
+
+#define GET_FRAGCOORD()                                                        \
+    float4(in.position.xy *supportBuffer.fragCoordScale.xy, in.position.z,     \
+           1.0 / in.position.w)
+struct FragmentIn {
+    float4 position [[position]];
+    float4 passParameterSem0 [[user(locn0)]];
+};
+
+struct FragmentOut {
+    float4 passPixelColor0 [[color(0)]];
+};
+
+// end of shader inputs/outputs
+template <typename TextureT, typename CoordT>
+float sampleCompareEmulate(TextureT tex, sampler samplr, CoordT coord,
+                           float compareValue) {
+    return compareValue < tex.sample(samplr, coord).x ? 1.0 : 0.0;
+}
+template <typename TextureT, typename CoordT>
+float2 textureCalculateLod(TextureT tex, sampler samplr, CoordT coord) {
+    float lod = tex.calculate_unclamped_lod(samplr, coord);
+    return float2(floor(lod), fract(lod));
+}
+int clampFI32(int v) {
+    if (v == 0x7FFFFFFF)
+        return as_type<int>(1.0);
+    else if (v == 0xFFFFFFFF)
+        return as_type<int>(0.0);
+    return as_type<int>(clamp(as_type<float>(v), 0.0, 1.0));
+}
+float mul_nonIEEE(float a, float b) {
+    if (a == 0.0 || b == 0.0)
+        return 0.0;
+    return a * b;
+}
+fragment FragmentOut
+main0(FragmentIn in [[stage_in]], float2 pointCoord [[point_coord]],
+      bool frontFacing [[front_facing]],
+      constant SupportBuffer &supportBuffer [[buffer(0)]],
+      texture2d<float> tex0 [[texture(0)]], sampler samplr0 [[sampler(0)]],
+      texture2d<float> tex1 [[texture(1)]], sampler samplr1 [[sampler(1)]],
+      texture2d<float> tex2 [[texture(2)]], sampler samplr2 [[sampler(2)]]) {
+    FragmentOut out;
+#if fxaa == 0
+    out.passPixelColor0 = tex0.sample(samplr0, in.passParameterSem0.xy);
+#else
+    float4 R0f = float4(0.0);
+    float4 R1f = float4(0.0);
+    float4 R2f = float4(0.0);
+    float4 R123f = float4(0.0);
+    float4 R127f = float4(0.0);
+    float backupReg0f, backupReg1f, backupReg2f, backupReg3f, backupReg4f;
+    float PV0fx = 0.0, PV0fy = 0.0, PV0fz = 0.0, PV0fw = 0.0, PV1fx = 0.0,
+          PV1fy = 0.0, PV1fz = 0.0, PV1fw = 0.0;
+    float PS0f = 0.0, PS1f = 0.0;
+    float4 tempf = float4(0.0);
+    float tempResultf;
+    int tempResulti;
+    int4 ARi = int4(0);
+    bool predResult = true;
+    R0f = in.passParameterSem0;
+    R2f.w = (tex1.sample(samplr1, float2(R0f.x, R0f.y)).x);
+    R1f.xyzw =
+        (tex2.gather(samplr2, float2(0.0001) + float2(R0f.x, R0f.y)).xyzw);
+    // 0
+    PV0fx = -(R2f.w) + R1f.y;
+    PV0fy = -(R2f.w) + R1f.x;
+    PV0fz = -(R2f.w) + R1f.w;
+    PV0fw = -(R2f.w) + R1f.z;
+    PS0f = R2f.w + as_type<float>(supportBuffer.remapped[0].x);
+    // 1
+    PV1fx = max(PV0fx, -(PV0fx));
+    PV1fy = max(PV0fy, -(PV0fy));
+    PV1fz = max(PV0fz, -(PV0fz));
+    PV1fw = max(PV0fw, -(PV0fw));
+    PS1f = 1.0 / PS0f;
+    // 2
+    PV0fx = PV1fy + -(PV1fw);
+    PV0fy = -(PV1fx) + PV1fz;
+    R127f.z = as_type<float>(supportBuffer.remapped[1].w) * PS1f;
+    R127f.w = fract(R0f.z);
+    R127f.y = fract(R0f.w);
+    // 3
+    PV1fz = PV0fy + -(PV0fx);
+    PV1fw = PV0fy + PV0fx;
+    // 4
+    R123f.x = mul_nonIEEE(R127f.z, PV1fz) + R127f.y;
+    R123f.x = clamp(R123f.x, 0.0, 1.0);
+    R123f.y = mul_nonIEEE(R127f.z, PV1fw) + R127f.w;
+    R123f.y = clamp(R123f.y, 0.0, 1.0);
+    // 5
+    PV1fz = -(R127f.y) + R123f.x;
+    PV1fw = -(R127f.w) + R123f.y;
+    // 6
+    R0f.x = mul_nonIEEE(PV1fw, as_type<float>(supportBuffer.remapped[2].z) /
+                                   resXScale) +
+            R0f.x;
+    R0f.y = mul_nonIEEE(PV1fz, as_type<float>(supportBuffer.remapped[2].w) /
+                                   resYScale) +
+            R0f.y;
+    R0f.xyzw = (tex0.sample(samplr0, float2(R0f.x, R0f.y)).xyzw);
+    // export
+    out.passPixelColor0 = as_type<float4>(float4(R0f.x, R0f.y, R0f.z, R0f.w));
+#endif
+    return out;
+}

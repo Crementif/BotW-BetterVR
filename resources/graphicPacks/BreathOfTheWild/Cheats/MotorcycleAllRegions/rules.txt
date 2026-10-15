@@ -1,0 +1,6 @@
+[Definition]
+titleIds = 00050000101C9300,00050000101C9400,00050000101C9500
+name = Spawn Motorcycle In All Regions
+path = "The Legend of Zelda: Breath of the Wild/Cheats/Spawn Motorcycle In All Regions"
+description = Allows you to spawn the motorcycle in all the regions (normally you can't in the Gerudo Desert and Eldin).||Made by Zeikken (porting) and leoetlino (original code).
+version = 6

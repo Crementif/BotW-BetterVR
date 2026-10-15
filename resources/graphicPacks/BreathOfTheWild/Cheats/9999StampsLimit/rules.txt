@@ -1,0 +1,6 @@
+[Definition]
+titleIds = 00050000101C9300,00050000101C9400,00050000101C9500
+name = 9999 Map Stamps Limit
+path = "The Legend of Zelda: Breath of the Wild/Cheats/9999 Map Stamps Limit"
+description = "Allows you to place 9999 stamps on the map instead of the default 100.||Original cheat by Kirbymimi. Adjusted by Waikuteru."
+version = 7

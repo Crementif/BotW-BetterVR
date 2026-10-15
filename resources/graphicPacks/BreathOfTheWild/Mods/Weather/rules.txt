@@ -1,0 +1,676 @@
+[Definition]
+titleIds = 00050000101C9300,00050000101C9400,00050000101C9500
+name = Weather
+path = "The Legend of Zelda: Breath of the Wild/Mods/Weather"
+description = Allows you to change the weather forecast to an individual level.|Won't change weather in areas that have a certain type forced.||Made by dragbe.
+version = 6
+
+# Weather names from https://github.com/zeldaret/botw
+
+[Default]
+$individualControl:int = 1
+
+$blueSky:int = 0
+$cloudy:int = 1
+$rain:int = 2
+$heavyRain:int = 3
+$snow:int = 4
+$heavySnow:int = 5
+$thunderstorm:int = 6
+$thunderRain:int = 7
+$blueSkyRain:int = 8
+
+
+[Preset]
+name = None (Use Individual Settings)
+category = Replace All Weather
+default = 1
+$individualControl:int = 1
+
+[Preset]
+name = Blue Sky
+category = Replace All Weather
+$individualControl:int = 0
+$blueSky:int = 0
+$cloudy:int = 0
+$rain:int = 0
+$heavyRain:int = 0
+$snow:int = 0
+$heavySnow:int = 0
+$thunderstorm:int = 0
+$thunderRain:int = 0
+$blueSkyRain:int = 0
+
+[Preset]
+name = Cloudy
+category = Replace All Weather
+$individualControl:int = 0
+$blueSky:int = 1
+$cloudy:int = 1
+$rain:int = 1
+$heavyRain:int = 1
+$snow:int = 1
+$heavySnow:int = 1
+$thunderstorm:int = 1
+$thunderRain:int = 1
+$blueSkyRain:int = 1
+
+[Preset]
+name = Rain
+category = Replace All Weather
+$individualControl:int = 0
+$blueSky:int = 2
+$cloudy:int = 2
+$rain:int = 2
+$heavyRain:int = 2
+$snow:int = 2
+$heavySnow:int = 2
+$thunderstorm:int = 2
+$thunderRain:int = 2
+$blueSkyRain:int = 2
+
+[Preset]
+name = Heavy Rain
+category = Replace All Weather
+$individualControl:int = 0
+$blueSky:int = 3
+$cloudy:int = 3
+$rain:int = 3
+$heavyRain:int = 3
+$snow:int = 3
+$heavySnow:int = 3
+$thunderstorm:int = 3
+$thunderRain:int = 3
+$blueSkyRain:int = 3
+
+[Preset]
+name = Snow
+category = Replace All Weather
+$individualControl:int = 0
+$blueSky:int = 4
+$cloudy:int = 4
+$rain:int = 4
+$heavyRain:int = 4
+$snow:int = 4
+$heavySnow:int = 4
+$thunderstorm:int = 4
+$thunderRain:int = 4
+$blueSkyRain:int = 4
+
+[Preset]
+name = Heavy Snow
+category = Replace All Weather
+$individualControl:int = 0
+$blueSky:int = 5
+$cloudy:int = 5
+$rain:int = 5
+$heavyRain:int = 5
+$snow:int = 5
+$heavySnow:int = 5
+$thunderstorm:int = 5
+$thunderRain:int = 5
+$blueSkyRain:int = 5
+
+[Preset]
+name = Thunderstorm
+category = Replace All Weather
+$individualControl:int = 0
+$blueSky:int = 6
+$cloudy:int = 6
+$rain:int = 6
+$heavyRain:int = 6
+$snow:int = 6
+$heavySnow:int = 6
+$thunderstorm:int = 6
+$thunderRain:int = 6
+$blueSkyRain:int = 6
+
+[Preset]
+name = Thunderstorm with Rain
+category = Replace All Weather
+$individualControl:int = 0
+$blueSky:int = 7
+$cloudy:int = 7
+$rain:int = 7
+$heavyRain:int = 7
+$snow:int = 7
+$heavySnow:int = 7
+$thunderstorm:int = 7
+$thunderRain:int = 7
+$blueSkyRain:int = 7
+
+[Preset]
+name = Blue Sky With Rain
+category = Replace All Weather
+$individualControl:int = 0
+$blueSky:int = 8
+$cloudy:int = 8
+$rain:int = 8
+$heavyRain:int = 8
+$snow:int = 8
+$heavySnow:int = 8
+$thunderstorm:int = 8
+$thunderRain:int = 8
+$blueSkyRain:int = 8
+
+
+# Clear Weather
+
+[Preset]
+name = Blue Sky
+category = Replace Blue Sky Weather
+default = 1
+condition = $individualControl == 1
+$blueSky:int = 0
+
+[Preset]
+name = Cloudy
+category = Replace Blue Sky Weather
+condition = $individualControl == 1
+$blueSky:int = 1
+
+[Preset]
+name = Rain
+category = Replace Blue Sky Weather
+condition = $individualControl == 1
+$blueSky:int = 2
+
+[Preset]
+name = Heavy Rain
+category = Replace Blue Sky Weather
+condition = $individualControl == 1
+$blueSky:int = 3
+
+[Preset]
+name = Snow
+category = Replace Blue Sky Weather
+condition = $individualControl == 1
+$blueSky:int = 4
+
+[Preset]
+name = Heavy Snow
+category = Replace Blue Sky Weather
+condition = $individualControl == 1
+$blueSky:int = 5
+
+[Preset]
+name = Thunderstorm
+category = Replace Blue Sky Weather
+condition = $individualControl == 1
+$blueSky:int = 6
+
+[Preset]
+name = Thunderstorm with Rain
+category = Replace Blue Sky Weather
+condition = $individualControl == 1
+$blueSky:int = 7
+
+[Preset]
+name = Blue Sky With Rain
+category = Replace Blue Sky Weather
+condition = $individualControl == 1
+$blueSky:int = 8
+
+
+# Cloudy Weather
+
+[Preset]
+name = Blue Sky
+category = Replace Cloudy Weather
+condition = $individualControl == 1
+$cloudy:int = 0
+
+[Preset]
+name = Cloudy
+category = Replace Cloudy Weather
+default = 1
+condition = $individualControl == 1
+$cloudy:int = 1
+
+[Preset]
+name = Rain
+category = Replace Cloudy Weather
+condition = $individualControl == 1
+$cloudy:int = 2
+
+[Preset]
+name = Heavy Rain
+category = Replace Cloudy Weather
+condition = $individualControl == 1
+$cloudy:int = 3
+
+[Preset]
+name = Snow
+category = Replace Cloudy Weather
+condition = $individualControl == 1
+$cloudy:int = 4
+
+[Preset]
+name = Heavy Snow
+category = Replace Cloudy Weather
+condition = $individualControl == 1
+$cloudy:int = 5
+
+[Preset]
+name = Thunderstorm
+category = Replace Cloudy Weather
+condition = $individualControl == 1
+$cloudy:int = 6
+
+[Preset]
+name = Thunderstorm with Rain
+category = Replace Cloudy Weather
+condition = $individualControl == 1
+$cloudy:int = 7
+
+[Preset]
+name = Blue Sky With Rain
+category = Replace Cloudy Weather
+condition = $individualControl == 1
+$cloudy:int = 8
+
+
+# Rain Weather
+
+[Preset]
+name = Blue Sky
+category = Replace Rain Weather
+condition = $individualControl == 1
+$rain:int = 0
+
+[Preset]
+name = Cloudy
+category = Replace Rain Weather
+condition = $individualControl == 1
+$rain:int = 1
+
+[Preset]
+name = Rain
+category = Replace Rain Weather
+default = 1
+condition = $individualControl == 1
+$rain:int = 2
+
+[Preset]
+name = Heavy Rain
+category = Replace Rain Weather
+condition = $individualControl == 1
+$rain:int = 3
+
+[Preset]
+name = Snow
+category = Replace Rain Weather
+condition = $individualControl == 1
+$rain:int = 4
+
+[Preset]
+name = Heavy Snow
+category = Replace Rain Weather
+condition = $individualControl == 1
+$rain:int = 5
+
+[Preset]
+name = Thunderstorm
+category = Replace Rain Weather
+condition = $individualControl == 1
+$rain:int = 6
+
+[Preset]
+name = Thunderstorm with Rain
+category = Replace Rain Weather
+condition = $individualControl == 1
+$rain:int = 7
+
+[Preset]
+name = Blue Sky With Rain
+category = Replace Rain Weather
+condition = $individualControl == 1
+$rain:int = 8
+
+
+# Heavy Rain Weather
+
+[Preset]
+name = Blue Sky
+category = Replace Heavy Rain Weather
+condition = $individualControl == 1
+$heavyRain:int = 0
+
+[Preset]
+name = Cloudy
+category = Replace Heavy Rain Weather
+condition = $individualControl == 1
+$heavyRain:int = 1
+
+[Preset]
+name = Rain
+category = Replace Heavy Rain Weather
+condition = $individualControl == 1
+$heavyRain:int = 2
+
+[Preset]
+name = Heavy Rain
+category = Replace Heavy Rain Weather
+default = 1
+condition = $individualControl == 1
+$heavyRain:int = 3
+
+[Preset]
+name = Snow
+category = Replace Heavy Rain Weather
+condition = $individualControl == 1
+$heavyRain:int = 4
+
+[Preset]
+name = Heavy Snow
+category = Replace Heavy Rain Weather
+condition = $individualControl == 1
+$heavyRain:int = 5
+
+[Preset]
+name = Thunderstorm
+category = Replace Heavy Rain Weather
+condition = $individualControl == 1
+$heavyRain:int = 6
+
+[Preset]
+name = Thunderstorm with Rain
+category = Replace Heavy Rain Weather
+condition = $individualControl == 1
+$heavyRain:int = 7
+
+[Preset]
+name = Blue Sky With Rain
+category = Replace Heavy Rain Weather
+condition = $individualControl == 1
+$heavyRain:int = 8
+
+
+# Snow Weather
+
+[Preset]
+name = Blue Sky
+category = Replace Snow Weather
+condition = $individualControl == 1
+$snow:int = 0
+
+[Preset]
+name = Cloudy
+category = Replace Snow Weather
+condition = $individualControl == 1
+$snow:int = 1
+
+[Preset]
+name = Rain
+category = Replace Snow Weather
+condition = $individualControl == 1
+$snow:int = 2
+
+[Preset]
+name = Heavy Rain
+category = Replace Snow Weather
+condition = $individualControl == 1
+$snow:int = 3
+
+[Preset]
+name = Snow
+category = Replace Snow Weather
+default = 1
+condition = $individualControl == 1
+$snow:int = 4
+
+[Preset]
+name = Heavy Snow
+category = Replace Snow Weather
+condition = $individualControl == 1
+$snow:int = 5
+
+[Preset]
+name = Thunderstorm
+category = Replace Snow Weather
+condition = $individualControl == 1
+$snow:int = 6
+
+[Preset]
+name = Thunderstorm with Rain
+category = Replace Snow Weather
+condition = $individualControl == 1
+$snow:int = 7
+
+[Preset]
+name = Blue Sky With Rain
+category = Replace Snow Weather
+condition = $individualControl == 1
+$snow:int = 8
+
+
+# Heavy Snow Weather
+
+[Preset]
+name = Blue Sky
+category = Replace Heavy Snow Weather
+condition = $individualControl == 1
+$heavySnow:int = 0
+
+[Preset]
+name = Cloudy
+category = Replace Heavy Snow Weather
+condition = $individualControl == 1
+$heavySnow:int = 1
+
+[Preset]
+name = Rain
+category = Replace Heavy Snow Weather
+condition = $individualControl == 1
+$heavySnow:int = 2
+
+[Preset]
+name = Heavy Rain
+category = Replace Heavy Snow Weather
+condition = $individualControl == 1
+$heavySnow:int = 3
+
+[Preset]
+name = Snow
+category = Replace Heavy Snow Weather
+condition = $individualControl == 1
+$heavySnow:int = 4
+
+[Preset]
+name = Heavy Snow
+category = Replace Heavy Snow Weather
+default = 1
+condition = $individualControl == 1
+$heavySnow:int = 5
+
+[Preset]
+name = Thunderstorm
+category = Replace Heavy Snow Weather
+condition = $individualControl == 1
+$heavySnow:int = 6
+
+[Preset]
+name = Thunderstorm with Rain
+category = Replace Heavy Snow Weather
+condition = $individualControl == 1
+$heavySnow:int = 7
+
+[Preset]
+name = Blue Sky With Rain
+category = Replace Heavy Snow Weather
+condition = $individualControl == 1
+$heavySnow:int = 8
+
+
+# Thunderstorm Weather
+
+[Preset]
+name = Blue Sky
+category = Replace Thunderstorm Weather
+condition = $individualControl == 1
+$thunderstorm:int = 0
+
+[Preset]
+name = Cloudy
+category = Replace Thunderstorm Weather
+condition = $individualControl == 1
+$thunderstorm:int = 1
+
+[Preset]
+name = Rain
+category = Replace Thunderstorm Weather
+condition = $individualControl == 1
+$thunderstorm:int = 2
+
+[Preset]
+name = Heavy Rain
+category = Replace Thunderstorm Weather
+condition = $individualControl == 1
+$thunderstorm:int = 3
+
+[Preset]
+name = Snow
+category = Replace Thunderstorm Weather
+condition = $individualControl == 1
+$thunderstorm:int = 4
+
+[Preset]
+name = Heavy Snow
+category = Replace Thunderstorm Weather
+condition = $individualControl == 1
+$thunderstorm:int = 5
+
+[Preset]
+name = Thunderstorm
+category = Replace Thunderstorm Weather
+default = 1
+condition = $individualControl == 1
+$thunderstorm:int = 6
+
+[Preset]
+name = Thunderstorm with Rain
+category = Replace Thunderstorm Weather
+condition = $individualControl == 1
+$thunderstorm:int = 7
+
+[Preset]
+name = Blue Sky With Rain
+category = Replace Thunderstorm Weather
+condition = $individualControl == 1
+$thunderstorm:int = 8
+
+
+# Thunderstorm With Rain Weather
+
+[Preset]
+name = Blue Sky
+category = Replace Thunderstorm With Rain Weather
+condition = $individualControl == 1
+$thunderRain:int = 0
+
+[Preset]
+name = Cloudy
+category = Replace Thunderstorm With Rain Weather
+condition = $individualControl == 1
+$thunderRain:int = 1
+
+[Preset]
+name = Rain
+category = Replace Thunderstorm With Rain Weather
+condition = $individualControl == 1
+$thunderRain:int = 2
+
+[Preset]
+name = Heavy Rain
+category = Replace Thunderstorm With Rain Weather
+condition = $individualControl == 1
+$thunderRain:int = 3
+
+[Preset]
+name = Snow
+category = Replace Thunderstorm With Rain Weather
+condition = $individualControl == 1
+$thunderRain:int = 4
+
+[Preset]
+name = Heavy Snow
+category = Replace Thunderstorm With Rain Weather
+condition = $individualControl == 1
+$thunderRain:int = 5
+
+[Preset]
+name = Thunderstorm
+category = Replace Thunderstorm With Rain Weather
+condition = $individualControl == 1
+$thunderRain:int = 6
+
+[Preset]
+name = Thunderstorm with Rain
+category = Replace Thunderstorm With Rain Weather
+default = 1
+condition = $individualControl == 1
+$thunderRain:int = 7
+
+[Preset]
+name = Blue Sky With Rain
+category = Replace Thunderstorm With Rain Weather
+condition = $individualControl == 1
+$thunderRain:int = 8
+
+
+# Blue Sky With Rain Weather
+
+[Preset]
+name = Blue Sky
+category = Replace Blue Sky With Rain Weather
+condition = $individualControl == 1
+$blueSkyRain:int = 0
+
+[Preset]
+name = Cloudy
+category = Replace Blue Sky With Rain Weather
+condition = $individualControl == 1
+$blueSkyRain:int = 1
+
+[Preset]
+name = Rain
+category = Replace Blue Sky With Rain Weather
+condition = $individualControl == 1
+$blueSkyRain:int = 2
+
+[Preset]
+name = Heavy Rain
+category = Replace Blue Sky With Rain Weather
+condition = $individualControl == 1
+$blueSkyRain:int = 3
+
+[Preset]
+name = Snow
+category = Replace Blue Sky With Rain Weather
+condition = $individualControl == 1
+$blueSkyRain:int = 4
+
+[Preset]
+name = Heavy Snow
+category = Replace Blue Sky With Rain Weather
+condition = $individualControl == 1
+$blueSkyRain:int = 5
+
+[Preset]
+name = Thunderstorm
+category = Replace Blue Sky With Rain Weather
+condition = $individualControl == 1
+$blueSkyRain:int = 6
+
+[Preset]
+name = Thunderstorm with Rain
+category = Replace Blue Sky With Rain Weather
+condition = $individualControl == 1
+$blueSkyRain:int = 7
+
+[Preset]
+name = Blue Sky With Rain
+category = Replace Blue Sky With Rain Weather
+default = 1
+condition = $individualControl == 1
+$blueSkyRain:int = 8

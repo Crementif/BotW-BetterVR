@@ -1,0 +1,950 @@
+#include <metal_stdlib>
+using namespace metal;
+
+// shader 88133ee405eaae28
+// Shader dumped from BotW 208, using Cemu 2193a8c
+// Based on 88133ee405eaae28_000003c000009269_ps.txt
+// Shadow 2x2 box blur fix
+
+constant float resScale = $shadowRes;
+
+#define SET_POSITION(_v)                                                       \
+    out.position = _v;                                                         \
+    out.position.z = (out.position.z + out.position.w) / 2.0
+// start of shader inputs/outputs, predetermined by Cemu. Do not touch
+struct SupportBuffer {
+    float2 fragCoordScale;
+};
+
+struct UBuff1 {
+    float4 d[4096];
+};
+
+struct UBuff6 {
+    float4 d[54];
+};
+
+struct UBuff10 {
+    float4 d[4];
+};
+
+#define GET_FRAGCOORD()                                                        \
+    float4(in.position.xy *supportBuffer.fragCoordScale.xy, in.position.z,     \
+           1.0 / in.position.w)
+struct FragmentIn {
+    float4 position [[position]];
+    float4 passParameterSem0 [[user(locn0)]];
+    float4 passParameterSem5 [[user(locn1)]];
+    float4 passParameterSem6 [[user(locn2)]];
+};
+
+struct FragmentOut {
+    float4 passPixelColor5 [[color(5)]];
+};
+
+// end of shader inputs/outputs
+template <typename TextureT, typename CoordT>
+float sampleCompareEmulate(TextureT tex, sampler samplr, CoordT coord,
+                           float compareValue) {
+    return compareValue < tex.sample(samplr, coord).x ? 1.0 : 0.0;
+}
+template <typename TextureT, typename CoordT>
+float2 textureCalculateLod(TextureT tex, sampler samplr, CoordT coord) {
+    float lod = tex.calculate_unclamped_lod(samplr, coord);
+    return float2(floor(lod), fract(lod));
+}
+int clampFI32(int v) {
+    if (v == 0x7FFFFFFF)
+        return as_type<int>(1.0);
+    else if (v == 0xFFFFFFFF)
+        return as_type<int>(0.0);
+    return as_type<int>(clamp(as_type<float>(v), 0.0, 1.0));
+}
+float mul_nonIEEE(float a, float b) {
+    if (a == 0.0 || b == 0.0)
+        return 0.0;
+    return a * b;
+}
+fragment FragmentOut
+main0(FragmentIn in [[stage_in]], float2 pointCoord [[point_coord]],
+      bool frontFacing [[front_facing]],
+      constant SupportBuffer &supportBuffer [[buffer(0)]],
+      constant UBuff1 &ubuff1 [[buffer(1)]],
+      constant UBuff6 &ubuff6 [[buffer(2)]],
+      constant UBuff10 &ubuff10 [[buffer(3)]],
+      texture2d<float> tex0 [[texture(0)]], sampler samplr0 [[sampler(0)]],
+      texture2d<float> tex1 [[texture(1)]], sampler samplr1 [[sampler(1)]],
+      texture2d<float> tex3 [[texture(2)]], sampler samplr3 [[sampler(2)]],
+      texture2d<float> tex6 [[texture(3)]], sampler samplr6 [[sampler(3)]],
+      depth2d_array<float> tex8 [[texture(4)]], sampler samplr8 [[sampler(4)]],
+      texture2d<float> tex15 [[texture(5)]], sampler samplr15 [[sampler(5)]]) {
+    FragmentOut out;
+    int4 R0i = int4(0);
+    int4 R1i = int4(0);
+    int4 R2i = int4(0);
+    int4 R3i = int4(0);
+    int4 R4i = int4(0);
+    int4 R5i = int4(0);
+    int4 R6i = int4(0);
+    int4 R7i = int4(0);
+    int4 R8i = int4(0);
+    int4 R9i = int4(0);
+    int4 R10i = int4(0);
+    int4 R11i = int4(0);
+    int4 R12i = int4(0);
+    int4 R13i = int4(0);
+    int4 R14i = int4(0);
+    int4 R15i = int4(0);
+    int4 R16i = int4(0);
+    int4 R17i = int4(0);
+    int4 R122i = int4(0);
+    int4 R123i = int4(0);
+    int4 R124i = int4(0);
+    int4 R125i = int4(0);
+    int4 R126i = int4(0);
+    int4 R127i = int4(0);
+    int backupReg0i, backupReg1i, backupReg2i, backupReg3i, backupReg4i;
+    int PV0ix = 0, PV0iy = 0, PV0iz = 0, PV0iw = 0, PV1ix = 0, PV1iy = 0,
+        PV1iz = 0, PV1iw = 0;
+    int PS0i = 0, PS1i = 0;
+    int4 tempi = int4(0);
+    float tempResultf;
+    int tempResulti;
+    int4 ARi = int4(0);
+    bool predResult = true;
+    bool activeMaskStack[3];
+    bool activeMaskStackC[4];
+    activeMaskStack[0] = false;
+    activeMaskStack[1] = false;
+    activeMaskStackC[0] = false;
+    activeMaskStackC[1] = false;
+    activeMaskStackC[2] = false;
+    activeMaskStack[0] = true;
+    activeMaskStackC[0] = true;
+    activeMaskStackC[1] = true;
+    R0i = as_type<int4>(in.passParameterSem0);
+    R1i = as_type<int4>(in.passParameterSem5);
+    R2i = as_type<int4>(in.passParameterSem6);
+    if (activeMaskStackC[1] == true) {
+        R3i.w = as_type<int>(tex6.sample(samplr6, float2(as_type<float>(R0i.x),
+                                                         as_type<float>(R0i.y)))
+                                 .x);
+        R7i.xzw = as_type<int3>(
+            tex6.gather(samplr6, float2(0.0001) + float2(as_type<float>(R0i.x),
+                                                         as_type<float>(R0i.y)))
+                .xzw);
+        R4i.xyzw =
+            as_type<int4>(tex3.sample(samplr3, float2(as_type<float>(R2i.z),
+                                                      as_type<float>(R2i.w)))
+                              .xyzw);
+        R2i.xy = as_type<int2>(
+            tex0.sample(samplr0,
+                        float2(as_type<float>(R2i.x), as_type<float>(R2i.y)),
+                        level(0.0))
+                .xw);
+    }
+    if (activeMaskStackC[1] == true) {
+        // 0
+        R123i.x =
+            as_type<int>(mul_nonIEEE(ubuff1.d[16].x, as_type<float>(R7i.w)) +
+                         ubuff1.d[14].x);
+        R127i.y =
+            as_type<int>(mul_nonIEEE(ubuff1.d[16].x, as_type<float>(R7i.z)) +
+                         ubuff1.d[14].x);
+        R127i.z =
+            as_type<int>(mul_nonIEEE(ubuff1.d[16].x, as_type<float>(R7i.x)) +
+                         ubuff1.d[14].x);
+        R123i.w =
+            as_type<int>(mul_nonIEEE(as_type<float>(R3i.w), ubuff1.d[16].x) +
+                         ubuff1.d[14].x);
+        R127i.x = as_type<int>(as_type<float>(R4i.x) * 2.0 + -(1.0));
+        // 1
+        R3i.x = as_type<int>(
+            mul_nonIEEE(as_type<float>(R0i.z), -(as_type<float>(R123i.w))));
+        R8i.y = as_type<int>(
+            mul_nonIEEE(as_type<float>(R0i.w), -(as_type<float>(R123i.w))));
+        R12i.z = as_type<int>(-(as_type<float>(R123i.x)));
+        R127i.w = as_type<int>(as_type<float>(R4i.y) * 2.0 + -(1.0));
+        R125i.z = as_type<int>(as_type<float>(R4i.z) * 2.0 + -(1.0));
+        // 2
+        PV0ix = as_type<int>(-(as_type<float>(R127i.y)));
+        PV0iy = as_type<int>(
+            mul_nonIEEE(as_type<float>(R1i.y), -(as_type<float>(R127i.y))));
+        PV0iz = as_type<int>(
+            mul_nonIEEE(as_type<float>(R1i.x), -(as_type<float>(R127i.y))));
+        PV0iw = as_type<int>(
+            mul_nonIEEE(as_type<float>(R1i.z), -(as_type<float>(R127i.z))));
+        R126i.z = as_type<int>(
+            mul_nonIEEE(as_type<float>(R1i.w), -(as_type<float>(R127i.z))));
+        // 3
+        R125i.x =
+            as_type<int>(-(as_type<float>(R3i.x)) + as_type<float>(PV0iz));
+        R127i.y = as_type<int>(-(as_type<float>(R127i.z)));
+        R124i.z =
+            as_type<int>(-(as_type<float>(R12i.z)) + as_type<float>(PV0ix));
+        R125i.w =
+            as_type<int>(-(as_type<float>(R8i.y)) + as_type<float>(PV0iy));
+        R126i.y =
+            as_type<int>(-(as_type<float>(R3i.x)) + as_type<float>(PV0iw));
+        // 4
+        backupReg0i = R126i.z;
+        tempi.x = as_type<int>(
+            dot(float4(as_type<float>(R3i.x), as_type<float>(R8i.y),
+                       as_type<float>(R12i.z), as_type<float>(0x80000000)),
+                float4(as_type<float>(R3i.x), as_type<float>(R8i.y),
+                       as_type<float>(R12i.z), 0.0)));
+        PV0ix = tempi.x;
+        PV0iy = tempi.x;
+        R126i.z = tempi.x;
+        PV0iw = tempi.x;
+        R126i.x = as_type<int>(-(as_type<float>(R8i.y)) +
+                               as_type<float>(backupReg0i));
+        // 5
+        tempi.x = as_type<int>(
+            dot(float4(as_type<float>(R127i.x), as_type<float>(R127i.w),
+                       as_type<float>(R125i.z), as_type<float>(0x80000000)),
+                float4(as_type<float>(R127i.x), as_type<float>(R127i.w),
+                       as_type<float>(R125i.z), 0.0)));
+        PV1ix = tempi.x;
+        PV1iy = tempi.x;
+        R127i.z = tempi.x;
+        PV1iw = tempi.x;
+        R126i.w =
+            as_type<int>(-(as_type<float>(R12i.z)) + as_type<float>(R127i.y));
+        // 6
+        backupReg0i = R126i.z;
+        PV0ix =
+            as_type<int>(mul_nonIEEE(as_type<float>(R3i.x), ubuff6.d[43].x));
+        R127i.y = as_type<int>(
+            mul_nonIEEE(as_type<float>(R124i.z), as_type<float>(R126i.y)));
+        R126i.z = as_type<int>(
+            mul_nonIEEE(as_type<float>(R125i.w), as_type<float>(R126i.w)));
+        R124i.w = as_type<int>(
+            mul_nonIEEE(as_type<float>(R125i.x), as_type<float>(R126i.x)));
+        R125i.y = as_type<int>(sqrt(as_type<float>(backupReg0i)));
+        // 7
+        backupReg0i = R127i.z;
+        R124i.x =
+            as_type<int>(mul_nonIEEE(as_type<float>(R3i.x), ubuff6.d[45].x));
+        R124i.y = as_type<int>(as_type<float>(R4i.w) * 255.0);
+        R127i.z = as_type<int>(as_type<float>(R2i.x) * 2.0 + -(1.0));
+        R4i.w =
+            as_type<int>(mul_nonIEEE(as_type<float>(R8i.y), ubuff6.d[43].y) +
+                         as_type<float>(PV0ix));
+        tempResultf = 1.0 / sqrt(as_type<float>(backupReg0i));
+        PS1i = as_type<int>(tempResultf);
+        // 8
+        backupReg0i = R125i.z;
+        R4i.x = as_type<int>(
+            mul_nonIEEE(as_type<float>(R127i.x), as_type<float>(PS1i)));
+        R4i.y = as_type<int>(
+            mul_nonIEEE(as_type<float>(R127i.w), as_type<float>(PS1i)));
+        R125i.z = as_type<int>(mul_nonIEEE(ubuff1.d[18].y, ubuff1.d[18].z));
+        R127i.w = as_type<int>(-(as_type<float>(R12i.z)) *
+                               as_type<float>(0x3d4ccccd));
+        R2i.z = as_type<int>(
+            mul_nonIEEE(as_type<float>(backupReg0i), as_type<float>(PS1i)));
+        // 9
+        R1i.x = as_type<int>(
+            mul_nonIEEE(-(as_type<float>(R126i.x)), as_type<float>(R124i.z)) +
+            as_type<float>(R126i.z));
+        R3i.y = as_type<int>(
+            mul_nonIEEE(-(as_type<float>(R126i.w)), as_type<float>(R125i.x)) +
+            as_type<float>(R127i.y));
+        R126i.z = as_type<int>(as_type<float>(R2i.y) * 2.0 + -(1.0));
+        R123i.w =
+            as_type<int>(mul_nonIEEE(as_type<float>(R8i.y), ubuff6.d[45].y) +
+                         as_type<float>(R124i.x));
+        R126i.w = as_type<int>(
+            mul_nonIEEE(as_type<float>(R125i.z), as_type<float>(R127i.z)));
+        // 10
+        backupReg0i = R126i.y;
+        R126i.x =
+            as_type<int>(mul_nonIEEE(as_type<float>(R12i.z), ubuff6.d[45].z) +
+                         as_type<float>(R123i.w));
+        R126i.y =
+            as_type<int>(mul_nonIEEE(as_type<float>(R12i.z), ubuff6.d[43].z) +
+                         as_type<float>(R4i.w));
+        R1i.z = as_type<int>(mul_nonIEEE(-(as_type<float>(backupReg0i)),
+                                         as_type<float>(R125i.w)) +
+                             as_type<float>(R124i.w));
+        R125i.w = R4i.x;
+        R125i.w = as_type<int>(as_type<float>(R125i.w) * 2.0);
+        R124i.z = R4i.y;
+        R124i.z = as_type<int>(as_type<float>(R124i.z) * 2.0);
+        // 11
+        R124i.x = as_type<int>(
+            dot(float4(-(as_type<float>(R1i.x)), -(as_type<float>(R3i.y)),
+                       -(as_type<float>(R1i.z)), as_type<float>(0x80000000)),
+                float4(-(as_type<float>(R1i.x)), -(as_type<float>(R3i.y)),
+                       -(as_type<float>(R1i.z)), 0.0)));
+        PV1iy = R124i.x;
+        PV1iz = R124i.x;
+        PV1iw = R124i.x;
+        R2i.x = as_type<int>(-(ubuff6.d[53].w) * as_type<float>(0x3d4ccccd) +
+                             as_type<float>(R127i.w));
+        R2i.x = clampFI32(R2i.x);
+        // 12
+        R125i.x = as_type<int>(
+            mul_nonIEEE(as_type<float>(R125i.z), -(as_type<float>(R126i.z))));
+        R127i.y =
+            as_type<int>(as_type<float>(R126i.z) * as_type<float>(0xbb6fe5d7));
+        PV0iz =
+            as_type<int>(as_type<float>(R126i.w) * as_type<float>(0x3ca30589));
+        PV0iw =
+            as_type<int>(as_type<float>(R126i.z) * as_type<float>(0x3ca30589));
+        R126i.z =
+            as_type<int>(as_type<float>(R126i.w) * as_type<float>(0xbb6fe5d7));
+        // 13
+        R7i.x = as_type<int>(ubuff6.d[43].w + as_type<float>(R126i.y));
+        R1i.y =
+            as_type<int>(as_type<float>(R127i.z) * as_type<float>(0x3b02da3b) +
+                         as_type<float>(PV0iw));
+        R3i.z = as_type<int>(
+            mul_nonIEEE(-(as_type<float>(R12i.z)), ubuff1.d[17].y));
+        R1i.w = int(0x3f800000);
+        R6i.x =
+            as_type<int>(as_type<float>(R125i.x) * as_type<float>(0x3b02da3b) +
+                         as_type<float>(PV0iz));
+        // 14
+        R5i.x =
+            as_type<int>(as_type<float>(R125i.x) * as_type<float>(0x3d156fb9) +
+                         as_type<float>(R126i.z));
+        R5i.y =
+            as_type<int>(as_type<float>(R127i.z) * as_type<float>(0x3d156fb9) +
+                         as_type<float>(R127i.y));
+        R13i.z = as_type<int>(ubuff6.d[45].w + as_type<float>(R126i.x));
+        R12i.w = as_type<int>(-(ubuff6.d[53].z) * as_type<float>(0x3d4ccccd) +
+                              as_type<float>(R127i.w));
+        R12i.w = clampFI32(R12i.w);
+        PS0i = as_type<int>(1.0 / as_type<float>(R125i.y));
+        // 15
+        backupReg0i = R124i.y;
+        R126i.x = as_type<int>(
+            mul_nonIEEE(as_type<float>(R3i.x), as_type<float>(PS0i)));
+        R124i.y = as_type<int>(
+            mul_nonIEEE(as_type<float>(R8i.y), as_type<float>(PS0i)));
+        PV1iz = as_type<int>(
+            mul_nonIEEE(as_type<float>(R12i.z), as_type<float>(PS0i)));
+        PS1i = int(as_type<float>(backupReg0i));
+        // 16
+        tempi.x = as_type<int>(
+            dot(float4(as_type<float>(R4i.x), as_type<float>(R4i.y),
+                       as_type<float>(R2i.z), as_type<float>(0x80000000)),
+                float4(as_type<float>(R126i.x), as_type<float>(R124i.y),
+                       as_type<float>(PV1iz), 0.0)));
+        PV0ix = tempi.x;
+        PV0iy = tempi.x;
+        PV0iz = tempi.x;
+        PV0iw = tempi.x;
+        PS0i = PS1i & int(1);
+        // 17
+        R12i.x = as_type<int>(
+            mul_nonIEEE(-(as_type<float>(PV0ix)), as_type<float>(R125i.w)) +
+            as_type<float>(R126i.x));
+        R7i.y = as_type<int>(
+            mul_nonIEEE(-(as_type<float>(PV0ix)), as_type<float>(R124i.z)) +
+            as_type<float>(R124i.y));
+        R13i.w = as_type<int>(as_type<float>(PV0ix) + 1.0);
+        R13i.w = clampFI32(R13i.w);
+        R2i.y = ((PS0i == 0) ? (0) : (int(0x3f800000)));
+        // 18
+        tempResultf = 1.0 / sqrt(as_type<float>(R124i.x));
+        R2i.w = as_type<int>(tempResultf);
+    }
+    if (activeMaskStackC[1] == true) {
+        activeMaskStack[1] = activeMaskStack[0];
+        activeMaskStackC[2] = activeMaskStackC[1];
+        // 0
+        PV0ix = as_type<int>(ubuff10.d[2].z + 1.0);
+        R9i.y = as_type<int>(mul_nonIEEE(ubuff6.d[4].y, ubuff10.d[2].w));
+        R8i.x = as_type<int>(mul_nonIEEE(ubuff6.d[4].x, ubuff10.d[2].w));
+        // 1
+        R10i.z = as_type<int>(mul_nonIEEE(ubuff6.d[4].z, ubuff10.d[2].w));
+        R14i.w = as_type<int>(-(as_type<float>(R2i.x)) + as_type<float>(PV0ix));
+        R14i.w = clampFI32(R14i.w);
+        R4i.w = 0;
+        // 2
+        predResult = (1.0 > as_type<float>(R12i.w));
+        activeMaskStack[1] = predResult;
+        activeMaskStackC[2] = predResult == true && activeMaskStackC[1] == true;
+    } else {
+        activeMaskStack[1] = false;
+        activeMaskStackC[2] = false;
+    }
+    if (activeMaskStackC[2] == true) {
+        // 0
+        R13i.x = as_type<int>(as_type<float>(R0i.x) + as_type<float>(R6i.x));
+        R13i.y = as_type<int>(as_type<float>(R0i.y) + as_type<float>(R1i.y));
+        R14i.x = as_type<int>(as_type<float>(R0i.x) + -(as_type<float>(R6i.x)));
+        // 1
+        R15i.x = as_type<int>(as_type<float>(R0i.x) + as_type<float>(R5i.x));
+        R14i.y = as_type<int>(as_type<float>(R0i.y) + -(as_type<float>(R1i.y)));
+        R15i.y = as_type<int>(as_type<float>(R0i.y) + as_type<float>(R5i.y));
+        // 2
+        R16i.x = as_type<int>(as_type<float>(R0i.x) + -(as_type<float>(R5i.x)));
+        R16i.y = as_type<int>(as_type<float>(R0i.y) + -(as_type<float>(R5i.y)));
+    }
+    if (activeMaskStackC[2] == true) {
+        // 0
+        PV0ix = as_type<int>(as_type<float>(R4i.x) * 1.5);
+        PV0iy = as_type<int>(as_type<float>(R4i.y) * 1.5);
+        PV0iz = ((-(as_type<float>(R12i.z)) > ubuff1.d[58].x) ? -1 : 0);
+        R127i.w = ((-(as_type<float>(R12i.z)) > ubuff1.d[58].y) ? -1 : 0);
+        PS0i = as_type<int>(as_type<float>(R2i.z) * 1.5);
+        // 1
+        backupReg0i = R1i.z;
+        R1i.x = as_type<int>(
+            mul_nonIEEE(-(as_type<float>(R1i.x)), as_type<float>(R2i.w)) +
+            as_type<float>(PV0ix));
+        PV1iy = PV0iz & int(1);
+        R1i.z = as_type<int>(
+            mul_nonIEEE(-(as_type<float>(R3i.y)), as_type<float>(R2i.w)) +
+            as_type<float>(PV0iy));
+        R1i.w = as_type<int>(
+            mul_nonIEEE(-(as_type<float>(backupReg0i)), as_type<float>(R2i.w)) +
+            as_type<float>(PS0i));
+        R122i.x = as_type<int>(as_type<float>(R3i.z) * 0.25 + 1.0);
+        // 2
+        backupReg0i = R2i.y;
+        R2i.x = as_type<int>(ubuff6.d[53].y / resScale);
+        R2i.x = as_type<int>(as_type<float>(R2i.x) / 2.0);
+        R2i.y = as_type<int>(ubuff6.d[53].x / resScale);
+        R2i.y = as_type<int>(as_type<float>(R2i.y) / 2.0);
+        R3i.z = as_type<int>(
+            mul_nonIEEE(as_type<float>(backupReg0i), as_type<float>(R122i.x)));
+        R3i.w = PV1iy - R127i.w;
+        PS0i = as_type<int>(
+            mul_nonIEEE(as_type<float>(R1i.w), as_type<float>(R1i.w)));
+        // 3
+        R123i.x = as_type<int>(
+            mul_nonIEEE(as_type<float>(R1i.z), as_type<float>(R1i.z)) +
+            as_type<float>(PS0i));
+        R3i.y = as_type<int>(-(as_type<float>(R2i.x)));
+        R7i.z = as_type<int>(-(as_type<float>(R2i.y)));
+        PV1iw = R3i.w << int(0x2);
+        R1i.y = as_type<int>(float(R3i.w));
+        // 4
+        R0i.x = PV1iw + int(0x2c);
+        R0i.y = PV1iw + int(0x2b);
+        R0i.z = PV1iw + int(0x2a);
+        R0i.w = PV1iw + int(0x2d);
+        R122i.x = as_type<int>(
+            mul_nonIEEE(as_type<float>(R1i.x), as_type<float>(R1i.x)) +
+            as_type<float>(R123i.x));
+        // 5
+        backupReg0i = R2i.z;
+        tempi.x = as_type<int>(dot(
+            float4(as_type<float>(R4i.x), as_type<float>(R4i.y),
+                   as_type<float>(backupReg0i), as_type<float>(backupReg0i)),
+            float4(-(as_type<float>(R8i.x)), -(as_type<float>(R9i.y)),
+                   -(as_type<float>(R10i.z)), -(as_type<float>(R4i.w)))));
+        tempi.x = clampFI32(tempi.x);
+        PV1ix = tempi.x;
+        PV1iy = tempi.x;
+        R2i.z = tempi.x;
+        PV1iw = tempi.x;
+        tempResultf = 1.0 / sqrt(as_type<float>(R122i.x));
+        R2i.w = as_type<int>(tempResultf);
+    }
+    if (activeMaskStackC[2] == true) {
+        R4i.xyzw = as_type<int4>(ubuff1.d[R0i.w].xyzw);
+        R5i.xyzw = as_type<int4>(ubuff1.d[R0i.x].xyzw);
+        R6i.xyzw = as_type<int4>(ubuff1.d[R0i.z].xyzw);
+        R0i.xyzw = as_type<int4>(ubuff1.d[R0i.y].xyzw);
+    }
+    if (activeMaskStackC[2] == true) {
+        // 0
+        R127i.x = as_type<int>(
+            mul_nonIEEE(as_type<float>(R1i.x), as_type<float>(R2i.w)));
+        R127i.y = as_type<int>(
+            mul_nonIEEE(as_type<float>(R1i.z), as_type<float>(R2i.w)));
+        R127i.z = as_type<int>(
+            mul_nonIEEE(as_type<float>(R1i.w), as_type<float>(R2i.w)));
+        R127i.w = R2i.x;
+        R8i.z = as_type<int>(rint(as_type<float>(R1i.y)));
+        // 1
+        tempi.x = as_type<int>(
+            dot(float4(as_type<float>(R8i.x), as_type<float>(R9i.y),
+                       as_type<float>(R10i.z), as_type<float>(0x80000000)),
+                float4(as_type<float>(R127i.x), as_type<float>(R127i.y),
+                       as_type<float>(R127i.z), 0.0)));
+        PV1ix = tempi.x;
+        PV1iy = tempi.x;
+        PV1iz = tempi.x;
+        PV1iw = tempi.x;
+        R9i.z = R8i.z;
+        // 2
+        R123i.x = as_type<int>(
+            mul_nonIEEE(-(as_type<float>(R10i.z)), as_type<float>(PV1ix)) +
+            as_type<float>(R127i.z));
+        R123i.y = as_type<int>(
+            mul_nonIEEE(-(as_type<float>(R9i.y)), as_type<float>(PV1ix)) +
+            as_type<float>(R127i.y));
+        R123i.z = as_type<int>(
+            mul_nonIEEE(-(as_type<float>(PV1ix)), as_type<float>(PV1ix)) + 1.0);
+        R123i.w = as_type<int>(
+            mul_nonIEEE(-(as_type<float>(R8i.x)), as_type<float>(PV1ix)) +
+            as_type<float>(R127i.x));
+        R10i.z = R8i.z;
+        // 3
+        R127i.x = as_type<int>(
+            mul_nonIEEE(as_type<float>(R3i.z), as_type<float>(R123i.w)));
+        R127i.y = as_type<int>(
+            mul_nonIEEE(as_type<float>(R3i.z), as_type<float>(R123i.y)));
+        R127i.z = as_type<int>(
+            mul_nonIEEE(as_type<float>(R3i.z), as_type<float>(R123i.x)));
+        PV1iw = as_type<int>(
+            mul_nonIEEE(as_type<float>(R123i.z), as_type<float>(R2i.z)));
+        R11i.z = R8i.z;
+        // 4
+        PV0ix =
+            as_type<int>(as_type<float>(PV1iw) * as_type<float>(0x3da1ff2e));
+        // 5
+        R17i.x = as_type<int>(
+            mul_nonIEEE(as_type<float>(R127i.x), as_type<float>(PV0ix)) +
+            as_type<float>(R3i.x));
+        R12i.y = as_type<int>(
+            mul_nonIEEE(as_type<float>(R127i.y), as_type<float>(PV0ix)) +
+            as_type<float>(R8i.y));
+        R12i.z = as_type<int>(
+            mul_nonIEEE(as_type<float>(R127i.z), as_type<float>(PV0ix)) +
+            as_type<float>(R12i.z));
+        // 6
+        PV0ix = as_type<int>(
+            mul_nonIEEE(as_type<float>(R17i.x), as_type<float>(R5i.x)));
+        R127i.y = as_type<int>(
+            mul_nonIEEE(as_type<float>(R17i.x), as_type<float>(R6i.x)));
+        PV0iz = as_type<int>(
+            mul_nonIEEE(as_type<float>(R17i.x), as_type<float>(R4i.x)));
+        // 7
+        R123i.x = as_type<int>(
+            mul_nonIEEE(as_type<float>(R12i.y), as_type<float>(R5i.y)) +
+            as_type<float>(PV0ix));
+        R123i.y = as_type<int>(
+            mul_nonIEEE(as_type<float>(R12i.y), as_type<float>(R4i.y)) +
+            as_type<float>(PV0iz));
+        R127i.z = as_type<int>(
+            mul_nonIEEE(as_type<float>(R17i.x), as_type<float>(R0i.x)));
+        // 8
+        backupReg0i = R123i.x;
+        R123i.x = as_type<int>(
+            mul_nonIEEE(as_type<float>(R12i.z), as_type<float>(R4i.z)) +
+            as_type<float>(R123i.y));
+        R123i.y = as_type<int>(
+            mul_nonIEEE(as_type<float>(R12i.z), as_type<float>(R5i.z)) +
+            as_type<float>(backupReg0i));
+        R123i.z = as_type<int>(
+            mul_nonIEEE(as_type<float>(R12i.y), as_type<float>(R6i.y)) +
+            as_type<float>(R127i.y));
+        // 9
+        R127i.x = as_type<int>(as_type<float>(R5i.w) + as_type<float>(R123i.y));
+        R123i.y = as_type<int>(
+            mul_nonIEEE(as_type<float>(R12i.y), as_type<float>(R0i.y)) +
+            as_type<float>(R127i.z));
+        R123i.z = as_type<int>(
+            mul_nonIEEE(as_type<float>(R12i.z), as_type<float>(R6i.z)) +
+            as_type<float>(R123i.z));
+        PV1iw = as_type<int>(as_type<float>(R4i.w) + as_type<float>(R123i.x));
+        // 10
+        R123i.x = as_type<int>(
+            mul_nonIEEE(as_type<float>(R12i.z), as_type<float>(R0i.z)) +
+            as_type<float>(R123i.y));
+        PV0iw = as_type<int>(as_type<float>(R6i.w) + as_type<float>(R123i.z));
+        R127i.z = as_type<int>(1.0 / as_type<float>(PV1iw));
+        // 11
+        PV1ix = as_type<int>(as_type<float>(R0i.w) + as_type<float>(R123i.x));
+        R127i.y = as_type<int>(
+            mul_nonIEEE(as_type<float>(PV0iw), as_type<float>(R127i.z)));
+        PV1iw = as_type<int>(
+            mul_nonIEEE(as_type<float>(R127i.x), as_type<float>(R127i.z)));
+        // 12
+        R127i.x = as_type<int>(
+            mul_nonIEEE(as_type<float>(PV1ix), as_type<float>(R127i.z)));
+        PV0iz =
+            as_type<int>(as_type<float>(PV1iw) + as_type<float>(0xbb03126f));
+        R8i.x = as_type<int>(ubuff6.d[53].x / resScale * 0.5 +
+                             as_type<float>(R127i.y));
+        // 13
+        R126i.x =
+            as_type<int>(-(as_type<float>(R1i.y)) * as_type<float>(0x3a03126f) +
+                         as_type<float>(PV0iz));
+        R126i.x = clampFI32(R126i.x);
+        R8i.y = as_type<int>(ubuff6.d[53].y / resScale * 0.5 +
+                             as_type<float>(R127i.x));
+        R9i.x = as_type<int>(as_type<float>(R127i.y) + as_type<float>(R2i.y));
+        // 14
+        R10i.x = as_type<int>(as_type<float>(R127i.y) + as_type<float>(R7i.z));
+        R9i.y = as_type<int>(as_type<float>(R127i.x) + as_type<float>(R3i.y));
+        R8i.w = R126i.x;
+        R9i.w = R126i.x;
+        // 15
+        R11i.x = as_type<int>(-(ubuff6.d[53].x) / resScale * 0.5 +
+                              as_type<float>(R127i.y));
+        R10i.y =
+            as_type<int>(as_type<float>(R127i.x) + as_type<float>(R127i.w));
+        R10i.w = R126i.x;
+        R11i.y = as_type<int>(-(ubuff6.d[53].y) / resScale * 0.5 +
+                              as_type<float>(R127i.x));
+        // 16
+        R11i.w = R126i.x;
+    }
+    if (activeMaskStackC[2] == true) {
+        R8i.z = as_type<int>(
+            float4(tex8.sample_compare(
+                       samplr8,
+                       float2(as_type<float>(R8i.x), as_type<float>(R8i.y)),
+                       uint(rint(as_type<float>(R8i.z))),
+                       as_type<float>(R8i.w)))
+                .x);
+        R9i.y = as_type<int>(
+            float4(tex8.sample_compare(
+                       samplr8,
+                       float2(as_type<float>(R9i.x), as_type<float>(R9i.y)),
+                       uint(rint(as_type<float>(R9i.z))),
+                       as_type<float>(R9i.w)))
+                .x);
+        R10i.x = as_type<int>(
+            float4(tex8.sample_compare(
+                       samplr8,
+                       float2(as_type<float>(R10i.x), as_type<float>(R10i.y)),
+                       uint(rint(as_type<float>(R10i.z))),
+                       as_type<float>(R10i.w)))
+                .x);
+        R11i.w = as_type<int>(
+            float4(tex8.sample_compare(
+                       samplr8,
+                       float2(as_type<float>(R11i.x), as_type<float>(R11i.y)),
+                       uint(rint(as_type<float>(R11i.z))),
+                       as_type<float>(R11i.w)))
+                .x);
+    }
+    if (activeMaskStackC[2] == true) {
+        activeMaskStack[2] = activeMaskStack[1];
+        activeMaskStackC[3] = activeMaskStackC[2];
+        // 0
+        PV0iw = as_type<int>(as_type<float>(R8i.z) + as_type<float>(R9i.y));
+        PV0iw = as_type<int>(as_type<float>(PV0iw) / 2.0);
+        // 1
+        R123i.y =
+            as_type<int>(as_type<float>(R10i.x) * 0.5 + as_type<float>(PV0iw));
+        // 2
+        R4i.z = as_type<int>(
+            (as_type<float>(R11i.w) * 0.5 + as_type<float>(R123i.y)) / 2.0);
+        // 3
+        PV1ix = ((1.0 > as_type<float>(R4i.z)) ? -1 : 0);
+        // 4
+        R0i.w = ((R3i.w > 0) ? (PV1ix) : (0));
+        // 5
+        predResult = (R0i.w != 0);
+        activeMaskStack[2] = predResult;
+        activeMaskStackC[3] = predResult == true && activeMaskStackC[2] == true;
+    } else {
+        activeMaskStack[2] = false;
+        activeMaskStackC[3] = false;
+    }
+    if (activeMaskStackC[3] == true) {
+        // 0
+        PV0iz = int(-1) + R3i.w;
+        // 1
+        PV1iy = PV0iz << int(0x2);
+        R4i.x = as_type<int>(float(PV0iz));
+        // 2
+        R0i.x = PV1iy + int(0x2a);
+        R0i.y = PV1iy + int(0x2d);
+        R0i.z = PV1iy + int(0x2c);
+        R0i.w = PV1iy + int(0x2b);
+        R5i.z = as_type<int>(rint(as_type<float>(R4i.x)));
+    }
+    if (activeMaskStackC[3] == true) {
+        R1i.xyzw = as_type<int4>(ubuff1.d[R0i.y].xyzw);
+        R2i.xyzw = as_type<int4>(ubuff1.d[R0i.z].xyzw);
+        R3i.xyzw = as_type<int4>(ubuff1.d[R0i.x].xyzw);
+        R0i.xyzw = as_type<int4>(ubuff1.d[R0i.w].xyzw);
+    }
+    if (activeMaskStackC[3] == true) {
+        // 0
+        PV0ix = as_type<int>(
+            mul_nonIEEE(as_type<float>(R17i.x), as_type<float>(R1i.x)));
+        PV0iy = as_type<int>(
+            mul_nonIEEE(as_type<float>(R17i.x), as_type<float>(R2i.x)));
+        // 1
+        R123i.x = as_type<int>(
+            mul_nonIEEE(as_type<float>(R12i.y), as_type<float>(R2i.y)) +
+            as_type<float>(PV0iy));
+        PV1iy = as_type<int>(
+            mul_nonIEEE(as_type<float>(R17i.x), as_type<float>(R3i.x)));
+        PV1iz = as_type<int>(
+            mul_nonIEEE(as_type<float>(R17i.x), as_type<float>(R0i.x)));
+        R123i.w = as_type<int>(
+            mul_nonIEEE(as_type<float>(R12i.y), as_type<float>(R1i.y)) +
+            as_type<float>(PV0ix));
+        // 2
+        R123i.x = as_type<int>(
+            mul_nonIEEE(as_type<float>(R12i.z), as_type<float>(R2i.z)) +
+            as_type<float>(R123i.x));
+        R123i.y = as_type<int>(
+            mul_nonIEEE(as_type<float>(R12i.y), as_type<float>(R0i.y)) +
+            as_type<float>(PV1iz));
+        R123i.z = as_type<int>(
+            mul_nonIEEE(as_type<float>(R12i.z), as_type<float>(R1i.z)) +
+            as_type<float>(R123i.w));
+        R123i.w = as_type<int>(
+            mul_nonIEEE(as_type<float>(R12i.y), as_type<float>(R3i.y)) +
+            as_type<float>(PV1iy));
+        // 3
+        R127i.x = as_type<int>(as_type<float>(R2i.w) + as_type<float>(R123i.x));
+        PV1iy = as_type<int>(as_type<float>(R1i.w) + as_type<float>(R123i.z));
+        R123i.z = as_type<int>(
+            mul_nonIEEE(as_type<float>(R12i.z), as_type<float>(R3i.z)) +
+            as_type<float>(R123i.w));
+        R123i.w = as_type<int>(
+            mul_nonIEEE(as_type<float>(R12i.z), as_type<float>(R0i.z)) +
+            as_type<float>(R123i.y));
+        // 4
+        PV0ix = as_type<int>(as_type<float>(R0i.w) + as_type<float>(R123i.w));
+        PV0iy = as_type<int>(as_type<float>(R3i.w) + as_type<float>(R123i.z));
+        PS0i = as_type<int>(1.0 / as_type<float>(PV1iy));
+        // 5
+        R5i.x = as_type<int>(
+            mul_nonIEEE(as_type<float>(PV0iy), as_type<float>(PS0i)));
+        R5i.y = as_type<int>(
+            mul_nonIEEE(as_type<float>(PV0ix), as_type<float>(PS0i)));
+        PV1iw = as_type<int>(
+            mul_nonIEEE(as_type<float>(R127i.x), as_type<float>(PS0i)));
+        // 6
+        PV0iy =
+            as_type<int>(as_type<float>(PV1iw) + as_type<float>(0xbb03126f));
+        // 7
+        R5i.w =
+            as_type<int>(-(as_type<float>(R4i.x)) * as_type<float>(0x3a03126f) +
+                         as_type<float>(PV0iy));
+        R5i.w = clampFI32(R5i.w);
+    }
+    if (activeMaskStackC[3] == true) {
+        R5i.z = as_type<int>(
+            float4(tex8.sample_compare(
+                       samplr8,
+                       float2(as_type<float>(R5i.x), as_type<float>(R5i.y)),
+                       uint(rint(as_type<float>(R5i.z))),
+                       as_type<float>(R5i.w)))
+                .x);
+    }
+    if (activeMaskStackC[3] == true) {
+        // 0
+        R4i.z = as_type<int>(
+            mul_nonIEEE(as_type<float>(R4i.z), as_type<float>(R5i.z)));
+    }
+    activeMaskStackC[2] =
+        activeMaskStack[1] == true && activeMaskStackC[1] == true;
+    if (activeMaskStackC[2] == true) {
+        R0i.x =
+            as_type<int>(tex6.sample(samplr6, float2(as_type<float>(R15i.x),
+                                                     as_type<float>(R15i.y)))
+                             .x);
+        R0i.y =
+            as_type<int>(tex6.sample(samplr6, float2(as_type<float>(R16i.x),
+                                                     as_type<float>(R16i.y)))
+                             .x);
+        R1i.x =
+            as_type<int>(tex6.sample(samplr6, float2(as_type<float>(R13i.x),
+                                                     as_type<float>(R13i.y)))
+                             .x);
+        R1i.y =
+            as_type<int>(tex6.sample(samplr6, float2(as_type<float>(R14i.x),
+                                                     as_type<float>(R14i.y)))
+                             .x);
+    }
+    if (activeMaskStackC[2] == true) {
+        // 0
+        R127i.x =
+            as_type<int>(as_type<float>(R7i.w) * as_type<float>(0x3f7eb852));
+        PV0iy = as_type<int>(ubuff1.d[16].x * 20.0);
+        R124i.z = as_type<int>(-(as_type<float>(R4i.z)) + 1.0);
+        R127i.w = as_type<int>(ubuff1.d[16].x * as_type<float>(0x3f555555));
+        // 1
+        PV1ix =
+            as_type<int>(as_type<float>(R127i.x) + -(as_type<float>(R0i.y)));
+        PV1iy =
+            as_type<int>(as_type<float>(R127i.x) + -(as_type<float>(R0i.x)));
+        R127i.z =
+            as_type<int>(as_type<float>(PV0iy) * as_type<float>(0x3f8ba8d6));
+        R127i.z = as_type<int>(as_type<float>(R127i.z) / 2.0);
+        PV1iw =
+            as_type<int>(as_type<float>(PV0iy) * as_type<float>(0x3fbc4580));
+        PV1iw = as_type<int>(as_type<float>(PV1iw) / 2.0);
+        R126i.z =
+            as_type<int>(-(as_type<float>(R1i.x)) + as_type<float>(R127i.x));
+        // 2
+        backupReg0i = R127i.x;
+        R127i.x = as_type<int>(
+            mul_nonIEEE(-(as_type<float>(R127i.w)), as_type<float>(PV1iy)) +
+            1.0);
+        R127i.x = clampFI32(R127i.x);
+        R127i.y = as_type<int>(
+            mul_nonIEEE(as_type<float>(PV1iw), as_type<float>(PV1ix)) + 0.5);
+        R127i.y = clampFI32(R127i.y);
+        R125i.z = as_type<int>(
+            mul_nonIEEE(as_type<float>(PV1iw), as_type<float>(PV1iy)) + 0.5);
+        R125i.z = clampFI32(R125i.z);
+        R126i.w = as_type<int>(-(as_type<float>(R1i.y)) +
+                               as_type<float>(backupReg0i));
+        R125i.w = as_type<int>(
+            mul_nonIEEE(-(as_type<float>(R127i.w)), as_type<float>(PV1ix)) +
+            1.0);
+        R125i.w = clampFI32(R125i.w);
+        // 3
+        R126i.x = as_type<int>(
+            mul_nonIEEE(as_type<float>(R127i.z), as_type<float>(R126i.z)) +
+            0.5);
+        R126i.x = clampFI32(R126i.x);
+        PV1iy = as_type<int>(0.5 + -(as_type<float>(R127i.y)));
+        PV1iz = as_type<int>(0.5 + -(as_type<float>(R125i.z)));
+        R124i.w = as_type<int>(
+            mul_nonIEEE(as_type<float>(R127i.z), as_type<float>(R126i.w)) +
+            0.5);
+        R124i.w = clampFI32(R124i.w);
+        R0i.w = as_type<int>(
+            mul_nonIEEE(-(as_type<float>(R127i.w)), as_type<float>(R126i.z)) +
+            1.0);
+        R0i.w = clampFI32(R0i.w);
+        // 4
+        backupReg0i = R127i.w;
+        PV0ix = as_type<int>(0.5 + -(as_type<float>(R126i.x)));
+        R126i.y = as_type<int>(
+            mul_nonIEEE(as_type<float>(PV1iz), as_type<float>(R127i.x)) + 0.5);
+        PV0iz = as_type<int>(0.5 + -(as_type<float>(R124i.w)));
+        R127i.w = as_type<int>(
+            mul_nonIEEE(as_type<float>(PV1iy), as_type<float>(R125i.w)) + 0.5);
+        R125i.y = as_type<int>(mul_nonIEEE(-(as_type<float>(backupReg0i)),
+                                           as_type<float>(R126i.w)) +
+                               1.0);
+        R125i.y = clampFI32(R125i.y);
+        // 5
+        PV1ix =
+            as_type<int>(as_type<float>(R127i.y) + -(as_type<float>(R126i.y)));
+        R127i.y = as_type<int>(
+            mul_nonIEEE(as_type<float>(PV0iz), as_type<float>(R125i.y)) + 0.5);
+        PV1iz =
+            as_type<int>(as_type<float>(R125i.z) + -(as_type<float>(R127i.w)));
+        R126i.w = as_type<int>(
+            mul_nonIEEE(as_type<float>(PV0ix), as_type<float>(R0i.w)) + 0.5);
+        R3i.w = as_type<int>(
+            mul_nonIEEE(as_type<float>(R124i.z), as_type<float>(R12i.w)) +
+            as_type<float>(R4i.z));
+        // 6
+        R123i.x = as_type<int>(
+            mul_nonIEEE(as_type<float>(PV1iz), as_type<float>(R127i.x)) +
+            as_type<float>(R127i.w));
+        PV0iy =
+            as_type<int>(as_type<float>(R126i.x) + -(as_type<float>(R127i.y)));
+        PV0iz =
+            as_type<int>(as_type<float>(R124i.w) + -(as_type<float>(R126i.w)));
+        R123i.w = as_type<int>(
+            mul_nonIEEE(as_type<float>(PV1ix), as_type<float>(R125i.w)) +
+            as_type<float>(R126i.y));
+        // 7
+        PV1ix =
+            as_type<int>(as_type<float>(R123i.x) * as_type<float>(0x3e35e743));
+        PV1iy =
+            as_type<int>(as_type<float>(R123i.w) * as_type<float>(0x3e35e743));
+        R123i.z = as_type<int>(
+            mul_nonIEEE(as_type<float>(PV0iz), as_type<float>(R125i.y)) +
+            as_type<float>(R126i.w));
+        R123i.w = as_type<int>(
+            mul_nonIEEE(as_type<float>(PV0iy), as_type<float>(R0i.w)) +
+            as_type<float>(R127i.y));
+        // 8
+        R123i.x =
+            as_type<int>(as_type<float>(R123i.w) * as_type<float>(0x3e825397) +
+                         as_type<float>(PV1ix));
+        R123i.w =
+            as_type<int>(as_type<float>(R123i.z) * as_type<float>(0x3e825397) +
+                         as_type<float>(PV1iy));
+        // 9
+        PV1iz = as_type<int>(as_type<float>(R123i.x) + as_type<float>(R123i.w));
+        // 10
+        PV0iy =
+            as_type<int>(as_type<float>(PV1iz) + as_type<float>(0xbedd476b));
+        // 11
+        PV1ix = as_type<int>(as_type<float>(PV0iy) * 6.0);
+        PV1ix = clampFI32(PV1ix);
+        // 12
+        R1i.w = as_type<int>(-(as_type<float>(PV1ix)) + 1.0);
+    }
+    activeMaskStack[1] = activeMaskStack[1] == false;
+    activeMaskStackC[2] =
+        activeMaskStack[1] == true && activeMaskStackC[1] == true;
+    if (activeMaskStackC[2] == true) {
+        // 0
+        R3i.w = R1i.w;
+    }
+    activeMaskStackC[1] =
+        activeMaskStack[0] == true && activeMaskStackC[0] == true;
+    if (activeMaskStackC[1] == true) {
+        // 0
+        R0i.x = as_type<int>(
+            as_type<float>(R7i.x) * as_type<float>(0x38d1b717) + 0.5);
+        R0i.y = as_type<int>(
+            as_type<float>(R13i.z) * as_type<float>(0x3903126f) + 0.5);
+        PV0iz = as_type<int>(-(as_type<float>(R7i.y)));
+        PV0iz = as_type<int>(as_type<float>(PV0iz) / 2.0);
+        PV0iw = R12i.x;
+        PV0iw = as_type<int>(as_type<float>(PV0iw) / 2.0);
+        R2i.z = R1i.w;
+        // 1
+        R1i.x = as_type<int>(as_type<float>(PV0iw) + 0.5);
+        R1i.y = as_type<int>(as_type<float>(PV0iz) + 0.5);
+        R2i.w = int(0x3f800000);
+    }
+    if (activeMaskStackC[1] == true) {
+        R0i.xyz = as_type<int3>(
+            tex15
+                .sample(samplr15,
+                        float2(as_type<float>(R0i.x), as_type<float>(R0i.y)),
+                        level(0.0))
+                .xyz);
+        R1i.y = as_type<int>(
+            tex1.sample(samplr1,
+                        float2(as_type<float>(R1i.x), as_type<float>(R1i.y)),
+                        level(0.0))
+                .x);
+    }
+    if (activeMaskStackC[1] == true) {
+        // 0
+        tempi.x = as_type<int>(
+            dot(float4(as_type<float>(R0i.x), as_type<float>(R0i.y),
+                       as_type<float>(R0i.z), as_type<float>(0x80000000)),
+                float4(ubuff6.d[42].x, ubuff6.d[42].y, ubuff6.d[42].z, 0.0)));
+        PV0ix = tempi.x;
+        PV0iy = tempi.x;
+        PV0iz = tempi.x;
+        PV0iw = tempi.x;
+        R2i.y = as_type<int>(
+            mul_nonIEEE(as_type<float>(R1i.y), -(as_type<float>(R13i.w))) +
+            as_type<float>(R1i.y));
+        // 1
+        PV1iw = as_type<int>(
+            mul_nonIEEE(as_type<float>(PV0ix), as_type<float>(PV0ix)));
+        // 2
+        R127i.z = as_type<int>(
+            mul_nonIEEE(as_type<float>(PV1iw), as_type<float>(PV1iw)));
+        // 3
+        PV1iy =
+            as_type<int>(as_type<float>(R3i.w) + -(as_type<float>(R127i.z)));
+        // 4
+        R123i.x = as_type<int>(
+            mul_nonIEEE(as_type<float>(PV1iy), as_type<float>(R14i.w)) +
+            as_type<float>(R127i.z));
+        // 5
+        R2i.x =
+            as_type<int>(mul_nonIEEE(as_type<float>(R123i.x), ubuff10.d[3].z) +
+                         ubuff10.d[1].y);
+        R2i.x = clampFI32(R2i.x);
+    }
+    // export
+    out.passPixelColor5 =
+        as_type<float4>(float4(as_type<float>(R2i.x), as_type<float>(R2i.y),
+                               as_type<float>(R2i.z), as_type<float>(R2i.w)));
+    return out;
+}

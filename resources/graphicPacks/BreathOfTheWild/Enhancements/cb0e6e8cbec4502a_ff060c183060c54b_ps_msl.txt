@@ -1,0 +1,69 @@
+// shader cb0e6e8cbec4502a
+#include <metal_stdlib>
+using namespace metal;
+#define SET_POSITION(_v) out.position = _v; out.position.z = (out.position.z + out.position.w) / 2.0
+// start of shader inputs/outputs, predetermined by Cemu. Do not touch
+struct SupportBuffer {
+float2 fragCoordScale;
+};
+
+#define GET_FRAGCOORD() float4(in.position.xy * supportBuffer.fragCoordScale.xy, in.position.z, 1.0 / in.position.w)
+struct FragmentIn {
+float4 position [[position]];
+float4 passParameterSem3 [[user(locn0)]];
+};
+
+struct FragmentOut {
+float4 passPixelColor0 [[color(0)]];
+};
+
+// end of shader inputs/outputs
+template<typename TextureT, typename CoordT>
+float sampleCompareEmulate(TextureT tex, sampler samplr, CoordT coord, float compareValue) {
+return compareValue < tex.sample(samplr, coord).x ? 1.0 : 0.0;
+}
+template<typename TextureT, typename CoordT>
+float2 textureCalculateLod(TextureT tex, sampler samplr, CoordT coord) {
+float lod = tex.calculate_unclamped_lod(samplr, coord);
+return float2(floor(lod), fract(lod));
+}
+int clampFI32(int v)
+{
+if( v == 0x7FFFFFFF )
+	return as_type<int>(1.0);
+else if( v == 0xFFFFFFFF )
+	return as_type<int>(0.0);
+return as_type<int>(clamp(as_type<float>(v), 0.0, 1.0));
+}
+float mul_nonIEEE(float a, float b){ if( a == 0.0 || b == 0.0 ) return 0.0; return a*b; }
+
+#define disableDOF $disableDOF
+
+#if (disableDOF == 0) // Keep DOF Enabled
+
+fragment FragmentOut main0(FragmentIn in [[stage_in]], float2 pointCoord [[point_coord]], bool frontFacing [[front_facing]], constant SupportBuffer& supportBuffer [[buffer(0)]], texture2d<float> tex0 [[texture(0)]], sampler samplr0 [[sampler(0)]]) {
+	int radius = int(rint(2.0 / supportBuffer.fragCoordScale.y));
+	float2 resolution = float2(tex0.get_width(), tex0.get_height());
+
+	float2 center = (in.passParameterSem3.xy + in.passParameterSem3.zw) / 2.0;
+	float3 result = float3(0.0);
+	float count = 0.0;
+	for (int x = 1 - radius; x <= radius - 1; x += 2) {
+		for (int y = 1 - radius; y <= radius - 1; y += 2) {
+			if (length(float2(x, y)) <= radius) {
+				result += tex0.sample(samplr0, center + float2(x, y) / resolution).xyz;
+				count += 1.0;
+			}
+		}
+	}
+	
+	return {float4(result / count, 1.0)};
+}
+
+#elif (disableDOF == 1) // Disable DOF
+
+fragment FragmentOut main0(FragmentIn in [[stage_in]], float2 pointCoord [[point_coord]], bool frontFacing [[front_facing]], constant SupportBuffer& supportBuffer [[buffer(0)]], texture2d<float> tex0 [[texture(0)]], sampler samplr0 [[sampler(0)]]) {
+	return {tex0.sample(samplr0, in.passParameterSem3)};
+}
+
+#endif

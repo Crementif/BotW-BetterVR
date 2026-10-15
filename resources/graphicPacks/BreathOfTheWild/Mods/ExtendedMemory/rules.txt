@@ -1,0 +1,15 @@
+[Definition]
+titleIds = 00050000101C9300,00050000101C9400,00050000101C9500
+name = Extended Memory
+path = "The Legend of Zelda: Breath of the Wild/Mods/Extended Memory"
+description = Adds an extra 2GB of emulated RAM.|Only enable this if a mod you want to use requires this since it'll use more RAM.
+version = 6
+
+[RAM]
+mapping0 = 0x10000000-0xA0000000 # extend MEM2 region (default range is 0x10000000-0x50000000)
+mapping1 = 0xA0000000-0xE0000000 # extend overlay region (default range is 0xA0000000-0xBC000000)
+# BotW (and other games might) require additional modifications to the code to utilize this extra ram.
+
+
+# If you've got any improvements for this pack (since it's currently work-in-progress), please let us know in the Cemu Graphic Packs github (https://github.com/cemu-project/cemu_graphic_packs) via an issue.
+# Also, it'd be appreciated if the code for this graphic pack wasn't included inside of mods for the sake of mod compatibility.

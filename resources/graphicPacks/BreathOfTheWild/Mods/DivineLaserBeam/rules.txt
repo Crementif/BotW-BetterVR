@@ -1,0 +1,127 @@
+[Definition]
+titleIds = 00050000101C9300,00050000101C9400,00050000101C9500
+name = Divine Laser Beams
+path = "The Legend of Zelda: Breath of the Wild/Mods/Divine Laser Beams"
+description = Customizes the appearance of the Divine Beasts's Laser Beams. They can also be completely hidden.||Made by Kiri.
+version = 6
+
+[Default]
+$hue:int = 0
+$rainbow:int = 0
+$disableBeams:int = 0
+$saturation = 1.0
+$alpha = 1.0
+
+
+[Preset]
+name = Yes (Default)
+category = Show Laser
+default = 1
+$disableBeams:int = 0
+
+[Preset]
+name = No
+category = Show Laser
+$disableBeams:int = 1
+
+
+[Preset]
+name = Red (Default)
+condition = $disableBeams == 0
+category = Laser Color
+default = 1
+$hue:int = 0
+
+[Preset]
+name = Rainbow
+condition = $disableBeams == 0
+category = Laser Color
+$rainbow:int = 1
+
+[Preset]
+name = Purple
+condition = $disableBeams == 0
+category = Laser Color
+$hue:int = 300
+
+[Preset]
+name = Blue
+condition = $disableBeams == 0
+category = Laser Color
+$hue:int = 225
+
+[Preset]
+name = Cyan
+condition = $disableBeams == 0
+category = Laser Color
+$hue:int = 160
+
+[Preset]
+name = Green
+condition = $disableBeams == 0
+category = Laser Color
+$hue:int = 120
+
+[Preset]
+name = Yellow
+condition = $disableBeams == 0
+category = Laser Color
+$hue:int = 45
+
+
+[Preset]
+name = 100% (Default)
+condition = $disableBeams == 0
+category = Color Saturation
+default = 1
+$saturation = 1.0
+
+[Preset]
+name = 75%
+condition = $disableBeams == 0
+category = Color Saturation
+$saturation = 0.75
+
+[Preset]
+name = 50%
+condition = $disableBeams == 0
+category = Color Saturation
+$saturation = 0.5
+
+[Preset]
+name = 25%
+condition = $disableBeams == 0
+category = Color Saturation
+$saturation = 0.25
+
+
+[Preset]
+name = 100% (Default)
+condition = $disableBeams == 0
+category = Laser Opacity
+default = 1
+$alpha = 1.0
+
+[Preset]
+name = 75%
+condition = $disableBeams == 0
+category = Laser Opacity
+$alpha = 0.75
+
+[Preset]
+name = 50%
+condition = $disableBeams == 0
+category = Laser Opacity
+$alpha = 0.5
+
+[Preset]
+name = 25%
+condition = $disableBeams == 0
+category = Laser Opacity
+$alpha = 0.25
+
+[Preset]
+name = 10%
+condition = $disableBeams == 0
+category = Laser Opacity
+$alpha = 0.1

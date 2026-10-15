@@ -1,0 +1,144 @@
+#include <metal_stdlib>
+using namespace metal;
+
+// shader 2633e3bef936262b
+// Shader dumped from BotW 208, using Cemu 2193a8c
+// Based on fc3e63a2007625f8_0000000000000000_vs.txt
+// Used For: Vertical Menu Blur
+
+constant float resYScale = float($height) / float($gameHeight);
+
+#define SET_POSITION(_v)                                                       \
+    out.position = _v;                                                         \
+    out.position.z = (out.position.z + out.position.w) / 2.0
+// start of shader inputs/outputs, predetermined by Cemu. Do not touch
+struct SupportBuffer {
+    int4 remapped[5];
+};
+
+struct VertexIn {
+    uint4 attrDataSem0 [[attribute(0)]];
+};
+
+struct VertexOut {
+    float4 position [[position]] [[invariant]];
+    float4 passParameterSem0 [[user(locn0)]];
+};
+
+// end of shader inputs/outputs
+template <typename TextureT, typename CoordT>
+float sampleCompareEmulate(TextureT tex, sampler samplr, CoordT coord,
+                           float compareValue) {
+    return compareValue < tex.sample(samplr, coord).x ? 1.0 : 0.0;
+}
+template <typename TextureT, typename CoordT>
+float2 textureCalculateLod(TextureT tex, sampler samplr, CoordT coord) {
+    float lod = tex.calculate_unclamped_lod(samplr, coord);
+    return float2(floor(lod), fract(lod));
+}
+int clampFI32(int v) {
+    if (v == 0x7FFFFFFF)
+        return as_type<int>(1.0);
+    else if (v == 0xFFFFFFFF)
+        return as_type<int>(0.0);
+    return as_type<int>(clamp(as_type<float>(v), 0.0, 1.0));
+}
+float mul_nonIEEE(float a, float b) {
+    if (a == 0.0 || b == 0.0)
+        return 0.0;
+    return a * b;
+}
+vertex VertexOut main0(uint vid [[vertex_id]], uint iid [[instance_id]],
+                       VertexIn in [[stage_in]],
+                       constant SupportBuffer &supportBuffer [[buffer(0)]]) {
+    VertexOut out;
+    float4 R0f = float4(0.0);
+    float4 R1f = float4(0.0);
+    float4 R126f = float4(0.0);
+    float4 R127f = float4(0.0);
+    uint4 attrDecoder;
+    float backupReg0f, backupReg1f, backupReg2f, backupReg3f, backupReg4f;
+    float PV0fx = 0.0, PV0fy = 0.0, PV0fz = 0.0, PV0fw = 0.0, PV1fx = 0.0,
+          PV1fy = 0.0, PV1fz = 0.0, PV1fw = 0.0;
+    float PS0f = 0.0, PS1f = 0.0;
+    float4 tempf = float4(0.0);
+    float tempResultf;
+    int tempResulti;
+    int4 ARi = int4(0);
+    bool predResult = true;
+    R0f = float4(vid, 0, 0, iid);
+    attrDecoder.xyz = in.attrDataSem0.xyz;
+    attrDecoder.xyz =
+        (attrDecoder.xyz >> 24) | ((attrDecoder.xyz >> 8) & 0xFF00) |
+        ((attrDecoder.xyz << 8) & 0xFF0000) | ((attrDecoder.xyz << 24));
+    attrDecoder.w = 0;
+    R1f = float4(
+        as_type<float>(int(attrDecoder.x)), as_type<float>(int(attrDecoder.y)),
+        as_type<float>(int(attrDecoder.z)), as_type<float>(0x3f800000));
+    // 0
+    R127f.x = -(R1f.y);
+    R127f.y = (R1f.x > 0.0) ? 1.0 : 0.0;
+    R127f.y /= 2.0;
+    R126f.z = (0.0 > R1f.x) ? 1.0 : 0.0;
+    R126f.z /= 2.0;
+    R127f.w = 1.0;
+    R126f.x = as_type<float>(supportBuffer.remapped[0].w) *
+              (as_type<float>(0x3fae8a72) / resYScale);
+    // 1
+    R0f.x = dot(float4(R1f.x, R1f.y, R1f.z, R127f.w),
+                float4(as_type<float>(supportBuffer.remapped[1].x),
+                       as_type<float>(supportBuffer.remapped[1].y),
+                       as_type<float>(supportBuffer.remapped[1].z),
+                       as_type<float>(supportBuffer.remapped[1].w)));
+    PV1fy = R0f.x;
+    PV1fz = R0f.x;
+    PV1fw = R0f.x;
+    R127f.z = (R127f.x > 0.0) ? 1.0 : 0.0;
+    R127f.z /= 2.0;
+    // 2
+    tempf.x = dot(float4(R1f.x, R1f.y, R1f.z, R127f.w),
+                  float4(as_type<float>(supportBuffer.remapped[2].x),
+                         as_type<float>(supportBuffer.remapped[2].y),
+                         as_type<float>(supportBuffer.remapped[2].z),
+                         as_type<float>(supportBuffer.remapped[2].w)));
+    PV0fx = tempf.x;
+    R0f.y = tempf.x;
+    PV0fz = tempf.x;
+    PV0fw = tempf.x;
+    PS0f = (0.0 > R127f.x) ? 1.0 : 0.0;
+    PS0f /= 2.0;
+    // 3
+    tempf.x = dot(float4(R1f.x, R1f.y, R1f.z, R127f.w),
+                  float4(as_type<float>(supportBuffer.remapped[3].x),
+                         as_type<float>(supportBuffer.remapped[3].y),
+                         as_type<float>(supportBuffer.remapped[3].z),
+                         as_type<float>(supportBuffer.remapped[3].w)));
+    PV1fx = tempf.x;
+    PV1fy = tempf.x;
+    R0f.z = tempf.x;
+    PV1fw = tempf.x;
+    R127f.z = R127f.z + -(PS0f);
+    // 4
+    tempf.x = dot(float4(R1f.x, R1f.y, R1f.z, R127f.w),
+                  float4(as_type<float>(supportBuffer.remapped[4].x),
+                         as_type<float>(supportBuffer.remapped[4].y),
+                         as_type<float>(supportBuffer.remapped[4].z),
+                         as_type<float>(supportBuffer.remapped[4].w)));
+    PV0fx = tempf.x;
+    PV0fy = tempf.x;
+    PV0fz = tempf.x;
+    R0f.w = tempf.x;
+    PS0f = R127f.y + -(R126f.z);
+    // 5
+    R1f.x = PS0f + 0.5;
+    PV1fy = R127f.z + 0.5;
+    // 6
+    R1f.y = PV1fy + -(R126f.x);
+    R1f.z = PV1fy + R126f.x;
+    R1f.w = PV1fy;
+    // export
+    SET_POSITION(float4(R0f.x, R0f.y, R0f.z, R0f.w));
+    // export
+    out.passParameterSem0 = float4(R1f.x, R1f.y, R1f.z, R1f.w);
+    return out;
+}

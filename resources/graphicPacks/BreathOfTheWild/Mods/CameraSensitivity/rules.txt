@@ -1,0 +1,182 @@
+[Definition]
+titleIds = 00050000101C9300,00050000101C9400,00050000101C9500
+name = Camera Sensitivity
+path = "The Legend of Zelda: Breath of the Wild/Mods/Camera Sensitivity"
+description = Changes the sensitivity of the camera.|On top of the normal sensitivity you can apply additional sensitivity while moving.||With higher sensitivities, vertical sensitivity may feel too high - use last option to fix.||Made by FakeMichau and theboy181.
+version = 6
+
+[Default]
+$sensitivity = 1.00
+$movementSensitivity = 1.00
+$vertMovementSens = 1.00
+
+[Preset]
+name = 0.5x
+category = Camera Sensitivity
+$sensitivity = 0.50
+
+[Preset]
+name = 0.75x
+category = Camera Sensitivity
+$sensitivity = 0.9
+
+[Preset]
+name = 0.9x
+category = Camera Sensitivity
+$sensitivity = 0.9
+
+[Preset]
+name = 1x (Default)
+category = Camera Sensitivity
+default = 1
+
+[Preset]
+name = 1.1x
+category = Camera Sensitivity
+$sensitivity = 1.10
+
+[Preset]
+name = 1.25x
+category = Camera Sensitivity
+$sensitivity = 1.25
+
+[Preset]
+name = 1.4x (Recommended)
+category = Camera Sensitivity
+$sensitivity = 1.40
+
+[Preset]
+name = 1.5x
+category = Camera Sensitivity
+$sensitivity = 1.50
+
+[Preset]
+name = 1.75x
+category = Camera Sensitivity
+$sensitivity = 1.75
+
+[Preset]
+name = 2x
+category = Camera Sensitivity
+$sensitivity = 2.00
+
+[Preset]
+name = 2.5x
+category = Camera Sensitivity
+$sensitivity = 2.50
+
+[Preset]
+name = 3x
+category = Camera Sensitivity
+$sensitivity = 3.00
+
+
+[Preset]
+name = 0.5x
+category = Additional Movement Sensitivity
+$movementSensitivity = 0.5
+
+[Preset]
+name = 0.75x
+category = Additional Movement Sensitivity
+$movementSensitivity = 0.75
+
+[Preset]
+name = 0.9x
+category = Additional Movement Sensitivity
+$movementSensitivity = 0.9
+
+[Preset]
+name = 1x (Default)
+category = Additional Movement Sensitivity
+default = 1
+
+[Preset]
+name = 1.1x
+category = Additional Movement Sensitivity
+$movementSensitivity = 1.10
+
+[Preset]
+name = 1.15x (Recommended)
+category = Additional Movement Sensitivity
+$movementSensitivity = 1.15
+
+[Preset]
+name = 1.25x
+category = Additional Movement Sensitivity
+$movementSensitivity = 1.25
+
+[Preset]
+name = 1.35x
+category = Additional Movement Sensitivity
+$movementSensitivity = 1.35
+
+[Preset]
+name = 1.5x
+category = Additional Movement Sensitivity
+$movementSensitivity = 1.50
+
+[Preset]
+name = 2x
+category = Additional Movement Sensitivity
+$movementSensitivity = 2.00
+
+[Preset]
+name = 2.5x
+category = Additional Movement Sensitivity
+$movementSensitivity = 2.50
+
+[Preset]
+name = 3x
+category = Additional Movement Sensitivity
+$movementSensitivity = 3.00
+
+[Preset]
+name = 0.2x
+category = Additional Vertical Movement Sensitivity
+$vertMovementSens = 0.2
+
+[Preset]
+name = 0.3x
+category = Additional Vertical Movement Sensitivity
+$vertMovementSens = 0.3
+
+[Preset]
+name = 0.4x
+category = Additional Vertical Movement Sensitivity
+$vertMovementSens = 0.4
+
+[Preset]
+name = 0.5x
+category = Additional Vertical Movement Sensitivity
+$vertMovementSens = 0.5
+
+[Preset]
+name = 0.6x
+category = Additional Vertical Movement Sensitivity
+$vertMovementSens = 0.6
+
+[Preset]
+name = 0.7x
+category = Additional Vertical Movement Sensitivity
+$vertMovementSens = 0.7
+
+[Preset]
+name = 0.8x
+category = Additional Vertical Movement Sensitivity
+$vertMovementSens = 0.8
+
+[Preset]
+name = 0.9x
+category = Additional Vertical Movement Sensitivity
+$vertMovementSens = 0.9
+
+[Preset]
+name = 1x (Default)
+category = Additional Vertical Movement Sensitivity
+default = 1
+
+[Preset]
+name = 1.1x
+category = Additional Vertical Movement Sensitivity
+$vertMovementSens = 1.10

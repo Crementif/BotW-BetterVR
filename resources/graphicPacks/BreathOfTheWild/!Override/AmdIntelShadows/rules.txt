@@ -1,0 +1,7 @@
+[Definition]
+titleIds = 00050000101C9300,00050000101C9400,00050000101C9500
+name = Shadows Workaround (for older Cemu versions)
+path = "The Legend of Zelda: Breath of the Wild/Workarounds/GPU specific workarounds for OpenGL/AMD and Intel: Shadows (for older Cemu versions)"
+description = Only enable this pack IF you have issues.|Reduces the severity of the bugged shadows on Intel and AMD GPUs with some combinations of Cemu versions and some driver versions.||Made by ethrillo and Cypher.
+version = 6
+rendererFilter = opengl

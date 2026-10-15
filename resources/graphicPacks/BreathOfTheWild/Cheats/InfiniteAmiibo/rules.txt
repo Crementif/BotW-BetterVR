@@ -1,0 +1,6 @@
+[Definition]
+titleIds = 00050000101C9300,00050000101C9400,00050000101C9500
+name = Infinite Amiibo
+path = "The Legend of Zelda: Breath of the Wild/Cheats/Infinite Amiibo"
+description = Removes the limit that only allows you to scan each amiibo per day.||Made by C313571N and Xalphenos.
+version = 6

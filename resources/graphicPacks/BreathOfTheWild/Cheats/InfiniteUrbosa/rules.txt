@@ -1,0 +1,6 @@
+[Definition]
+titleIds = 00050000101C9300,00050000101C9400,00050000101C9500
+name = Infinite Urbosa's Fury
+path = "The Legend of Zelda: Breath of the Wild/Cheats/Infinite Urbosa's Fury"
+description = Lets you use Urbosa's Fury without a time limit.||Made by C313571N and Xalphenos.
+version = 6

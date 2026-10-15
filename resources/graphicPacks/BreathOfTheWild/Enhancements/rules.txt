@@ -1,0 +1,219 @@
+[Definition]
+titleIds = 00050000101C9300,00050000101C9400,00050000101C9500
+name = Enhancements
+path = "The Legend of Zelda: Breath of the Wild/Enhancements"
+description = Allows you to change post-processing effects and texture detail to enhance the picture.||Made by Kiri, Jamie, M&&M, Pig, Skyth, and clarity preset creators.
+version = 6
+
+[Default]
+$preset:int = 10
+$disableClarity:int = 0
+$disableDOF:int = 0
+$reflExtra:int = 0
+$sampleCount:int = 4
+$advancedLOD = 0
+$lodBias = 0
+$anisotropy = 1
+
+# Clarity Preset
+
+[Preset]
+name = Disabled (Default)
+category = Clarity
+default = 1
+$disableClarity:int = 1
+
+[Preset]
+name = Serfrost's Preset (Recommended)
+category = Clarity
+$preset:int = 10
+
+[Preset]
+name = Serfrost's Preset (Dim Display)
+category = Clarity
+$preset:int = 9
+
+[Preset]
+name = Serfrost's Preset (Bright Display)
+category = Clarity
+$preset:int = 8
+
+[Preset]
+name = Bruz's Preset
+category = Clarity
+$preset:int = 1
+
+[Preset]
+name = CellHunter's Preset
+category = Clarity
+$preset:int = 7
+
+[Preset]
+name = Jamie's Preset
+category = Clarity
+$preset:int = 3
+
+[Preset]
+name = t3nka Neutral+
+category = Clarity
+$preset:int = 2
+
+[Preset]
+name = The Complaining Gamer's Preset
+category = Clarity
+$preset:int = 5
+
+[Preset]
+name = ViskClarity Preset
+category = Clarity
+$preset:int = 11
+
+[Preset]
+name = Contrasty Preset
+category = Clarity
+$preset:int = 4
+
+[Preset]
+name = Filmic Preset
+category = Clarity
+$preset:int = 6
+
+[Preset]
+name = Silentverge's Survival of the Wild Preset (Warmer)
+category = Clarity
+$preset:int = 12
+
+[Preset]
+name = Silentverge's Survival of the Wild Preset (Colder)
+category = Clarity
+$preset:int = 13
+
+[Preset]
+name = Godot's Mexican Preset
+category = Clarity
+$preset:int = 14
+
+[Preset]
+name = Hexaae's Clear Preset
+category = Clarity
+$preset:int = 15
+
+[Preset]
+name = MaranBr Preset (Little More Intense)
+category = Clarity
+$preset:int = 16
+
+[Preset]
+name = YeMaoWuXin's Preset (Bright colors)
+category = Clarity
+$preset:int = 17
+
+[Preset]
+name = YeMaoWuXin's Preset (Vivid and clear)
+category = Clarity
+$preset:int = 18
+
+[Preset]
+name = Cobalt's Preset (Saturated & Bright)
+category = Clarity
+$preset:int = 19
+
+[Preset]
+name = User-Defined Preset
+category = Clarity
+$preset:int = 0
+
+# Depth of Field
+
+[Preset]
+name = Disabled (no performance gain)
+category = Depth Of Field
+$disableDOF:int = 1
+
+[Preset]
+name = Enabled
+category = Depth Of Field
+default = 1
+
+# Enhanced Reflections
+
+[Preset]
+name = Normal Reflections
+category = Reflections
+default = 1
+
+[Preset]
+name = Enhanced Reflections
+category = Reflections
+$reflExtra:int = 1
+
+# SSR Sample Count
+
+[Preset]
+name = Disabled
+category = Reflection Range
+$sampleCount:int = 0
+
+[Preset]
+name = Extra Low (2 samples)
+category = Reflection Range
+$sampleCount:int = 2
+
+[Preset]
+name = Low (4 samples, Default)
+category = Reflection Range
+default = 1
+
+[Preset]
+name = Medium (8 samples)
+category = Reflection Range
+$sampleCount:int = 8
+
+[Preset]
+name = High (16 samples)
+category = Reflection Range
+$sampleCount:int = 16
+
+[Preset]
+name = Extra High (32 samples)
+category = Reflection Range
+$sampleCount:int = 32
+
+[Preset]
+name = Extreme (64 samples)
+category = Reflection Range
+$sampleCount:int = 64
+
+# Anisotropic Filtering
+
+[Preset]
+name = Low (1x)
+category = Anisotropic Filtering
+$anisotropy = 1
+
+[Preset]
+name = Medium (2x)
+category = Anisotropic Filtering
+$anisotropy = 2
+
+[Preset]
+name = High (4x)
+category = Anisotropic Filtering
+$anisotropy = 4
+
+[Preset]
+name = Ultra (8x, Default)
+category = Anisotropic Filtering
+default = 1
+$anisotropy = 8
+
+[Preset]
+name = Extreme (16x)
+category = Anisotropic Filtering
+$anisotropy = 16
+
+
+[TextureRedefine]
+tileModesExcluded = 0x001 # ignore cpu processed textures (ex. videos)
+formatsExcluded = 0x001,0x005,0x007,0x019,0x01a,0x01f,0x122,0x41a,0x806,0x80e,0x816,0x820 # ignore viewports, cubemaps, and shadows
+overwriteAnisotropy = $anisotropy

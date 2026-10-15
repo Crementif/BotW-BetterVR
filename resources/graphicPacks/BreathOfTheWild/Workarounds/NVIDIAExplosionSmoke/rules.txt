@@ -1,0 +1,8 @@
+[Definition]
+titleIds = 00050000101C9300,00050000101C9400,00050000101C9500
+name = Explosion Smoke workaround (NVIDIA GPU and OpenGL)
+path = "The Legend of Zelda: Breath of the Wild/Workarounds/GPU specific workarounds for OpenGL/NVIDIA: Explosion Smoke"
+description = Workaround for the smoke and explosion particles on NVIDIA when using OpenGL.||Made by rajkosto, Xalphenos, and Darkemaste.
+vendorFilter = nvidia
+rendererFilter = opengl
+version = 6

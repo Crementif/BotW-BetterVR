@@ -1,0 +1,136 @@
+#version 430
+#extension GL_ARB_texture_gather : enable
+#extension GL_ARB_separate_shader_objects : enable
+// shader ededcf8bdc3384ef
+// Used for: Hide empty heart icons and backdrops
+
+
+// start of shader inputs/outputs, predetermined by Cemu. Do not touch
+#ifdef VULKAN
+#define ATTR_LAYOUT(__vkSet, __location) layout(set = __vkSet, location = __location)
+#define UNIFORM_BUFFER_LAYOUT(__glLocation, __vkSet, __vkLocation) layout(set = __vkSet, binding = __vkLocation, std140)
+#define TEXTURE_LAYOUT(__glLocation, __vkSet, __vkLocation) layout(set = __vkSet, binding = __vkLocation)
+#define GET_FRAGCOORD() vec4(gl_FragCoord.xy*uf_fragCoordScale.xy,gl_FragCoord.zw)
+#else
+#define ATTR_LAYOUT(__vkSet, __location) layout(location = __location)
+#define UNIFORM_BUFFER_LAYOUT(__glLocation, __vkSet, __vkLocation) layout(binding = __glLocation, std140) 
+#define TEXTURE_LAYOUT(__glLocation, __vkSet, __vkLocation) layout(binding = __glLocation)
+#define GET_FRAGCOORD() vec4(gl_FragCoord.xy*uf_fragCoordScale,gl_FragCoord.zw)
+#endif
+#ifdef VULKAN
+layout(set = 1, binding = 1) uniform ufBlock
+{
+uniform ivec4 uf_remappedPS[2];
+uniform vec4 uf_fragCoordScale;
+};
+#else
+uniform ivec4 uf_remappedPS[2];
+uniform vec2 uf_fragCoordScale;
+#endif
+TEXTURE_LAYOUT(0, 1, 0) uniform sampler2D textureUnitPS0;
+layout(location = 0) in vec4 passParameterSem0;
+layout(location = 1) in vec4 passParameterSem1;
+layout(location = 0) out vec4 passPixelColor0;
+// end of shader inputs/outputs
+int clampFI32(int v)
+{
+if( v == 0x7FFFFFFF )
+	return floatBitsToInt(1.0);
+else if( v == 0xFFFFFFFF )
+	return floatBitsToInt(0.0);
+return floatBitsToInt(clamp(intBitsToFloat(v), 0.0, 1.0));
+}
+float mul_nonIEEE(float a, float b){ if( a == 0.0 || b == 0.0 ) return 0.0; return a*b; }
+void main()
+{
+vec4 R0f = vec4(0.0);
+vec4 R1f = vec4(0.0);
+vec4 R123f = vec4(0.0);
+vec4 R127f = vec4(0.0);
+float backupReg0f, backupReg1f, backupReg2f, backupReg3f, backupReg4f;
+vec4 PV0f = vec4(0.0), PV1f = vec4(0.0);
+float PS0f = 0.0, PS1f = 0.0;
+vec4 tempf = vec4(0.0);
+float tempResultf;
+int tempResulti;
+ivec4 ARi = ivec4(0);
+bool predResult = true;
+vec3 cubeMapSTM;
+int cubeMapFaceId;
+R0f = passParameterSem0;
+R1f = passParameterSem1;
+R1f.xyzw = (texture(textureUnitPS0, R1f.xy).xyzw);
+// 0
+R127f.z = (mul_nonIEEE(R1f.y,intBitsToFloat(uf_remappedPS[0].y)) + intBitsToFloat(uf_remappedPS[1].y));
+R123f.w = (mul_nonIEEE(R1f.x,intBitsToFloat(uf_remappedPS[0].x)) + intBitsToFloat(uf_remappedPS[1].x));
+PV0f.w = R123f.w;
+// 1
+R123f.x = (mul_nonIEEE(R1f.w,intBitsToFloat(uf_remappedPS[0].w)) + intBitsToFloat(uf_remappedPS[1].w));
+PV1f.x = R123f.x;
+R123f.y = (mul_nonIEEE(R1f.z,intBitsToFloat(uf_remappedPS[0].z)) + intBitsToFloat(uf_remappedPS[1].z));
+PV1f.y = R123f.y;
+R1f.x = mul_nonIEEE(R0f.x, PV0f.w);
+PS1f = R1f.x;
+// 2
+R1f.y = mul_nonIEEE(R0f.y, R127f.z);
+R1f.z = mul_nonIEEE(R0f.z, PV1f.y);
+R1f.w = mul_nonIEEE(R0f.w, PV1f.x);
+// export
+
+#if ($hideHearts == 1)
+// Check specific pixels of the input texture to match with that specific heart texture
+if (texelFetch(textureUnitPS0, ivec2(24, 24), 0) == vec4(0.0,0.0,0.0,1.0) && texelFetch(textureUnitPS0, ivec2(0, 0), 0) == vec4(1.0,1.0,1.0,0.0)) {
+	R1f.xyzw = vec4(0.0);
+}
+
+// Check specific pixels of the input texture to match with that specific heart backdrop texture
+if (textureSize(textureUnitPS0, 0).xy == ivec2(48, 48) &&
+texelFetch(textureUnitPS0, ivec2(24, 24), 0) == vec4(1.0,1.0,1.0,1.0) &&
+texelFetch(textureUnitPS0, ivec2(24, 10), 0) == vec4(1.0,1.0,1.0,0.0) &&
+texelFetch(textureUnitPS0, ivec2(17, 28), 0) == vec4(1.0,1.0,1.0,0.0) &&
+texelFetch(textureUnitPS0, ivec2(23, 31), 0) == vec4(1.0,1.0,1.0,1.0) &&
+texelFetch(textureUnitPS0, ivec2(28, 30), 0) == vec4(1.0,1.0,1.0,0.0) &&
+texelFetch(textureUnitPS0, ivec2(24, 18), 0) == vec4(1.0,1.0,1.0,0.0)) {
+	R1f.xyzw = vec4(0.0);
+}
+#endif
+
+#if ($hideMasterModeIcon == 1)
+// Check specific pixels of the input texture to match with the master mode icon backdrop blur
+if (textureSize(textureUnitPS0, 0).xy == ivec2(18, 20) && texelFetch(textureUnitPS0, ivec2(4, 10), 0) == vec4(1.0,1.0,1.0,0.2)) {
+	R1f.xyzw = vec4(0.0);
+}
+#endif
+
+#if ($hideCameraGUI == 1)
+// Hide lines overlay
+if (textureSize(textureUnitPS0, 0).xy == ivec2(8, 8) && texelFetch(textureUnitPS0, ivec2(7, 3), 0) == vec4(1.0,1.0,1.0,1.0) && uf_remappedPS[0].y == 1056898815) {
+	R1f.xyzw = vec4(0.0);
+}
+
+// Hide camera framer thing
+if (textureSize(textureUnitPS0, 0).xy == ivec2(200, 200) && texelFetch(textureUnitPS0, ivec2(78, 81), 0) == vec4(1.0,1.0,1.0,1.0) &&
+texelFetch(textureUnitPS0, ivec2(81, 81), 0) == vec4(1.0,1.0,1.0,1.0) &&
+texelFetch(textureUnitPS0, ivec2(81, 84), 0) == vec4(1.0,1.0,1.0,0.0) &&
+texelFetch(textureUnitPS0, ivec2(2, 92), 0) == vec4(1.0,1.0,1.0,1.0) &&
+texelFetch(textureUnitPS0, ivec2(5, 92), 0) == vec4(1.0,1.0,1.0,0.0)) {
+	R1f.xyzw = vec4(0.0);
+}
+
+// Hide glowy background filler things from camera rune borders
+if (textureSize(textureUnitPS0, 0).xy == ivec2(182, 152) && (texelFetch(textureUnitPS0, ivec2(54, 67), 0).xyzw).w == 0.0 && (texelFetch(textureUnitPS0, ivec2(53, 67), 0).xyzw).w > 0.0 && (texelFetch(textureUnitPS0, ivec2(129, 30), 0).xyzw).w == 0.0 && (texelFetch(textureUnitPS0, ivec2(128, 30), 0).xyzw).w > 0.0) {
+	R1f.xyzw = ivec4(0.0);
+}
+if (textureSize(textureUnitPS0, 0).xy == ivec2(159, 152) && (texelFetch(textureUnitPS0, ivec2(81, 129), 0).xyzw).w == 0.0 && (texelFetch(textureUnitPS0, ivec2(82, 129), 0).xyzw).w > 0.0 && (texelFetch(textureUnitPS0, ivec2(42, 96), 0).xyzw).w == 0.0 && (texelFetch(textureUnitPS0, ivec2(43, 96), 0).xyzw).w > 0.0) {
+	R1f.xyzw = ivec4(0.0);
+}
+if (textureSize(textureUnitPS0, 0).xy == ivec2(52, 133) && (texelFetch(textureUnitPS0, ivec2(8, 47), 0).xyzw).w == 0.0 && (texelFetch(textureUnitPS0, ivec2(8, 48), 0).xyzw).w > 0.0 && (texelFetch(textureUnitPS0, ivec2(18, 128), 0).xyzw).w == 0.0 && (texelFetch(textureUnitPS0, ivec2(18, 127), 0).xyzw).w > 0.0) {
+	R1f.xyzw = ivec4(0.0);
+}
+if (textureSize(textureUnitPS0, 0).xy == ivec2(126, 153) && (texelFetch(textureUnitPS0, ivec2(64, 66), 0).xyzw).w == 0.0 && (texelFetch(textureUnitPS0, ivec2(65, 66), 0).xyzw).w > 0.0 && (texelFetch(textureUnitPS0, ivec2(14, 128), 0).xyzw).w == 0.0 && (texelFetch(textureUnitPS0, ivec2(15, 128), 0).xyzw).w > 0.0) {
+	R1f.xyzw = ivec4(0.0);
+}
+#endif
+
+passPixelColor0 = vec4(R1f.x, R1f.y, R1f.z, R1f.w);
+}

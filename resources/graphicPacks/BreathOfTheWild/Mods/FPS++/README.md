@@ -1,0 +1,6 @@
+Since this work isn't wholly mine anymore I feel it needs a readme.
+Thanks to the contributors Crementif and epigramx and as always rajkosto for the input early on and for making it possible to begin with. Also thanks to the Cemu dev team for creating such a fun emulator. They recently added a debugger to aid in projects like this and I can't wait to try it out.
+
+Credits for the arrow fix go to epigramx and the initial porting of it to FPS++ by Crementif. It's always nice to see people contribute to make something better. I fully welcome others messing around with this and have added comments to all the original code in hope that it is easier to understand. But I suck at comments as much as I suck at code. If you have questions about patching feel free to ask me on Discord. I would like to avoid situations where a whole bunch of lines are copy pasted into FPS++, where 90% of them don't do anything, claiming it fixes things it doesn't. And fragmenting the user base with regards to which FPS++ they should use.
+
+To clarify the statement above, we don't give permission for redistributing FPS++ **or parts of it** in any form unless it's done with explicit permission.

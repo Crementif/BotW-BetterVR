@@ -1,0 +1,138 @@
+#version 420
+#extension GL_ARB_texture_gather : enable
+#extension GL_ARB_separate_shader_objects : enable
+#ifdef VULKAN
+#define gl_VertexID gl_VertexIndex
+#define gl_InstanceID gl_InstanceIndex
+#define SET_POSITION(_v) gl_Position = _v; gl_Position.z = (gl_Position.z + gl_Position.w) / 2.0
+#else
+#define SET_POSITION(_v) gl_Position = _v
+#endif
+#ifdef VULKAN
+#define ATTR_LAYOUT(__vkSet, __location) layout(set = __vkSet, location = __location)
+#define UNIFORM_BUFFER_LAYOUT(__glLocation, __vkSet, __vkLocation) layout(set = __vkSet, binding = __vkLocation, std140)
+#define TEXTURE_LAYOUT(__glLocation, __vkSet, __vkLocation) layout(set = __vkSet, binding = __vkLocation)
+#define SET_POSITION(_v) gl_Position = _v; gl_Position.z = (gl_Position.z + gl_Position.w) / 2.0
+#define GET_FRAGCOORD() vec4(gl_FragCoord.xy*uf_fragCoordScale.xy,gl_FragCoord.zw)
+#define gl_VertexID gl_VertexIndex
+#define gl_InstanceID gl_InstanceIndex
+#else
+#define ATTR_LAYOUT(__vkSet, __location) layout(location = __location)
+#define UNIFORM_BUFFER_LAYOUT(__glLocation, __vkSet, __vkLocation) layout(binding = __glLocation, std140) 
+#define TEXTURE_LAYOUT(__glLocation, __vkSet, __vkLocation) layout(binding = __glLocation)
+#define SET_POSITION(_v) gl_Position = _v
+#define GET_FRAGCOORD() vec4(gl_FragCoord.xy*uf_fragCoordScale,gl_FragCoord.zw)
+#endif
+// This shader was automatically converted to be cross-compatible with Vulkan and OpenGL.
+
+
+const float resScale = $height/720.0;
+
+// Night star (size)
+
+// shader 01ba1a725afa0b96
+UNIFORM_BUFFER_LAYOUT(1, 0, 0) uniform uniformBlockVS1
+{
+vec4 uf_blockVS1[1024];
+};
+
+
+UNIFORM_BUFFER_LAYOUT(2, 0, 1) uniform uniformBlockVS2
+{
+vec4 uf_blockVS2[1024];
+};
+
+
+ATTR_LAYOUT(0, 0) in uvec4 attrDataSem0;
+out gl_PerVertex
+{
+	vec4 gl_Position;
+	float gl_PointSize;
+};
+layout(location = 0) out vec4 passParameterSem1;
+layout(location = 1) out vec4 passParameterSem2;
+int clampFI32(int v)
+{
+if( v == 0x7FFFFFFF )
+	return floatBitsToInt(1.0);
+else if( v == 0xFFFFFFFF )
+	return floatBitsToInt(0.0);
+return floatBitsToInt(clamp(intBitsToFloat(v), 0.0, 1.0));
+}
+float mul_nonIEEE(float a, float b){ if( a == 0.0 || b == 0.0 ) return 0.0; return a*b; }
+void main()
+{
+ivec4 R0i = ivec4(0);
+ivec4 R1i = ivec4(0);
+ivec4 R2i = ivec4(0);
+ivec4 R3i = ivec4(0);
+uvec4 attrDecoder;
+int backupReg0i, backupReg1i, backupReg2i, backupReg3i, backupReg4i;
+ivec4 PV0i = ivec4(0), PV1i = ivec4(0);
+int PS0i = 0, PS1i = 0;
+ivec4 tempi = ivec4(0);
+float tempResultf;
+int tempResulti;
+ivec4 ARi = ivec4(0);
+bool predResult = true;
+vec3 cubeMapSTM;
+int cubeMapFaceId;
+R0i = ivec4(gl_VertexID, 0, 0, gl_InstanceID);
+attrDecoder.xyz = attrDataSem0.xyz;
+attrDecoder.xyz = (attrDecoder.xyz>>24)|((attrDecoder.xyz>>8)&0xFF00)|((attrDecoder.xyz<<8)&0xFF0000)|((attrDecoder.xyz<<24));
+attrDecoder.w = 0;
+R1i = ivec4(int(attrDecoder.x), int(attrDecoder.y), int(attrDecoder.z), floatBitsToInt(1.0));
+// 0
+R1i.x = floatBitsToInt(uf_blockVS2[7].z);
+R0i.z = R0i.x << int(1);
+PV0i.z = R0i.z;
+R0i.w = 0x3f800000;
+// 1
+R0i.y = PV0i.z + int(1);
+R3i.xyzw = floatBitsToInt(uf_blockVS1[R0i.z].xyzw);
+R2i.xyzw = floatBitsToInt(uf_blockVS1[R0i.y].xyzw);
+// export
+gl_PointSize = intBitsToFloat(R1i.x) * resScale;
+// 0
+backupReg0i = R0i.w;
+backupReg1i = R2i.w;
+R1i.x = floatBitsToInt(dot(vec4(intBitsToFloat(R3i.x),intBitsToFloat(R3i.y),intBitsToFloat(R3i.z),intBitsToFloat(backupReg0i)),vec4(uf_blockVS2[0].x,uf_blockVS2[0].y,uf_blockVS2[0].z,uf_blockVS2[0].w)));
+PV0i.x = R1i.x;
+PV0i.y = R1i.x;
+PV0i.z = R1i.x;
+PV0i.w = R1i.x;
+R2i.w = floatBitsToInt(mul_nonIEEE(intBitsToFloat(R3i.w), intBitsToFloat(backupReg1i)));
+PS0i = R2i.w;
+// 1
+backupReg0i = R0i.w;
+backupReg1i = R0i.x;
+tempi.x = floatBitsToInt(dot(vec4(intBitsToFloat(R3i.x),intBitsToFloat(R3i.y),intBitsToFloat(R3i.z),intBitsToFloat(backupReg0i)),vec4(uf_blockVS2[1].x,uf_blockVS2[1].y,uf_blockVS2[1].z,uf_blockVS2[1].w)));
+PV1i.x = tempi.x;
+PV1i.y = tempi.x;
+PV1i.z = tempi.x;
+PV1i.w = tempi.x;
+R1i.y = tempi.x;
+R3i.w = floatBitsToInt(float(backupReg1i));
+PS1i = R3i.w;
+// 2
+backupReg0i = R0i.w;
+tempi.x = floatBitsToInt(dot(vec4(intBitsToFloat(R3i.x),intBitsToFloat(R3i.y),intBitsToFloat(R3i.z),intBitsToFloat(backupReg0i)),vec4(uf_blockVS2[2].x,uf_blockVS2[2].y,uf_blockVS2[2].z,uf_blockVS2[2].w)));
+PV0i.x = tempi.x;
+PV0i.y = tempi.x;
+PV0i.z = tempi.x;
+PV0i.w = tempi.x;
+R1i.z = tempi.x;
+// 3
+tempi.x = floatBitsToInt(dot(vec4(intBitsToFloat(R3i.x),intBitsToFloat(R3i.y),intBitsToFloat(R3i.z),intBitsToFloat(R0i.w)),vec4(uf_blockVS2[3].x,uf_blockVS2[3].y,uf_blockVS2[3].z,uf_blockVS2[3].w)));
+PV1i.x = tempi.x;
+PV1i.y = tempi.x;
+PV1i.z = tempi.x;
+PV1i.w = tempi.x;
+R1i.w = tempi.x;
+// export
+SET_POSITION(vec4(intBitsToFloat(R1i.x), intBitsToFloat(R1i.y), intBitsToFloat(R1i.z), intBitsToFloat(R1i.w)));
+// export
+passParameterSem1 = vec4(intBitsToFloat(R2i.x), intBitsToFloat(R2i.y), intBitsToFloat(R2i.z), intBitsToFloat(R2i.w));
+// export
+passParameterSem2 = vec4(intBitsToFloat(R3i.x), intBitsToFloat(R3i.y), intBitsToFloat(R3i.z), intBitsToFloat(R3i.w));
+}

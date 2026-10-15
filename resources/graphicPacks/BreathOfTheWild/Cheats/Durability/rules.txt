@@ -1,0 +1,54 @@
+[Definition]
+titleIds = 00050000101C9300,00050000101C9400,00050000101C9500
+name = Durability
+path = "The Legend of Zelda: Breath of the Wild/Cheats/Durability"
+description = Modifies the weapons, bows and shields durability (except burn damage and throwing weapons).||Made by Nopt.
+version = 6
+
+[Default]
+$multiplier = 1
+
+[Preset]
+category = Durability Modifier
+name = One Hit
+$multiplier = 1000
+
+[Preset]
+category = Durability Modifier
+name = x1 (Default)
+default = 1
+
+[Preset]
+category = Durability Modifier
+name = x1.5
+$multiplier = 1/1.5
+
+[Preset]
+category = Durability Modifier
+name = x2
+$multiplier = 1/2
+
+[Preset]
+category = Durability Modifier
+name = x3
+$multiplier = 1/3
+
+[Preset]
+category = Durability Modifier
+name = x4
+$multiplier = 1/4
+
+[Preset]
+category = Durability Modifier
+name = x5
+$multiplier = 1/5
+
+[Preset]
+category = Durability Modifier
+name = x10
+$multiplier = 1/10
+
+[Preset]
+category = Durability Modifier
+name = Unbreakable
+$multiplier = 0

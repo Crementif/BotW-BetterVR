@@ -1,0 +1,173 @@
+#version 420
+#extension GL_ARB_texture_gather : enable
+#ifdef VULKAN
+#define ATTR_LAYOUT(__vkSet, __location) layout(set = __vkSet, location = __location)
+#define UNIFORM_BUFFER_LAYOUT(__glLocation, __vkSet, __vkLocation) layout(set = __vkSet, binding = __vkLocation, std140)
+#define TEXTURE_LAYOUT(__glLocation, __vkSet, __vkLocation) layout(set = __vkSet, binding = __vkLocation)
+#define SET_POSITION(_v) gl_Position = _v; gl_Position.z = (gl_Position.z + gl_Position.w) / 2.0
+#define GET_FRAGCOORD() vec4(gl_FragCoord.xy*uf_fragCoordScale.xy,gl_FragCoord.zw)
+#define gl_VertexID gl_VertexIndex
+#define gl_InstanceID gl_InstanceIndex
+#else
+#define ATTR_LAYOUT(__vkSet, __location) layout(location = __location)
+#define UNIFORM_BUFFER_LAYOUT(__glLocation, __vkSet, __vkLocation) layout(binding = __glLocation, std140) 
+#define TEXTURE_LAYOUT(__glLocation, __vkSet, __vkLocation) layout(binding = __glLocation)
+#define SET_POSITION(_v) gl_Position = _v
+#define GET_FRAGCOORD() vec4(gl_FragCoord.xy*uf_fragCoordScale,gl_FragCoord.zw)
+#endif
+// This shader was automatically converted to be cross-compatible with Vulkan and OpenGL.
+
+// shader 6fa2baef8a4ece42
+// Used for: Rings around divine beast laser
+// Credit for hsv functions below
+// http://lolengine.net/blog/2013/07/27/rgb-to-hsv-in-glsl
+
+#define RAINBOW_EFFECT $rainbow // [0 or 1] set it to 1 to enable rainbow beams effect. in that case, HUE_ROTATION is ignored
+#define DISABLE_BEAMS $disableBeams // [0 or 1] set it to 1 to hide the lasers completely
+#define HUE_ROTATION $hue //[0, 360] where 0 and 360 is unchanged Hue and 180 is completely opposite Hue. Check http://i.imgur.com/5UpyIGh.png
+#define SATURATION_FACTOR $saturation //[0.0, 1.0] 1.0 means unchanged Saturation, 0.0 means completely desaturated. Values above 1.0 are accepted, but they may cause clipping
+#define VALUE_FACTOR 1.0 //same as above; applies to Value
+#define ALPHA_FACTOR $alpha //same as above; applies to Transparency
+
+const float hueRotation = HUE_ROTATION / 360.0;
+
+#ifdef VULKAN
+layout(set = 1, binding = 3) uniform ufBlock
+{
+uniform ivec4 uf_remappedPS[3];
+uniform float uf_alphaTestRef;
+uniform vec4 uf_fragCoordScale;
+};
+#else
+uniform ivec4 uf_remappedPS[3];
+uniform float uf_alphaTestRef;
+uniform vec2 uf_fragCoordScale;
+#endif
+
+TEXTURE_LAYOUT(0, 1, 0) uniform sampler2D textureUnitPS0;
+TEXTURE_LAYOUT(1, 1, 1) uniform sampler2D textureUnitPS1;
+TEXTURE_LAYOUT(4, 1, 2) uniform sampler2D textureUnitPS4;
+layout(location = 0) in vec4 passParameterSem0;
+layout(location = 1) in vec4 passParameterSem1;
+layout(location = 2) in vec4 passParameterSem3;
+layout(location = 3) in vec4 passParameterSem4;
+layout(location = 4) in vec4 passParameterSem7;
+layout(location = 5) in vec4 passParameterSem8;
+layout(location = 6) in vec4 passParameterSem14;
+layout(location = 0) out vec4 passPixelColor0;
+
+
+int clampFI32(int v)
+{
+if( v == 0x7FFFFFFF )
+	return floatBitsToInt(1.0);
+else if( v == 0xFFFFFFFF )
+	return floatBitsToInt(0.0);
+return floatBitsToInt(clamp(intBitsToFloat(v), 0.0, 1.0));
+}
+float mul_nonIEEE(float a, float b){ if( a == 0.0 || b == 0.0 ) return 0.0; return a*b; }
+vec3 rgb2hsv(vec3 c) {
+	vec4 K = vec4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
+	vec4 p = mix(vec4(c.bg, K.wz), vec4(c.gb, K.xy), step(c.b, c.g));
+	vec4 q = mix(vec4(p.xyw, c.r), vec4(c.r, p.yzx), step(p.x, c.r));
+
+	float d = q.x - min(q.w, q.y);
+	float e = 1.0e-10;
+	return vec3(abs(q.z + (q.w - q.y) / (6.0 * d + e)), d / (q.x + e), q.x);
+}
+vec3 hsv2rgb(vec3 c) {
+	vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
+	vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
+	return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+}
+void main()
+{
+#if (DISABLE_BEAMS == 1) && (RAINBOW_EFFECT == 0)
+discard;
+#endif
+vec4 R0f = vec4(0.0);
+vec4 R1f = vec4(0.0);
+vec4 R2f = vec4(0.0);
+vec4 R3f = vec4(0.0);
+vec4 R4f = vec4(0.0);
+vec4 R5f = vec4(0.0);
+vec4 R6f = vec4(0.0);
+vec4 R7f = vec4(0.0);
+vec4 R123f = vec4(0.0);
+vec4 R127f = vec4(0.0);
+float backupReg0f, backupReg1f, backupReg2f, backupReg3f, backupReg4f;
+vec4 PV0f = vec4(0.0), PV1f = vec4(0.0);
+float PS0f = 0.0, PS1f = 0.0;
+vec4 tempf = vec4(0.0);
+float tempResultf;
+int tempResulti;
+ivec4 ARi = ivec4(0);
+bool predResult = true;
+vec3 cubeMapSTM;
+int cubeMapFaceId;
+R0f = passParameterSem0;
+R1f = passParameterSem1;
+R2f = passParameterSem3;
+R3f = passParameterSem4;
+R4f = passParameterSem7;
+R5f = passParameterSem8;
+R6f = passParameterSem14;
+R7f.xw = (texture(textureUnitPS0, R5f.xy).xw);
+// 0
+R123f.x = (R7f.x * 2.0 + -(1.0));
+PV0f.x = R123f.x;
+R123f.y = (R7f.w * 2.0 + -(1.0));
+PV0f.y = R123f.y;
+PV0f.z = mul_nonIEEE(R3f.y, intBitsToFloat(uf_remappedPS[0].y));
+PV0f.w = mul_nonIEEE(R3f.y, intBitsToFloat(uf_remappedPS[0].x));
+PS0f = 1.0 / R2f.w;
+// 1
+R5f.x = (mul_nonIEEE(PV0f.w,PV0f.x) + R5f.z);
+R5f.y = (mul_nonIEEE(PV0f.z,PV0f.y) + R5f.w);
+PV1f.z = R2f.z * PS0f;
+PS1f = 1.0 / R2f.w;
+// 2
+backupReg0f = R2f.x;
+backupReg1f = R2f.y;
+R2f.x = mul_nonIEEE(backupReg0f, PS1f);
+R2f.y = (mul_nonIEEE(PV1f.z,intBitsToFloat(uf_remappedPS[1].w)) + -(intBitsToFloat(uf_remappedPS[1].y)));
+R2f.z = mul_nonIEEE(backupReg1f, PS1f);
+R7f.x = mul_nonIEEE(R0f.x, R4f.x);
+PS0f = R7f.x;
+R2f.z = (texture(textureUnitPS4, R2f.xz).x);
+R5f.x = (texture(textureUnitPS1, R5f.xy).w);
+// 0
+R123f.x = (mul_nonIEEE(R4f.w,R5f.x) + -(R0f.w));
+PV0f.x = R123f.x;
+R127f.y = (mul_nonIEEE(intBitsToFloat(uf_remappedPS[1].w),R2f.z) + intBitsToFloat(uf_remappedPS[1].x));
+R7f.z = mul_nonIEEE(R0f.z, R4f.z);
+PS0f = 1.0 / R2f.y;
+// 1
+R127f.x = mul_nonIEEE(R1f.w, PV0f.x);
+R127f.x = clamp(R127f.x, 0.0, 1.0);
+R7f.y = mul_nonIEEE(R0f.y, R4f.y);
+PV1f.w = -(intBitsToFloat(uf_remappedPS[1].z)) * PS0f;
+R127f.w = 1.0 / intBitsToFloat(uf_remappedPS[2].y);
+PS1f = R127f.w;
+// 2
+PV0f.x = -(PV1f.w) + R127f.y;
+// 3
+PV1f.z = PV0f.x * R127f.w;
+PV1f.z = clamp(PV1f.z, 0.0, 1.0);
+// 4
+PV0f.y = mul_nonIEEE(R127f.x, PV1f.z);
+// 5
+PV1f.x = mul_nonIEEE(R3f.x, PV0f.y);
+// 6
+R7f.w = mul_nonIEEE(R6f.w, PV1f.x);
+// export
+if( ((vec4(R7f.x, R7f.y, R7f.z, R7f.w)).a > uf_alphaTestRef) == false) discard;
+passPixelColor0 = vec4(R7f.x, R7f.y, R7f.z, R7f.w);
+vec3 colhsv = rgb2hsv(passPixelColor0.rgb);
+#if (RAINBOW_EFFECT == 1)
+passPixelColor0.rgb = hsv2rgb(vec3(mod(colhsv.x + 1.5*R5f.y, 1.0), colhsv.y*SATURATION_FACTOR, colhsv.z*VALUE_FACTOR));
+#else
+passPixelColor0.rgb = hsv2rgb(vec3(mod(colhsv.x + hueRotation, 1.0), colhsv.y*SATURATION_FACTOR, colhsv.z*VALUE_FACTOR));
+#endif
+passPixelColor0.a *= ALPHA_FACTOR;
+}

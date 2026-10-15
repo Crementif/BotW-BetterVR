@@ -1,0 +1,141 @@
+#include <metal_stdlib>
+using namespace metal;
+
+// shader 148fc9c3111cf218
+// Shader dumped from BotW 208, using Cemu 2193a8c
+// Based on ea9a49a6185cf1e5_0000000000000000_vs.txt
+// Used for: Fix Reflection
+
+constant float resXScale = float($width) / float($gameWidth);
+constant float resYScale = float($height) / float($gameHeight);
+
+#define SET_POSITION(_v)                                                       \
+    out.position = _v;                                                         \
+    out.position.z = (out.position.z + out.position.w) / 2.0
+// start of shader inputs/outputs, predetermined by Cemu. Do not touch
+struct SupportBuffer {
+    int4 remapped[2];
+};
+
+struct VertexIn {
+    uint4 attrDataSem0 [[attribute(0)]];
+};
+
+struct VertexOut {
+    float4 position [[position]] [[invariant]];
+    float4 passParameterSem0 [[user(locn0)]] [[center_no_perspective]];
+    float4 passParameterSem1 [[user(locn1)]] [[center_no_perspective]];
+    float4 passParameterSem2 [[user(locn2)]] [[center_no_perspective]];
+    float4 passParameterSem3 [[user(locn3)]] [[center_no_perspective]];
+};
+
+// end of shader inputs/outputs
+template <typename TextureT, typename CoordT>
+float sampleCompareEmulate(TextureT tex, sampler samplr, CoordT coord,
+                           float compareValue) {
+    return compareValue < tex.sample(samplr, coord).x ? 1.0 : 0.0;
+}
+template <typename TextureT, typename CoordT>
+float2 textureCalculateLod(TextureT tex, sampler samplr, CoordT coord) {
+    float lod = tex.calculate_unclamped_lod(samplr, coord);
+    return float2(floor(lod), fract(lod));
+}
+int clampFI32(int v) {
+    if (v == 0x7FFFFFFF)
+        return as_type<int>(1.0);
+    else if (v == 0xFFFFFFFF)
+        return as_type<int>(0.0);
+    return as_type<int>(clamp(as_type<float>(v), 0.0, 1.0));
+}
+float mul_nonIEEE(float a, float b) {
+    if (a == 0.0 || b == 0.0)
+        return 0.0;
+    return a * b;
+}
+vertex VertexOut main0(uint vid [[vertex_id]], uint iid [[instance_id]],
+                       VertexIn in [[stage_in]],
+                       constant SupportBuffer &supportBuffer [[buffer(0)]]) {
+    VertexOut out;
+    float4 R0f = float4(0.0);
+    float4 R1f = float4(0.0);
+    float4 R2f = float4(0.0);
+    float4 R3f = float4(0.0);
+    float4 R123f = float4(0.0);
+    float4 R126f = float4(0.0);
+    float4 R127f = float4(0.0);
+    uint4 attrDecoder;
+    float backupReg0f, backupReg1f, backupReg2f, backupReg3f, backupReg4f;
+    float PV0fx = 0.0, PV0fy = 0.0, PV0fz = 0.0, PV0fw = 0.0, PV1fx = 0.0,
+          PV1fy = 0.0, PV1fz = 0.0, PV1fw = 0.0;
+    float PS0f = 0.0, PS1f = 0.0;
+    float4 tempf = float4(0.0);
+    float tempResultf;
+    int tempResulti;
+    int4 ARi = int4(0);
+    bool predResult = true;
+    R0f = float4(vid, 0, 0, iid);
+    attrDecoder.xyz = in.attrDataSem0.xyz;
+    attrDecoder.xyz =
+        (attrDecoder.xyz >> 24) | ((attrDecoder.xyz >> 8) & 0xFF00) |
+        ((attrDecoder.xyz << 8) & 0xFF0000) | ((attrDecoder.xyz << 24));
+    attrDecoder.w = 0;
+    R1f = float4(
+        as_type<float>(int(attrDecoder.x)), as_type<float>(int(attrDecoder.y)),
+        as_type<float>(int(attrDecoder.z)), as_type<float>(0x3f800000));
+    // 0
+    PV0fx = (0.0 > R1f.y) ? 1.0 : 0.0;
+    PV0fy = (0.0 > R1f.x) ? 1.0 : 0.0;
+    PV0fz = (R1f.y > 0.0) ? 1.0 : 0.0;
+    PV0fw = (R1f.x > 0.0) ? 1.0 : 0.0;
+    R1f.z = 0.0;
+    // 1
+    R1f.x = PV0fw + -(PV0fy);
+    R1f.y = PV0fz + -(PV0fx);
+    R1f.w = 1.0;
+    // 2
+    PV0fx = R1f.x;
+    PV0fx /= 2.0;
+    R127f.y = R1f.x * 1.0;
+    PV0fz = -(R1f.y);
+    PV0fz /= 2.0;
+    R127f.w = R1f.y * -(1.0);
+    R127f.x = R1f.x * 1.0;
+    // 3
+    R126f.x =
+        as_type<float>(supportBuffer.remapped[0].y) * 2.0 / resYScale + R127f.w;
+    R0f.y = PV0fz + 0.5;
+    R123f.z =
+        as_type<float>(supportBuffer.remapped[0].x) * 2.0 / resXScale + R127f.y;
+    PV1fw = R127f.w;
+    R0f.x = PV0fx + 0.5;
+    // 4
+    R2f.x =
+        mul_nonIEEE(R127f.x, -(as_type<float>(supportBuffer.remapped[1].x))) +
+        -(as_type<float>(supportBuffer.remapped[1].z));
+    R2f.y =
+        mul_nonIEEE(R127f.w, -(as_type<float>(supportBuffer.remapped[1].y))) +
+        -(as_type<float>(supportBuffer.remapped[1].w));
+    R0f.z =
+        mul_nonIEEE(-(as_type<float>(supportBuffer.remapped[1].x)), R123f.z) +
+        -(as_type<float>(supportBuffer.remapped[1].z));
+    R0f.w = mul_nonIEEE(-(as_type<float>(supportBuffer.remapped[1].y)), PV1fw) +
+            -(as_type<float>(supportBuffer.remapped[1].w));
+    R3f.x =
+        mul_nonIEEE(R127f.y, -(as_type<float>(supportBuffer.remapped[1].x))) +
+        -(as_type<float>(supportBuffer.remapped[1].z));
+    // 5
+    R3f.y =
+        mul_nonIEEE(R126f.x, -(as_type<float>(supportBuffer.remapped[1].y))) +
+        -(as_type<float>(supportBuffer.remapped[1].w));
+    // export
+    SET_POSITION(float4(R1f.x, R1f.y, R1f.z, R1f.w));
+    // export
+    out.passParameterSem0 = float4(R0f.x, R0f.y, R0f.z, R0f.z);
+    // export
+    out.passParameterSem1 = float4(R2f.x, R2f.y, R2f.z, R2f.z);
+    // export
+    out.passParameterSem2 = float4(R0f.z, R0f.w, R0f.z, R0f.z);
+    // export
+    out.passParameterSem3 = float4(R3f.x, R3f.y, R3f.z, R3f.z);
+    return out;
+}

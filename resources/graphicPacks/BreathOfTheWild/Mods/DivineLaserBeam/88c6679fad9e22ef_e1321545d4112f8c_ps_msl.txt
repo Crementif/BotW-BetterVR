@@ -1,0 +1,179 @@
+#include <metal_stdlib>
+using namespace metal;
+
+// shader 88c6679fad9e22ef
+// Used for: Rings around divine beast laser
+// Credit for hsv functions below
+// http://lolengine.net/blog/2013/07/27/rgb-to-hsv-in-glsl
+
+#define RAINBOW_EFFECT $rainbow // [0 or 1] set it to 1 to enable rainbow beams effect. in that case, HUE_ROTATION is ignored
+#define DISABLE_BEAMS $disableBeams // [0 or 1] set it to 1 to hide the lasers completely
+#define HUE_ROTATION $hue //[0, 360] where 0 and 360 is unchanged Hue and 180 is completely opposite Hue. Check http://i.imgur.com/5UpyIGh.png
+#define SATURATION_FACTOR $saturation //[0.0, 1.0] 1.0 means unchanged Saturation, 0.0 means completely desaturated. Values above 1.0 are accepted, but they may cause clipping
+#define VALUE_FACTOR 1.0 //same as above; applies to Value
+#define ALPHA_FACTOR $alpha //same as above; applies to Transparency
+
+constant float hueRotation = HUE_ROTATION / 360.0;
+
+float3 hsv2rgb(float3 c) {
+	float4 K = float4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
+	float3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
+	return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+}
+
+#define SET_POSITION(_v) out.position = _v; out.position.z = (out.position.z + out.position.w) / 2.0
+// start of shader inputs/outputs, predetermined by Cemu. Do not touch
+struct SupportBuffer {
+	int4 remapped[2];
+	float alphaTestRef;
+	float2 fragCoordScale;
+};
+
+#define GET_FRAGCOORD() float4(in.position.xy * supportBuffer.fragCoordScale.xy, in.position.z, 1.0 / in.position.w)
+struct FragmentIn {
+	float4 position [[position]];
+	float4 passParameterSem0 [[user(locn0)]];
+	float4 passParameterSem1 [[user(locn1)]];
+	float4 passParameterSem3 [[user(locn2)]];
+	float4 passParameterSem4 [[user(locn3)]];
+	float4 passParameterSem8 [[user(locn4)]];
+	float4 passParameterSem9 [[user(locn5)]];
+};
+
+struct FragmentOut {
+	float4 passPixelColor0 [[color(0)]];
+};
+
+// end of shader inputs/outputs
+template<typename TextureT, typename CoordT>
+float sampleCompareEmulate(TextureT tex, sampler samplr, CoordT coord, float compareValue) {
+	return compareValue < tex.sample(samplr, coord).x ? 1.0 : 0.0;
+}
+template<typename TextureT, typename CoordT>
+float2 textureCalculateLod(TextureT tex, sampler samplr, CoordT coord) {
+	float lod = tex.calculate_unclamped_lod(samplr, coord);
+	return float2(floor(lod), fract(lod));
+}
+int clampFI32(int v)
+{
+	if( v == 0x7FFFFFFF )
+		return as_type<int>(1.0);
+	else if( v == 0xFFFFFFFF )
+		return as_type<int>(0.0);
+	return as_type<int>(clamp(as_type<float>(v), 0.0, 1.0));
+}
+float mul_nonIEEE(float a, float b) {
+	if( a == 0.0 || b == 0.0 ) return 0.0;
+	return a*b;
+}
+fragment FragmentOut main0(FragmentIn in [[stage_in]], float2 pointCoord [[point_coord]], bool frontFacing [[front_facing]], constant SupportBuffer& supportBuffer [[buffer(0)]], texture2d<float> tex0 [[texture(0)]], sampler samplr0 [[sampler(0)]], texture2d<float> tex1 [[texture(1)]], sampler samplr1 [[sampler(1)]], texture2d<float> tex2 [[texture(2)]], sampler samplr2 [[sampler(2)]], texture2d<float> tex4 [[texture(3)]], sampler samplr4 [[sampler(3)]]) {
+	#if (DISABLE_BEAMS == 1) && (RAINBOW_EFFECT == 0)
+		discard_fragment();
+
+	FragmentOut out;
+	float4 R0f = float4(0.0);
+	float4 R1f = float4(0.0);
+	float4 R2f = float4(0.0);
+	float4 R3f = float4(0.0);
+	float4 R4f = float4(0.0);
+	float4 R5f = float4(0.0);
+	float4 R6f = float4(0.0);
+	float4 R7f = float4(0.0);
+	float4 R123f = float4(0.0);
+	float4 R127f = float4(0.0);
+	float backupReg0f, backupReg1f, backupReg2f, backupReg3f, backupReg4f;
+	float PV0fx = 0.0, PV0fy = 0.0, PV0fz = 0.0, PV0fw = 0.0, PV1fx = 0.0, PV1fy = 0.0, PV1fz = 0.0, PV1fw = 0.0;
+	float PS0f = 0.0, PS1f = 0.0;
+	float4 tempf = float4(0.0);
+	float tempResultf;
+	int tempResulti;
+	int4 ARi = int4(0);
+	bool predResult = true;
+	R0f = in.passParameterSem0;
+	R1f = in.passParameterSem1;
+	R2f = in.passParameterSem3;
+	R3f = in.passParameterSem4;
+	R4f = in.passParameterSem8;
+	R5f = in.passParameterSem9;
+	R6f.xw = (tex0.sample(samplr0, float2(R4f.x,R4f.y)).xw);
+// 0
+	R123f.x = R6f.w * 2.0 + -(1.0);
+	R123f.y = R6f.x * 2.0 + -(1.0);
+	R127f.z = -(R0f.w) + 1.0;
+	R6f.w = R0f.w * 2.0 + -(1.0);
+	PS0f = 1.0 / R2f.w;
+// 1
+	R6f.x = mul_nonIEEE(R2f.x, PS0f);
+	R6f.y = mul_nonIEEE(R2f.y, PS0f);
+	PV1fz = R123f.x * as_type<float>(0x3e19999a);
+	PV1fw = R123f.y * as_type<float>(0x3e19999a);
+	PS1f = 1.0 / R2f.w;
+// 2
+	R7f.x = R0f.x + -(R1f.x);
+	PV0fy = R2f.z * PS1f;
+	PV0fz = mul_nonIEEE(PV1fz, R127f.z);
+	PV0fw = mul_nonIEEE(PV1fw, R127f.z);
+	R3f.z = 1.0 / as_type<float>(supportBuffer.remapped[0].y);
+// 3
+	R4f.x = R5f.x + PV0fw;
+	R4f.y = R5f.y + PV0fz;
+	R4f.z = R4f.z + PV0fw;
+	R4f.w = R4f.w + PV0fz;
+	R5f.x = mul_nonIEEE(PV0fy,as_type<float>(supportBuffer.remapped[1].w)) + -(as_type<float>(supportBuffer.remapped[1].y));
+	R4f.x = (tex2.sample(samplr2, float2(R4f.x,R4f.y)).w);
+	R2f.z = (tex4.sample(samplr4, float2(R6f.x,R6f.y)).x);
+	R2f.xw = (tex1.sample(samplr1, float2(R4f.z,R4f.w)).xw);
+// 0
+	R127f.x = mul_nonIEEE(as_type<float>(supportBuffer.remapped[1].w),R2f.z) + as_type<float>(supportBuffer.remapped[1].x);
+	PV0fy = R4f.x + R6f.w;
+	R127f.z = R0f.y + -(R1f.y);
+	R127f.w = R0f.z + -(R1f.z);
+	PS0f = 1.0 / R5f.x;
+// 1
+	PV1fx = PV0fy + as_type<float>(0x80000000);
+	PV1fy = mul_nonIEEE(R2f.w, PV0fy);
+	PV1fz = -(as_type<float>(supportBuffer.remapped[1].z)) * PS0f;
+// 2
+	PV0fx = -(PV1fz) + R127f.x;
+	R127f.y = mul_nonIEEE(R1f.w, PV1fy);
+	R127f.y = clamp(R127f.y, 0.0, 1.0);
+	PV0fw = PV1fx * 2.0;
+	PV0fw = clamp(PV0fw, 0.0, 1.0);
+// 3
+	PV1fx = PV0fx * R3f.z;
+	PV1fx = clamp(PV1fx, 0.0, 1.0);
+	R123f.y = -2.0 * PV0fw + 3.0;
+	PV1fz = mul_nonIEEE(PV0fw, PV0fw);
+// 4
+	PV0fx = mul_nonIEEE(PV1fz, R123f.y);
+	PV0fy = mul_nonIEEE(R127f.y, PV1fx);
+// 5
+	PV1fw = mul_nonIEEE(R2f.x, PV0fx);
+	PV1fw = clamp(PV1fw, 0.0, 1.0);
+	R2f.w = mul_nonIEEE(R3f.x, PV0fy);
+// 6
+	R2f.x = mul_nonIEEE(R7f.x,PV1fw) + R1f.x;
+	R2f.y = mul_nonIEEE(R127f.z,PV1fw) + R1f.y;
+	R2f.z = mul_nonIEEE(R127f.w,PV1fw) + R1f.z;
+// export
+	if( ((float4(R2f.x, R2f.y, R2f.z, R2f.w)).a > supportBuffer.alphaTestRef) == false) discard_fragment();
+	out.passPixelColor0 = as_type<float4>(float4(R2f.x, R2f.y, R2f.z, R2f.w));
+
+	float3 colhsv = rgb2hsv(passPixelColor0.rgb);
+	#if (RAINBOW_EFFECT == 1)
+	passPixelColor0.rgb = hsv2rgb(float3(
+		fmod(colhsv.x + 1.5 * R5f.y, 1.0),
+		colhsv.y * SATURATION_FACTOR,
+		colhsv.z * VALUE_FACTOR
+	));
+	#else
+	passPixelColor0.rgb = hsv2rgb(float3(
+		fmod(colhsv.x + hueRotation, 1.0),
+		colhsv.y * SATURATION_FACTOR,
+		colhsv.z * VALUE_FACTOR
+	));
+	#endif
+	passPixelColor0.a *= ALPHA_FACTOR;
+	
+	return out;
+}

@@ -1,0 +1,664 @@
+[Definition]
+titleIds = 00050000101C9300,00050000101C9400,00050000101C9500
+name = Remove (Distant) Fog, Haze and Clouds
+path = "The Legend of Zelda: Breath of the Wild/Mods/Remove Distant Fog"
+description = Allows you to remove or customize each type of fog in the game.|NPC fog will conflict with the remove cel-shading graphic packs.||Made by Skalfate.
+version = 6
+
+[Default]
+# Settings will show a set of options and exclude other sets of options
+# Settings 0 = Shows Settings related to Distant Fog that affects all, the world, the trees, the water, the npc
+# Settings 1 = Shows Settings related to Field Fog Clouds
+# Settings 2 = Shows Settings related to NPC Fog
+# Settings 3 = Shows Settings related to Castle Aura & Moat
+# Settings 4 = Shows Settings related to Custom Preset edited by the user
+$settings = 0
+# -----------------
+# Distant Lighting of the world
+$distantlighting = 1
+# -----------------
+# Distant Fog effect seen throughout the world, trees, bushes, water
+$distantfoglevel = 1
+$distantfogred = 1
+$distantfoggreen = 1
+$distantfogblue = 1
+# -----------------
+# Field Fog Clouds that move around on the grounds
+$fieldfogcloudsopacity = 1
+$fieldfogcloudsred = 1
+$fieldfogcloudsgreen = 1
+$fieldfogcloudsblue = 1
+# -----------------
+# NPC in the distance have a fogy haze around them that immitates the world haze
+$npcfogopacity = 1
+$npcfogred = 1
+$npcfoggreen = 1
+$npcfogblue = 1
+# -----------------
+# Castle Base Moat Fog
+$castlebasefogopacity = 1
+$castlebasefogred = 1
+$castlebasefoggreen = 1
+$castlebasefogblue = 1
+# -----------------
+# Castle Aura
+$castleauraopacity = 1
+$castleaurared = 1
+$castleauragreen = 1
+$castleaurablue = 1
+
+
+# Main Menu # ------------------------------
+[Preset]
+category = Main Menu
+name = Distant Fog Settings
+$settings = 0
+
+[Preset]
+category = Main Menu
+name = Field Fog Clouds Settings
+$settings = 1
+
+[Preset]
+category = Main Menu
+name = NPC Fog Settings
+$settings = 2
+
+[Preset]
+category = Main Menu
+name = Castle Fog Settings
+$settings = 3
+
+[Preset]
+category = Main Menu
+name = Custom Preset Settings
+$settings = 4
+
+# Seconday Menus ------------------------------
+
+[Preset]
+condition = $settings == 0
+category = Distant World Fog
+name = Default Fog Levels
+$distantfoglevel = 1
+
+[Preset]
+condition = $settings == 0
+category = Distant World Fog
+name = Fog 0%
+$distantfoglevel = 0
+
+[Preset]
+condition = $settings == 0
+category = Distant World Fog
+name = Fog 10%
+$distantfoglevel = 0.1
+
+[Preset]
+condition = $settings == 0
+category = Distant World Fog
+name = Fog 20%
+$distantfoglevel = 0.2
+
+[Preset]
+condition = $settings == 0
+category = Distant World Fog
+name = Fog 30%
+$distantfoglevel = 0.3
+
+[Preset]
+condition = $settings == 0
+category = Distant World Fog
+name = Fog 40%
+$distantfoglevel = 0.4
+
+[Preset]
+condition = $settings == 0
+category = Distant World Fog
+name = Fog 50%
+$distantfoglevel = 0.5
+
+[Preset]
+condition = $settings == 0
+category = Distant World Fog
+name = Fog 60%
+$distantfoglevel = 0.6
+
+[Preset]
+condition = $settings == 0
+category = Distant World Fog
+name = Fog 80%
+$distantfoglevel = 0.8
+
+# ------------------------------
+
+[Preset]
+condition = $settings == 0
+category = Distant Lighting
+name = Default Distant Lighting 1x
+$distantlighting = 1
+
+[Preset]
+condition = $settings == 0
+category = Distant Lighting
+name = Distant Lighting x2
+$distantlighting = 2
+
+[Preset]
+condition = $settings == 0
+category = Distant Lighting
+name = Distant Lighting x3
+$distantlighting = 3
+
+[Preset]
+condition = $settings == 0
+category = Distant Lighting
+name = Distant Lighting x4
+$distantlighting = 4
+
+[Preset]
+condition = $settings == 0
+category = Distant Lighting
+name = Distant Lighting x6
+$distantlighting = 6
+
+[Preset]
+condition = $settings == 0
+category = Distant Lighting
+name = Distant Lighting x8
+$distantlighting = 8
+
+[Preset]
+condition = $settings == 0
+category = Distant Lighting
+name = Darker Distant Lighting 20%
+$distantlighting = 0.8
+
+[Preset]
+condition = $settings == 0
+category = Distant Lighting
+name = Darker Distant Lighting 40%
+$distantlighting = 0.6
+
+[Preset]
+condition = $settings == 0
+category = Distant Lighting
+name = Darker Distant Lighting 60%
+$distantlighting = 0.4
+
+[Preset]
+condition = $settings == 0
+category = Distant Lighting
+name = Darker Distant Lighting 80%
+$distantlighting = 0.2
+
+# ------------------------------
+
+[Preset]
+condition = $settings == 0
+category = Distant Fog Color RGB
+name = Default Fog RGB
+$distantfogred = 1
+$distantfoggreen = 1
+$distantfogblue = 1
+
+[Preset]
+condition = $settings == 0
+category = Distant Fog Color RGB
+name = Red Fog x1
+$distantfogred = 1
+$distantfoggreen = 0
+$distantfogblue = 0
+
+[Preset]
+condition = $settings == 0
+category = Distant Fog Color RGB
+name = Red Fog x2
+$distantfogred = 2
+$distantfoggreen = 0
+$distantfogblue = 0
+
+[Preset]
+condition = $settings == 0
+category = Distant Fog Color RGB
+name = Red Fog x3
+$distantfogred = 3
+$distantfoggreen = 0
+$distantfogblue = 0
+
+[Preset]
+condition = $settings == 0
+category = Distant Fog Color RGB
+name = Blue Fog x1
+$distantfogred = 0
+$distantfoggreen = 0
+$distantfogblue = 1
+
+[Preset]
+condition = $settings == 0
+category = Distant Fog Color RGB
+name = Blue Fog x2
+$distantfogred = 0
+$distantfoggreen = 0
+$distantfogblue = 2
+
+[Preset]
+condition = $settings == 0
+category = Distant Fog Color RGB
+name = Blue Fog x3
+$distantfogred = 0
+$distantfoggreen = 0
+$distantfogblue = 3
+
+[Preset]
+condition = $settings == 0
+category = Distant Fog Color RGB
+name = Green Fog x1
+$distantfogred = 0
+$distantfoggreen = 1
+$distantfogblue = 0
+
+[Preset]
+condition = $settings == 0
+category = Distant Fog Color RGB
+name = Green Fog x2
+$distantfogred = 0
+$distantfoggreen = 2
+$distantfogblue = 0
+
+[Preset]
+condition = $settings == 0
+category = Distant Fog Color RGB
+name = Green Fog x3
+$distantfogred = 0
+$distantfoggreen = 3
+$distantfogblue = 0
+
+[Preset]
+condition = $settings == 0
+category = Distant Fog Color RGB
+name = Purple Fog x2
+# blue and red makes purple
+$distantfogred = 2
+$distantfoggreen = 0
+$distantfogblue = 2
+
+[Preset]
+condition = $settings == 0
+category = Distant Fog Color RGB
+name = Purple Fog x3
+$distantfogred = 3
+$distantfoggreen = 0
+$distantfogblue = 3
+
+[Preset]
+condition = $settings == 0
+category = Distant Fog Color RGB
+name = Cyan Fog x2
+# blue and green makes cyan
+$distantfogred = 0
+$distantfoggreen = 2
+$distantfogblue = 2
+
+[Preset]
+condition = $settings == 0
+category = Distant Fog Color RGB
+name = Cyan Fog x3
+$distantfogred = 0
+$distantfoggreen = 3
+$distantfogblue = 3
+
+# ------------------------------
+
+[Preset]
+condition = $settings == 1
+category = Field Fog Clouds
+name = Default Field Fog Clouds Enabled
+$fieldfogcloudsopacity = 1
+
+[Preset]
+condition = $settings == 1
+category = Field Fog Clouds
+name = Field Fog Clouds Disabled
+$fieldfogcloudsopacity = 0
+
+# Field Fog Clouds ------------------------------
+
+[Preset]
+condition = $settings == 1
+category = Field Fog Clouds RGB
+name = Default RGB Field Fog Clouds
+$fieldfogcloudsred = 1
+$fieldfogcloudsgreen = 1
+$fieldfogcloudsblue = 1
+
+[Preset]
+condition = $settings == 1
+category = Field Fog Clouds RGB
+name = Red Field Fog Clouds
+$fieldfogcloudsred = 30 # red needs amplified levels to be visible
+$fieldfogcloudsgreen = 1
+$fieldfogcloudsblue = 1
+
+[Preset]
+condition = $settings == 1
+category = Field Fog Clouds RGB
+name = Blue Field Fog Clouds
+$fieldfogcloudsred = 1
+$fieldfogcloudsgreen = 1
+$fieldfogcloudsblue = 4
+
+[Preset]
+condition = $settings == 1
+category = Field Fog Clouds RGB
+name = Green Field Fog Clouds
+$fieldfogcloudsred = 1
+$fieldfogcloudsgreen = 4
+$fieldfogcloudsblue = 1
+
+[Preset]
+condition = $settings == 1
+category = Field Fog Clouds RGB
+name = Purple Field Fog Clouds
+# blue and red makes purple
+$fieldfogcloudsred = 30 # red needs amplified levels to be visible
+$fieldfogcloudsgreen = 1
+$fieldfogcloudsblue = 3
+
+[Preset]
+condition = $settings == 1
+category = Field Fog Clouds RGB
+name = Cyan Field Fog Clouds
+#blue and green makes cyan
+$fieldfogcloudsred = 1 # red needs amplified levels to be visible
+$fieldfogcloudsgreen = 3
+$fieldfogcloudsblue = 3
+
+# Distant NPC Fog ------------------------------
+
+[Preset]
+condition = $settings == 2
+category = Distant NPC Fog Percentage
+name = Default Distant NPC Fog Enabled
+$npcfogred = 1
+$npcfoggreen = 1
+$npcfogblue = 1
+
+[Preset]
+condition = $settings == 2
+category = Distant NPC Fog Percentage
+name = Distant NPC Fog 0%
+$npcfogred = 0
+$npcfoggreen = 0
+$npcfogblue = 0
+
+[Preset]
+condition = $settings == 2
+category = Distant NPC Fog Percentage
+name = Distant NPC Fog 10%
+$npcfogred = 0.1
+$npcfoggreen = 0.1
+$npcfogblue = 0.1
+
+[Preset]
+condition = $settings == 2
+category = Distant NPC Fog Percentage
+name = Distant NPC Fog 20%
+$npcfogred = 0.2
+$npcfoggreen = 0.2
+$npcfogblue = 0.2
+
+[Preset]
+condition = $settings == 2
+category = Distant NPC Fog Percentage
+name = Distant NPC Fog 30%
+$npcfogred = 0.3
+$npcfoggreen = 0.3
+$npcfogblue = 0.3
+
+[Preset]
+condition = $settings == 2
+category = Distant NPC Fog Percentage
+name = Distant NPC Fog 40%
+$npcfogred = 0.4
+$npcfoggreen = 0.4
+$npcfogblue = 0.4
+
+[Preset]
+condition = $settings == 2
+category = Distant NPC Fog Percentage
+name = Distant NPC Fog 60%
+$npcfogred = 0.6
+$npcfoggreen = 0.6
+$npcfogblue = 0.6
+
+[Preset]
+condition = $settings == 2
+category = Distant NPC Fog Percentage
+name = Distant NPC Fog 80%
+$npcfogred = 0.8
+$npcfoggreen = 0.8
+$npcfogblue = 0.8
+
+# Castle Fog Values ------------------------------
+
+# Castle Aura
+
+[Preset]
+condition = $settings == 3
+category = Castle Aura
+name = Castle Aura Enabled
+$castleauraopacity = 1
+
+[Preset]
+condition = $settings == 3
+category = Castle Aura
+name = Castle Aura Disabled
+$castleauraopacity = 0
+
+[Preset]
+condition = $settings == 3
+category = Castle Aura
+name = Castle Aura 30%
+$castleauraopacity = 0.3
+
+[Preset]
+condition = $settings == 3
+category = Castle Aura
+name = Castle Aura 50%
+$castleauraopacity = 0.5
+
+[Preset]
+condition = $settings == 3
+category = Castle Aura
+name = Castle Aura 80%
+$castleauraopacity = 0.8
+
+# Castle Swirling Aura RGB
+
+[Preset]
+condition = $settings == 3
+category = Castle Aura RGB
+name = Default RGB Castle Aura
+$castleaurared = 1
+$castleauragreen = 1
+$castleaurablue = 1
+
+[Preset]
+condition = $settings == 3
+category = Castle Aura RGB
+name = Red Castle Aura
+$castleaurared = 18
+
+[Preset]
+condition = $settings == 3
+category = Castle Aura RGB
+name = Green Castle Aura
+$castleauragreen = 2
+
+[Preset]
+condition = $settings == 3
+category = Castle Aura RGB
+name = Blue Castle Aura
+$castleaurablue = 2
+
+[Preset]
+condition = $settings == 3
+category = Castle Aura RGB
+name = Purple Castle Aura
+$castleaurared = 4
+$castleaurablue = 4
+
+[Preset]
+condition = $settings == 3
+category = Castle Aura RGB
+name = Cyan Castle Aura
+$castleaurared = 4
+$castleauragreen = 4
+
+# Castle Moat Fog -------------------------------------
+
+[Preset]
+condition = $settings == 3
+category = Castle Fog
+name = Castle Moat Fog Enabled
+$castlebasefogopacity = 1
+
+[Preset]
+condition = $settings == 3
+category = Castle Fog
+name = Castle Moat Fog Disabled
+$castlebasefogopacity = 0
+
+[Preset]
+condition = $settings == 3
+category = Castle Fog
+name = Castle Moat Fog 30%
+$castlebasefogopacity = 0.3
+
+[Preset]
+condition = $settings == 3
+category = Castle Fog
+name = Castle Moat Fog 50%
+$castlebasefogopacity = 0.5
+
+[Preset]
+condition = $settings == 3
+category = Castle Fog
+name = Castle Moat Fog 80%
+$castlebasefogopacity = 0.8
+
+# Castle Moat RGB
+
+[Preset]
+condition = $settings == 3
+category = Castle Moat Fog RGB
+name = Default RGB Castle Moat Fog
+$castlebasefogred = 1
+$castlebasefoggreen = 1
+$castlebasefogblue = 1
+
+[Preset]
+condition = $settings == 3
+category = Castle Moat Fog RGB
+name = Red Castle Moat Fog
+$castlebasefogred = 18
+
+[Preset]
+condition = $settings == 3
+category = Castle Moat Fog RGB
+name = Green Castle Moat Fog
+$castlebasefoggreen = 2
+
+[Preset]
+condition = $settings == 3
+category = Castle Moat Fog RGB
+name = Blue Castle Moat Fog
+$castlebasefogblue = 2
+
+[Preset]
+condition = $settings == 3
+category = Castle Moat Fog RGB
+name = Purple Castle Moat Fog
+$castlebasefogred = 4
+$castlebasefogblue = 4
+
+[Preset]
+condition = $settings == 3
+category = Castle Moat Fog RGB
+name = Cyan Castle Moat Fog
+$castlebasefogred = 4
+$castlebasefoggreen = 4
+
+# Custom Preset Values ------------------------------
+
+[Preset]
+condition = $settings == 4
+category = CustomPreset
+name = Default Preset
+$distantlighting = 1
+$distantfogred = 1
+$distantfoggreen = 1
+$distantfogblue = 1
+#
+$fieldfogcloudsred = 1
+$fieldfogcloudsgreen = 1
+$fieldfogcloudsblue = 1
+#
+$npcfogred = 1
+$npcfoggreen = 1
+$npcfogblue = 1
+
+[Preset]
+condition = $settings == 4
+category = CustomPreset
+name = Custom Preset (Edit Values in rules.txt)
+$distantlighting = 1
+#
+$distantfoglevel = 1
+#
+$distantfogred = 1
+$distantfoggreen = 1
+$distantfogblue = 1
+#
+$fieldfogcloudsopacity = 1
+$fieldfogcloudsred = 1
+$fieldfogcloudsgreen = 1
+$fieldfogcloudsblue = 1
+#
+$npcfogopacity = 1
+$npcfogred = 1
+$npcfoggreen = 1
+$npcfogblue = 1
+#
+$castlebasefogopacity = 1
+$castlebasefogred = 1
+$castlebasefoggreen = 1
+$castlebasefogblue = 1
+#
+$castleauraopacity = 1
+$castleaurared = 1
+$castleauragreen = 1
+$castleaurablue = 1
+
+# Information
+# by SkalFate
+# ----------------------
+# Distant lighting - is for distant area lighting of the land and how far in the distance everything is lit up
+# ------ Game Values are multiplied, so if you want to lower a value, use 0.01-0.99, or if you want to go higher go from 1.0-X.X
+
+# Greenery lighting - is the same as above but for trees vines, bushes
+# ------ Game Values are multiplied, so if you want to lower a value, use 0.01-0.99, or if you want to go higher go from 1.0-X.X
+
+# RGB - Red, Green, Blue - is self explanatory for the color of the fog, trees, water.
+# ------ Game Values are multiplied so if you want to lower a value, use 0.01-0.99, or if you want to go higher go from 1.0-X.X
+
+# ----------------------
+# (fieldfogopacity) = Fog Transparency/Opacity - how thick or thin you want the fog fields to look
+# ------ Values are multiplied, so if you want to lower use [0.01 - 0.99], or if you want to go higher go from [1.0 - X.X]
+
+# (fieldfogcloudsred, fieldfogcloudsgreen, fieldfogcloudsblue ) = RGB - Red, Green, Blue - Changes the color of the fog fields.
+# ------ Values are multiplied so if you want to lower use [0.01 - 0.99], or if you want to go higher go from [1.0 - X.X]
+
+# (npcfogred, npcfoggreen, npcblue ) = RGB - Red, Green, Blue - Changes the color of distant npcs fog.
+# ------ Values are multiplied so if you want to lower use [0.01 - 0.99], or if you want to go higher go from [1.0 - X.X]

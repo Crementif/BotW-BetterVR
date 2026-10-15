@@ -1,0 +1,8 @@
+[Definition]
+titleIds = 00050000101C9300,00050000101C9400,00050000101C9500
+name = Stretched Clouds workaround (NVIDIA GPU and OpenGL)
+path = "The Legend of Zelda: Breath of the Wild/Workarounds/GPU specific workarounds for OpenGL/NVIDIA: Stretched Clouds"
+description = Workaround for some low-hanging clouds appearing to be stretched if you're using OpenGL and an NVIDIA GPU.||Made by Exzap.
+vendorFilter = nvidia
+rendererFilter = opengl
+version = 6

@@ -1,0 +1,61 @@
+#version 420
+#extension GL_ARB_texture_gather : enable
+#extension GL_ARB_separate_shader_objects : enable
+#extension GL_ARB_shading_language_packing : enable
+// shader 83a697d61a3b9202
+layout(binding = 6, std140) 
+uniform uniformBlockVS6
+{
+vec4 uf_blockVS6[1024];
+};
+
+
+layout(binding = 7, std140) 
+uniform uniformBlockVS7
+{
+vec4 uf_blockVS7[1024];
+};
+
+
+layout(binding = 8, std140) 
+uniform uniformBlockVS8
+{
+vec4 uf_blockVS8[1024];
+};
+
+
+layout(binding = 11, std140) 
+uniform uniformBlockVS11
+{
+vec4 uf_blockVS11[1024];
+};
+
+
+layout(binding = 45) uniform sampler2D textureUnitVS13;
+layout(location = 0) in uvec4 attrDataSem0;
+layout(location = 1) in uvec4 attrDataSem1;
+layout(location = 2) in uvec4 attrDataSem2;
+layout(location = 3) in uvec4 attrDataSem3;
+layout(location = 4) in uvec4 attrDataSem4;
+layout(location = 5) in uvec4 attrDataSem5;
+layout(location = 6) in uvec4 attrDataSem6;
+layout(location = 7) in uvec4 attrDataSem7;
+out gl_PerVertex
+{
+	vec4 gl_Position;
+	float gl_PointSize;
+};
+int clampFI32(int v)
+{
+if( v == 0x7FFFFFFF )
+	return floatBitsToInt(1.0);
+else if( v == 0xFFFFFFFF )
+	return floatBitsToInt(0.0);
+return floatBitsToInt(clamp(intBitsToFloat(v), 0.0, 1.0));
+}
+float mul_nonIEEE(float a, float b){ return min(a*b,min(abs(a)*3.40282347E+38F,abs(b)*3.40282347E+38F)); }
+void main()
+{
+// export
+gl_Position = vec4(0.0);
+}

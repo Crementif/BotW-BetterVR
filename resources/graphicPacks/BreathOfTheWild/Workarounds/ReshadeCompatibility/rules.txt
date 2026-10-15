@@ -1,0 +1,7 @@
+[Definition]
+titleIds = 00050000101C9300,00050000101C9400,00050000101C9500
+name = Reshade Compatibility
+path = "The Legend of Zelda: Breath of the Wild/Workarounds/Reshade Compatibility (Enable Only When Using Reshade)"
+description = Makes Reshade effects that rely on the depth buffer working to function, but causes issues with lighting and distant mountains flickering. Should only be enabled when using Reshade.
+rendererFilter = vulkan
+version = 6

@@ -1,0 +1,59 @@
+[Definition]
+titleIds = 00050000101C9300,00050000101C9400,00050000101C9500
+name = Arrow Draw Speed
+path = "The Legend of Zelda: Breath of the Wild/Cheats/Arrow Draw Speed"
+description = Changes the speed that arrows are drawn at.||Made by C313571N and Xalphenos.
+version = 6
+
+[Default]
+$multiplier = 1
+
+[Preset]
+category = Draw Speed
+name = Disable Bow
+$multiplier = 0.0
+
+[Preset]
+category = Draw Speed
+name = 0.5x
+$multiplier = 0.5
+
+[Preset]
+category = Draw Speed
+name = 0.75x
+$multiplier = 0.75
+
+[Preset]
+category = Draw Speed
+default = 1
+name = 1x (Default)
+
+[Preset]
+category = Draw Speed
+name = 1.5x
+$multiplier = 1.5
+
+[Preset]
+category = Draw Speed
+name = 2x
+$multiplier = 2.0
+
+[Preset]
+category = Draw Speed
+name = 3x
+$multiplier = 3.0
+
+[Preset]
+category = Draw Speed
+name = 10x
+$multiplier = 10.0
+
+[Preset]
+category = Draw Speed
+name = 20x
+$multiplier = 20.0
+
+[Preset]
+category = Draw Speed
+name = 40x
+$multiplier = 40.0

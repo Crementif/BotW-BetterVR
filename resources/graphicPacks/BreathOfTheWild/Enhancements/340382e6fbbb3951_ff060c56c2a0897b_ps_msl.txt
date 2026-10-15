@@ -1,0 +1,609 @@
+// shader 340382e6fbbb3951
+#include <metal_stdlib>
+using namespace metal;
+#define SET_POSITION(_v) out.position = _v; out.position.z = (out.position.z + out.position.w) / 2.0
+// start of shader inputs/outputs, predetermined by Cemu. Do not touch
+struct SupportBuffer {
+int4 remapped[11];
+float2 fragCoordScale;
+};
+
+#define GET_FRAGCOORD() float4(in.position.xy * supportBuffer.fragCoordScale.xy, in.position.z, 1.0 / in.position.w)
+struct FragmentIn {
+float4 position [[position]];
+float4 passParameterSem0 [[user(locn0)]] [[center_no_perspective]];
+float4 passParameterSem1 [[user(locn1)]] [[center_no_perspective]];
+};
+
+struct FragmentOut {
+float4 passPixelColor0 [[color(0)]];
+};
+
+// end of shader inputs/outputs
+template<typename TextureT, typename CoordT>
+float sampleCompareEmulate(TextureT tex, sampler samplr, CoordT coord, float compareValue) {
+return compareValue < tex.sample(samplr, coord).x ? 1.0 : 0.0;
+}
+template<typename TextureT, typename CoordT>
+float2 textureCalculateLod(TextureT tex, sampler samplr, CoordT coord) {
+float lod = tex.calculate_unclamped_lod(samplr, coord);
+return float2(floor(lod), fract(lod));
+}
+int clampFI32(int v)
+{
+if( v == 0x7FFFFFFF )
+	return as_type<int>(1.0);
+else if( v == 0xFFFFFFFF )
+	return as_type<int>(0.0);
+return as_type<int>(clamp(as_type<float>(v), 0.0, 1.0));
+}
+float mul_nonIEEE(float a, float b){ if( a == 0.0 || b == 0.0 ) return 0.0; return a*b; }
+fragment FragmentOut main0(FragmentIn in [[stage_in]], float2 pointCoord [[point_coord]], bool frontFacing [[front_facing]], constant SupportBuffer& supportBuffer [[buffer(0)]], texture2d_array<float> tex0 [[texture(0)]], sampler samplr0 [[sampler(0)]], texture2d<float> tex1 [[texture(1)]], sampler samplr1 [[sampler(1)]], texture2d<float> tex2 [[texture(2)]], sampler samplr2 [[sampler(2)]]) {
+FragmentOut out;
+int4 R0i = int4(0);
+int4 R1i = int4(0);
+int4 R2i = int4(0);
+int4 R3i = int4(0);
+int4 R4i = int4(0);
+int4 R5i = int4(0);
+int4 R6i = int4(0);
+int4 R7i = int4(0);
+int4 R8i = int4(0);
+int4 R9i = int4(0);
+int4 R122i = int4(0);
+int4 R123i = int4(0);
+int4 R124i = int4(0);
+int4 R125i = int4(0);
+int4 R126i = int4(0);
+int4 R127i = int4(0);
+int backupReg0i, backupReg1i, backupReg2i, backupReg3i, backupReg4i;
+int PV0ix = 0, PV0iy = 0, PV0iz = 0, PV0iw = 0, PV1ix = 0, PV1iy = 0, PV1iz = 0, PV1iw = 0;
+int PS0i = 0, PS1i = 0;
+int4 tempi = int4(0);
+float tempResultf;
+int tempResulti;
+int4 ARi = int4(0);
+bool predResult = true;
+bool activeMaskStack[2];
+bool activeMaskStackC[3];
+activeMaskStack[0] = false;
+activeMaskStackC[0] = false;
+activeMaskStackC[1] = false;
+activeMaskStack[0] = true;
+activeMaskStackC[0] = true;
+activeMaskStackC[1] = true;
+R0i = as_type<int4>(in.passParameterSem0);
+R1i = as_type<int4>(in.passParameterSem1);
+if( activeMaskStackC[1] == true ) {
+R7i.xyz = as_type<int3>(tex2.sample(samplr2, float2(as_type<float>(R0i.x),as_type<float>(R0i.y))).xyz);
+R1i.w = as_type<int>(tex1.sample(samplr1, float2(as_type<float>(R0i.x),as_type<float>(R0i.y))).x);
+}
+if( activeMaskStackC[1] == true ) {
+// 0
+R127i.x = as_type<int>(as_type<float>(R7i.x) * 2.0 + -(1.0));
+R127i.y = as_type<int>(as_type<float>(R7i.y) * 2.0 + -(1.0));
+PV0iz = 0;
+R127i.w = as_type<int>(mul_nonIEEE(-(as_type<float>(R1i.w)),as_type<float>(supportBuffer.remapped[0].x)) + -(as_type<float>(supportBuffer.remapped[1].z)));
+R126i.w = int(0x3f800000);
+// 1
+tempi.x = as_type<int>(dot(float4(as_type<float>(R127i.x),as_type<float>(R127i.y),as_type<float>(PV0iz),as_type<float>(0x80000000)),float4(as_type<float>(R127i.x),as_type<float>(R127i.y),as_type<float>(R127i.y),0.0)));
+PV1ix = tempi.x;
+PV1iy = tempi.x;
+PV1iz = tempi.x;
+PV1iw = tempi.x;
+R2i.x = as_type<int>(mul_nonIEEE(as_type<float>(R1i.x), as_type<float>(R127i.w)));
+// 2
+R125i.x = as_type<int>(mul_nonIEEE(as_type<float>(R1i.y), as_type<float>(R127i.w)));
+PV0iy = as_type<int>(-(as_type<float>(PV1ix)) + 1.0);
+R126i.z = R127i.w;
+R3i.w = as_type<int>(max(as_type<float>(R127i.w), -(as_type<float>(R127i.w))));
+R125i.w = int(0x3f800000);
+// 3
+tempi.x = as_type<int>(dot(float4(as_type<float>(R2i.x),as_type<float>(R125i.x),as_type<float>(R126i.z),as_type<float>(R126i.w)),float4(as_type<float>(supportBuffer.remapped[2].x),as_type<float>(supportBuffer.remapped[2].y),as_type<float>(supportBuffer.remapped[2].z),as_type<float>(supportBuffer.remapped[2].w))));
+PV1ix = tempi.x;
+PV1iy = tempi.x;
+PV1iz = tempi.x;
+PV1iw = tempi.x;
+PS1i = as_type<int>(sqrt(as_type<float>(PV0iy)));
+// 4
+R126i.x = 0;
+R5i.y = 0;
+R127i.z = as_type<int>(-(as_type<float>(PS1i)));
+R127i.w = as_type<int>(mul_nonIEEE(as_type<float>(R126i.w), as_type<float>(supportBuffer.remapped[3].w)));
+R124i.w = as_type<int>(1.0 / as_type<float>(PV1ix));
+// 5
+tempi.x = as_type<int>(dot(float4(as_type<float>(R127i.x),as_type<float>(R127i.y),as_type<float>(R127i.z),as_type<float>(0x80000000)),float4(as_type<float>(R127i.x),as_type<float>(R127i.y),as_type<float>(R127i.z),0.0)));
+PV1ix = tempi.x;
+PV1iy = tempi.x;
+PV1iz = tempi.x;
+PV1iw = tempi.x;
+R6i.z = 0;
+// 6
+tempi.x = as_type<int>(dot(float4(as_type<float>(R2i.x),as_type<float>(R125i.x),as_type<float>(R126i.z),as_type<float>(R127i.w)),float4(as_type<float>(supportBuffer.remapped[3].x),as_type<float>(supportBuffer.remapped[3].y),as_type<float>(supportBuffer.remapped[3].z),1.0)));
+PV0ix = tempi.x;
+PV0iy = tempi.x;
+PV0iz = tempi.x;
+PV0iw = tempi.x;
+tempResultf = 1.0 / sqrt(as_type<float>(PV1ix));
+PS0i = as_type<int>(tempResultf);
+// 7
+R1i.x = as_type<int>(mul_nonIEEE(as_type<float>(R127i.x), as_type<float>(PS0i)));
+R1i.y = as_type<int>(mul_nonIEEE(as_type<float>(R127i.y), as_type<float>(PS0i)));
+R3i.z = as_type<int>(mul_nonIEEE(as_type<float>(R127i.z), as_type<float>(PS0i)));
+R127i.w = as_type<int>(mul_nonIEEE(as_type<float>(R126i.w), as_type<float>(supportBuffer.remapped[4].w)));
+R6i.x = as_type<int>(as_type<float>(PV0ix) * as_type<float>(R124i.w));
+// 8
+R124i.x = as_type<int>(mul_nonIEEE(as_type<float>(R1i.x),as_type<float>(R3i.w)) + as_type<float>(R2i.x));
+R127i.y = as_type<int>(mul_nonIEEE(as_type<float>(R1i.y),as_type<float>(R3i.w)) + as_type<float>(R125i.x));
+R127i.z = as_type<int>(mul_nonIEEE(as_type<float>(R3i.z),as_type<float>(R3i.w)) + as_type<float>(R126i.z));
+PV0iw = as_type<int>(max(as_type<float>(R1i.y), -(as_type<float>(R1i.y))));
+tempResultf = max(0.0, as_type<float>(supportBuffer.remapped[5].w));
+tempResultf = log2(tempResultf);
+if( isinf(tempResultf) == true ) tempResultf = -3.40282347E+38F;
+R4i.w = as_type<int>(tempResultf);
+// 9
+tempi.x = as_type<int>(dot(float4(as_type<float>(R124i.x),as_type<float>(R127i.y),as_type<float>(R127i.z),as_type<float>(R125i.w)),float4(as_type<float>(supportBuffer.remapped[2].x),as_type<float>(supportBuffer.remapped[2].y),as_type<float>(supportBuffer.remapped[2].z),as_type<float>(supportBuffer.remapped[2].w))));
+PV1ix = tempi.x;
+PV1iy = tempi.x;
+PV1iz = tempi.x;
+PV1iw = tempi.x;
+R6i.y = as_type<int>(-(as_type<float>(PV0iw)) + 1.0);
+// 10
+tempi.x = as_type<int>(dot(float4(as_type<float>(R2i.x),as_type<float>(R125i.x),as_type<float>(R126i.z),as_type<float>(R127i.w)),float4(as_type<float>(supportBuffer.remapped[4].x),as_type<float>(supportBuffer.remapped[4].y),as_type<float>(supportBuffer.remapped[4].z),1.0)));
+PV0ix = tempi.x;
+PV0iy = tempi.x;
+PV0iz = tempi.x;
+PV0iw = tempi.x;
+R1i.x = as_type<int>(1.0 / as_type<float>(PV1ix));
+// 11
+tempi.x = as_type<int>(dot(float4(as_type<float>(R124i.x),as_type<float>(R127i.y),as_type<float>(R127i.z),as_type<float>(R125i.w)),float4(as_type<float>(supportBuffer.remapped[3].x),as_type<float>(supportBuffer.remapped[3].y),as_type<float>(supportBuffer.remapped[3].z),as_type<float>(supportBuffer.remapped[3].w))));
+PV1ix = tempi.x;
+PV1iy = tempi.x;
+PV1iz = tempi.x;
+PV1iw = tempi.x;
+R7i.y = as_type<int>(as_type<float>(PV0ix) * as_type<float>(R124i.w));
+// 12
+tempi.x = as_type<int>(dot(float4(as_type<float>(R124i.x),as_type<float>(R127i.y),as_type<float>(R127i.z),as_type<float>(R125i.w)),float4(as_type<float>(supportBuffer.remapped[4].x),as_type<float>(supportBuffer.remapped[4].y),as_type<float>(supportBuffer.remapped[4].z),as_type<float>(supportBuffer.remapped[4].w))));
+PV0ix = tempi.x;
+PV0iy = tempi.x;
+PV0iz = tempi.x;
+PV0iw = tempi.x;
+PS0i = as_type<int>(as_type<float>(PV1ix) * as_type<float>(R1i.x));
+// 13
+R127i.x = as_type<int>(-(as_type<float>(R6i.x)) + as_type<float>(PS0i));
+R126i.y = as_type<int>(-(as_type<float>(R6i.x)) + as_type<float>(PS0i));
+PV1iz = as_type<int>(as_type<float>(PV0ix) * as_type<float>(R1i.x));
+PV1iw = as_type<int>(mul_nonIEEE(as_type<float>(R125i.w), as_type<float>(supportBuffer.remapped[6].w)));
+PS1i = as_type<int>(mul_nonIEEE(as_type<float>(R126i.w), as_type<float>(supportBuffer.remapped[6].w)));
+// 14
+R3i.x = as_type<int>(-(as_type<float>(R7i.y)) + as_type<float>(PV1iz));
+PV0iy = as_type<int>(-(as_type<float>(R7i.y)) + as_type<float>(PV1iz));
+R127i.z = as_type<int>(mul_nonIEEE(as_type<float>(R127i.z),as_type<float>(supportBuffer.remapped[6].z)) + as_type<float>(PV1iw));
+R122i.x = as_type<int>(mul_nonIEEE(as_type<float>(R126i.z),as_type<float>(supportBuffer.remapped[6].z)) + as_type<float>(PS1i));
+// 15
+tempi.x = as_type<int>(dot(float4(as_type<float>(R127i.x),as_type<float>(PV0iy),as_type<float>(R126i.x),as_type<float>(0x80000000)),float4(as_type<float>(R127i.x),as_type<float>(PV0iy),as_type<float>(R126i.x),0.0)));
+PV1ix = tempi.x;
+PV1iy = tempi.x;
+PV1iz = tempi.x;
+PV1iw = tempi.x;
+R127i.x = as_type<int>(mul_nonIEEE(as_type<float>(R125i.x),as_type<float>(supportBuffer.remapped[6].y)) + as_type<float>(R122i.x));
+// 16
+tempi.x = as_type<int>(dot(float4(as_type<float>(R124i.x),as_type<float>(R127i.y),as_type<float>(R127i.z),0.0),float4(as_type<float>(supportBuffer.remapped[6].x),as_type<float>(supportBuffer.remapped[6].y),1.0,0.0)));
+PV0ix = tempi.x;
+PV0iy = tempi.x;
+PV0iz = tempi.x;
+PV0iw = tempi.x;
+PS0i = as_type<int>(sqrt(as_type<float>(PV1ix)));
+// 17
+R123i.z = as_type<int>(mul_nonIEEE(as_type<float>(R2i.x),as_type<float>(supportBuffer.remapped[6].x)) + as_type<float>(R127i.x));
+R126i.w = as_type<int>(as_type<float>(PV0ix) * as_type<float>(R1i.x));
+PS1i = as_type<int>(1.0 / as_type<float>(PS0i));
+// 18
+R4i.z = as_type<int>(as_type<float>(R123i.z) * as_type<float>(R124i.w));
+PV0iw = as_type<int>(as_type<float>(PS1i) * as_type<float>(0x3db4b4b5));
+// 19
+PV1ix = as_type<int>(mul_nonIEEE(as_type<float>(PV0iw), as_type<float>(supportBuffer.remapped[5].y)));
+PV1iw = as_type<int>(-(as_type<float>(R4i.z)) + as_type<float>(R126i.w));
+// 20
+R7i.x = as_type<int>(mul_nonIEEE(as_type<float>(R126i.y), as_type<float>(PV1ix)));
+R8i.y = as_type<int>(mul_nonIEEE(as_type<float>(R3i.x), as_type<float>(PV1ix)));
+R5i.z = as_type<int>(mul_nonIEEE(as_type<float>(PV1iw), as_type<float>(PV1ix)));
+}
+while( activeMaskStackC[1] == true )
+{
+if( activeMaskStackC[1] == true ) {
+activeMaskStack[1] = activeMaskStack[0];
+activeMaskStackC[2] = activeMaskStackC[1];
+// 0
+R1i.y = (($sampleCount > as_type<float>(R6i.z))?-1:0);
+// 1
+predResult = (R1i.y == 0);
+activeMaskStack[1] = predResult;
+activeMaskStackC[2] = predResult == true && activeMaskStackC[1] == true;
+}
+else {
+activeMaskStack[1] = false;
+activeMaskStackC[2] = false;
+}
+if( activeMaskStackC[2] == true ) {
+// 0
+R1i.y = R5i.y;
+}
+if( activeMaskStackC[2] == true ) {
+break;
+}
+activeMaskStackC[1] = activeMaskStack[0] == true && activeMaskStackC[0] == true;
+if( activeMaskStackC[1] == true ) {
+activeMaskStack[1] = activeMaskStack[0];
+activeMaskStackC[2] = activeMaskStackC[1];
+// 0
+R123i.w = as_type<int>(as_type<float>(R6i.z) * 4.0 + 0.0);
+// 1
+R8i.x = as_type<int>(as_type<float>(R123i.w) + 1.0);
+R9i.y = as_type<int>(as_type<float>(R123i.w) + 2.0);
+R8i.z = as_type<int>(as_type<float>(R123i.w) + 3.0);
+R5i.w = as_type<int>(as_type<float>(R123i.w) + 4.0);
+// 2
+R1i.x = as_type<int>(mul_nonIEEE(as_type<float>(R7i.x),as_type<float>(R8i.x)) + as_type<float>(R6i.x));
+R1i.y = as_type<int>(mul_nonIEEE(as_type<float>(R8i.y),as_type<float>(R8i.x)) + as_type<float>(R7i.y));
+R1i.z = as_type<int>(mul_nonIEEE(as_type<float>(R7i.x),as_type<float>(R9i.y)) + as_type<float>(R6i.x));
+R1i.w = as_type<int>(mul_nonIEEE(as_type<float>(R8i.y),as_type<float>(R9i.y)) + as_type<float>(R7i.y));
+R2i.x = as_type<int>(mul_nonIEEE(as_type<float>(R7i.x),as_type<float>(R8i.z)) + as_type<float>(R6i.x));
+// 3
+PV1ix = as_type<int>(max(as_type<float>(R1i.y), -(1.0)));
+R2i.y = as_type<int>(mul_nonIEEE(as_type<float>(R8i.y),as_type<float>(R8i.z)) + as_type<float>(R7i.y));
+PV1iz = as_type<int>(max(as_type<float>(R1i.x), -(1.0)));
+PV1iw = as_type<int>(max(as_type<float>(R1i.z), -(1.0)));
+R127i.w = as_type<int>(max(as_type<float>(R1i.w), -(1.0)));
+// 4
+PV0ix = as_type<int>(min(as_type<float>(PV1iz), 1.0));
+PV0iy = as_type<int>(min(as_type<float>(PV1ix), 1.0));
+R2i.z = as_type<int>(mul_nonIEEE(as_type<float>(R7i.x),as_type<float>(R5i.w)) + as_type<float>(R6i.x));
+R2i.w = as_type<int>(mul_nonIEEE(as_type<float>(R8i.y),as_type<float>(R5i.w)) + as_type<float>(R7i.y));
+R127i.y = as_type<int>(min(as_type<float>(PV1iw), 1.0));
+// 5
+R127i.x = as_type<int>(max(as_type<float>(R2i.y), -(1.0)));
+R126i.y = as_type<int>(as_type<float>(R1i.x) + -(as_type<float>(PV0ix)));
+PV1iz = as_type<int>(max(as_type<float>(R2i.x), -(1.0)));
+PV1iw = as_type<int>(min(as_type<float>(R127i.w), 1.0));
+R125i.y = as_type<int>(as_type<float>(R1i.y) + -(as_type<float>(PV0iy)));
+// 6
+PV0ix = as_type<int>(max(as_type<float>(R2i.w), -(1.0)));
+PV0iy = as_type<int>(max(as_type<float>(R2i.z), -(1.0)));
+R127i.z = as_type<int>(as_type<float>(R1i.z) + -(as_type<float>(R127i.y)));
+R127i.w = as_type<int>(as_type<float>(R1i.w) + -(as_type<float>(PV1iw)));
+PS0i = as_type<int>(min(as_type<float>(PV1iz), 1.0));
+// 7
+PV1ix = as_type<int>(min(as_type<float>(R127i.x), 1.0));
+R127i.y = as_type<int>(as_type<float>(R2i.x) + -(as_type<float>(PS0i)));
+PV1iz = as_type<int>(min(as_type<float>(PV0iy), 1.0));
+PV1iw = as_type<int>(min(as_type<float>(PV0ix), 1.0));
+R3i.x = as_type<int>(mul_nonIEEE(as_type<float>(R5i.z),as_type<float>(R8i.x)) + as_type<float>(R4i.z));
+// 8
+PV0ix = as_type<int>(0.0);
+R124i.y = as_type<int>(as_type<float>(R2i.y) + -(as_type<float>(PV1ix)));
+R126i.z = as_type<int>(as_type<float>(R2i.z) + -(as_type<float>(PV1iz)));
+R126i.w = as_type<int>(as_type<float>(R2i.w) + -(as_type<float>(PV1iw)));
+R4i.y = as_type<int>(mul_nonIEEE(as_type<float>(R5i.z),as_type<float>(R9i.y)) + as_type<float>(R4i.z));
+// 9
+tempi.x = as_type<int>(dot(float4(as_type<float>(R126i.y),as_type<float>(R125i.y),as_type<float>(PV0ix),as_type<float>(0x80000000)),float4(1.0,1.0,1.0,0.0)));
+PV1ix = tempi.x;
+PV1iy = tempi.x;
+PV1iz = tempi.x;
+PV1iw = tempi.x;
+R0i.z = as_type<int>(mul_nonIEEE(as_type<float>(R5i.z),as_type<float>(R8i.z)) + as_type<float>(R4i.z));
+// 10
+tempi.x = as_type<int>(dot(float4(as_type<float>(R127i.z),as_type<float>(R127i.w),as_type<float>(R127i.w),as_type<float>(0x80000000)),float4(1.0,1.0,0.0,0.0)));
+PV0ix = tempi.x;
+PV0iy = tempi.x;
+PV0iz = tempi.x;
+PV0iw = tempi.x;
+R127i.z = ((as_type<float>(PV1ix) != 0.0)?-1:0);
+// 11
+tempi.x = as_type<int>(dot(float4(as_type<float>(R127i.y),as_type<float>(R124i.y),as_type<float>(R124i.y),as_type<float>(0x80000000)),float4(1.0,1.0,0.0,0.0)));
+PV1ix = tempi.x;
+R127i.y = tempi.x;
+PV1iz = tempi.x;
+PV1iw = tempi.x;
+PS1i = ((as_type<float>(PV0ix) != 0.0)?-1:0);
+// 12
+tempi.x = as_type<int>(dot(float4(as_type<float>(R126i.z),as_type<float>(R126i.w),as_type<float>(R126i.w),as_type<float>(0x80000000)),float4(1.0,1.0,0.0,0.0)));
+PV0ix = tempi.x;
+PV0iy = tempi.x;
+PV0iz = tempi.x;
+PV0iw = tempi.x;
+R127i.z = R127i.z | PS1i;
+// 13
+PV1iy = ((as_type<float>(R127i.y) != 0.0)?-1:0);
+R126i.w = ((as_type<float>(PV0ix) != 0.0)?-1:0);
+R0i.w = as_type<int>(mul_nonIEEE(as_type<float>(R5i.z),as_type<float>(R5i.w)) + as_type<float>(R4i.z));
+// 14
+PV0ix = PV1iy | R127i.z;
+// 15
+R3i.y = R126i.w | PV0ix;
+// 16
+predResult = (R3i.y != 0);
+activeMaskStack[1] = predResult;
+activeMaskStackC[2] = predResult == true && activeMaskStackC[1] == true;
+}
+else {
+activeMaskStack[1] = false;
+activeMaskStackC[2] = false;
+}
+if( activeMaskStackC[2] == true ) {
+// 0
+R1i.y = R5i.y;
+}
+if( activeMaskStackC[2] == true ) {
+break;
+}
+activeMaskStackC[1] = activeMaskStack[0] == true && activeMaskStackC[0] == true;
+if( activeMaskStackC[1] == true ) {
+// 0
+PV0ix = R1i.z;
+PV0ix = as_type<int>(as_type<float>(PV0ix) / 2.0);
+PV0iy = as_type<int>(-(as_type<float>(R1i.w)));
+PV0iy = as_type<int>(as_type<float>(PV0iy) / 2.0);
+PV0iz = R1i.x;
+PV0iz = as_type<int>(as_type<float>(PV0iz) / 2.0);
+PV0iw = as_type<int>(-(as_type<float>(R1i.y)));
+PV0iw = as_type<int>(as_type<float>(PV0iw) / 2.0);
+R127i.y = R2i.x;
+R127i.y = as_type<int>(as_type<float>(R127i.y) / 2.0);
+// 1
+R1i.x = as_type<int>(as_type<float>(PV0iz) + 0.5);
+R1i.y = as_type<int>(as_type<float>(PV0iw) + 0.5);
+R1i.z = as_type<int>(as_type<float>(PV0ix) + 0.5);
+R1i.w = as_type<int>(as_type<float>(PV0iy) + 0.5);
+PS1i = as_type<int>(-(as_type<float>(R2i.y)));
+PS1i = as_type<int>(as_type<float>(PS1i) / 2.0);
+// 2
+R2i.x = as_type<int>(as_type<float>(R127i.y) + 0.5);
+R2i.y = as_type<int>(as_type<float>(PS1i) + 0.5);
+PV0iz = as_type<int>(-(as_type<float>(R2i.w)));
+PV0iz = as_type<int>(as_type<float>(PV0iz) / 2.0);
+PV0iw = R2i.z;
+PV0iw = as_type<int>(as_type<float>(PV0iw) / 2.0);
+R4i.x = 0;
+// 3
+backupReg0i = R3i.x;
+R3i.x = as_type<int>(as_type<float>(PV0iw) + 0.5);
+R3i.y = as_type<int>(as_type<float>(PV0iz) + 0.5);
+R2i.z = backupReg0i;
+R2i.w = int(0x3f800000);
+R5i.x = 0;
+}
+if( activeMaskStackC[1] == true ) {
+R1i.x = as_type<int>(tex1.sample(samplr1, float2(as_type<float>(R1i.x),as_type<float>(R1i.y))).x);
+R1i.y = as_type<int>(tex1.sample(samplr1, float2(as_type<float>(R1i.z),as_type<float>(R1i.w))).x);
+R1i.z = as_type<int>(tex1.sample(samplr1, float2(as_type<float>(R2i.x),as_type<float>(R2i.y))).x);
+R1i.w = as_type<int>(tex1.sample(samplr1, float2(as_type<float>(R3i.x),as_type<float>(R3i.y))).x);
+}
+if( activeMaskStackC[1] == true ) {
+activeMaskStack[1] = activeMaskStack[0];
+activeMaskStackC[2] = activeMaskStackC[1];
+// 0
+R126i.x = 0;
+R125i.y = R0i.z;
+R127i.z = R4i.y;
+R127i.w = int(0x3f800000);
+R125i.w = int(0x3f800000);
+// 1
+tempi.x = as_type<int>(dot(float4(as_type<float>(R4i.x),as_type<float>(R4i.x),as_type<float>(R2i.z),as_type<float>(R2i.w)),float4(as_type<float>(supportBuffer.remapped[7].x),as_type<float>(supportBuffer.remapped[7].y),as_type<float>(supportBuffer.remapped[7].z),as_type<float>(supportBuffer.remapped[7].w))));
+PV1ix = tempi.x;
+R127i.y = tempi.x;
+PV1iz = tempi.x;
+PV1iw = tempi.x;
+R125i.x = 0;
+// 2
+tempi.x = as_type<int>(dot(float4(as_type<float>(R5i.x),as_type<float>(R5i.x),as_type<float>(R127i.z),as_type<float>(R127i.w)),float4(as_type<float>(supportBuffer.remapped[7].x),as_type<float>(supportBuffer.remapped[7].y),as_type<float>(supportBuffer.remapped[7].z),as_type<float>(supportBuffer.remapped[7].w))));
+PV0ix = tempi.x;
+PV0iy = tempi.x;
+PV0iz = tempi.x;
+R126i.w = tempi.x;
+R126i.z = R0i.w;
+// 3
+backupReg0i = R127i.y;
+PV1ix = as_type<int>(mul_nonIEEE(as_type<float>(R2i.w), as_type<float>(supportBuffer.remapped[8].w)));
+R127i.y = as_type<int>(mul_nonIEEE(as_type<float>(R127i.w), as_type<float>(supportBuffer.remapped[8].w)));
+R127i.w = int(0x3f800000);
+R127i.x = as_type<int>(1.0 / as_type<float>(backupReg0i));
+// 4
+tempi.x = as_type<int>(dot(float4(as_type<float>(R4i.x),as_type<float>(R4i.x),as_type<float>(R2i.z),as_type<float>(PV1ix)),float4(as_type<float>(supportBuffer.remapped[8].x),as_type<float>(supportBuffer.remapped[8].y),as_type<float>(supportBuffer.remapped[8].z),1.0)));
+PV0ix = tempi.x;
+PV0iy = tempi.x;
+PV0iz = tempi.x;
+PV0iw = tempi.x;
+R126i.y = as_type<int>(1.0 / as_type<float>(R126i.w));
+// 5
+tempi.x = as_type<int>(dot(float4(as_type<float>(R5i.x),as_type<float>(R5i.x),as_type<float>(R127i.z),as_type<float>(R127i.y)),float4(as_type<float>(supportBuffer.remapped[8].x),as_type<float>(supportBuffer.remapped[8].y),as_type<float>(supportBuffer.remapped[8].z),1.0)));
+PV1ix = tempi.x;
+PV1iy = tempi.x;
+PV1iz = tempi.x;
+PV1iw = tempi.x;
+R127i.z = as_type<int>(as_type<float>(PV0ix) * as_type<float>(R127i.x));
+// 6
+tempi.x = as_type<int>(dot(float4(as_type<float>(R126i.x),as_type<float>(R126i.x),as_type<float>(R125i.y),as_type<float>(R125i.w)),float4(as_type<float>(supportBuffer.remapped[7].x),as_type<float>(supportBuffer.remapped[7].y),as_type<float>(supportBuffer.remapped[7].z),as_type<float>(supportBuffer.remapped[7].w))));
+PV0ix = tempi.x;
+PV0iy = tempi.x;
+PV0iz = tempi.x;
+PV0iw = tempi.x;
+R127i.x = as_type<int>(as_type<float>(PV1ix) * as_type<float>(R126i.y));
+// 7
+tempi.x = as_type<int>(dot(float4(as_type<float>(R126i.x),as_type<float>(R126i.x),as_type<float>(R125i.y),as_type<float>(R125i.w)),float4(as_type<float>(supportBuffer.remapped[8].x),as_type<float>(supportBuffer.remapped[8].y),as_type<float>(supportBuffer.remapped[8].z),as_type<float>(supportBuffer.remapped[8].w))));
+PV1ix = tempi.x;
+PV1iy = tempi.x;
+PV1iz = tempi.x;
+PV1iw = tempi.x;
+PS1i = as_type<int>(1.0 / as_type<float>(PV0ix));
+// 8
+tempi.x = as_type<int>(dot(float4(as_type<float>(R125i.x),as_type<float>(R125i.x),as_type<float>(R126i.z),as_type<float>(R127i.w)),float4(as_type<float>(supportBuffer.remapped[7].x),as_type<float>(supportBuffer.remapped[7].y),as_type<float>(supportBuffer.remapped[7].z),as_type<float>(supportBuffer.remapped[7].w))));
+PV0ix = tempi.x;
+PV0iy = tempi.x;
+PV0iz = tempi.x;
+PV0iw = tempi.x;
+R125i.y = as_type<int>(as_type<float>(PV1ix) * as_type<float>(PS1i));
+// 9
+tempi.x = as_type<int>(dot(float4(as_type<float>(R125i.x),as_type<float>(R125i.x),as_type<float>(R126i.z),as_type<float>(R127i.w)),float4(as_type<float>(supportBuffer.remapped[8].x),as_type<float>(supportBuffer.remapped[8].y),as_type<float>(supportBuffer.remapped[8].z),as_type<float>(supportBuffer.remapped[8].w))));
+PV1ix = tempi.x;
+PV1iy = tempi.x;
+PV1iz = tempi.x;
+PV1iw = tempi.x;
+PS1i = as_type<int>(1.0 / as_type<float>(PV0ix));
+// 10
+R123i.x = as_type<int>(mul_nonIEEE(as_type<float>(supportBuffer.remapped[0].y),-(as_type<float>(R127i.x))) + -(as_type<float>(supportBuffer.remapped[0].z)));
+R123i.y = as_type<int>(mul_nonIEEE(as_type<float>(supportBuffer.remapped[0].y),-(as_type<float>(R127i.z))) + -(as_type<float>(supportBuffer.remapped[0].z)));
+R123i.z = as_type<int>(mul_nonIEEE(as_type<float>(supportBuffer.remapped[0].y),-(as_type<float>(R125i.y))) + -(as_type<float>(supportBuffer.remapped[0].z)));
+PV0iw = as_type<int>(as_type<float>(PV1ix) * as_type<float>(PS1i));
+// 11
+R1i.x = as_type<int>(as_type<float>(R1i.x) + -(as_type<float>(R123i.y)));
+R1i.y = as_type<int>(as_type<float>(R1i.y) + -(as_type<float>(R123i.x)));
+R0i.z = as_type<int>(as_type<float>(R1i.z) + -(as_type<float>(R123i.z)));
+R123i.w = as_type<int>(mul_nonIEEE(as_type<float>(supportBuffer.remapped[0].y),-(as_type<float>(PV0iw))) + -(as_type<float>(supportBuffer.remapped[0].z)));
+// 12
+R2i.x = ((0.0 > as_type<float>(R1i.x))?-1:0);
+R1i.z = ((0.0 > as_type<float>(R0i.z))?-1:0);
+R0i.w = ((0.0 > as_type<float>(R1i.y))?-1:0);
+R1i.w = as_type<int>(as_type<float>(R1i.w) + -(as_type<float>(R123i.w)));
+// 13
+PV1iy = R2i.x | R0i.w;
+R2i.y = ((0.0 > as_type<float>(R1i.w))?-1:0);
+// 14
+PV0ix = R1i.z | PV1iy;
+// 15
+R2i.z = R2i.y | PV0ix;
+// 16
+predResult = (R2i.z != 0);
+activeMaskStack[1] = predResult;
+activeMaskStackC[2] = predResult == true && activeMaskStackC[1] == true;
+}
+else {
+activeMaskStack[1] = false;
+activeMaskStackC[2] = false;
+}
+if( activeMaskStackC[2] == true ) {
+// 0
+int offset = as_type<int>($sampleCount * 4.0);
+R127i.x = ((R0i.w == 0)?(offset):(R9i.y));
+R127i.y = ((R2i.x == 0)?(offset):(R8i.x));
+R127i.z = ((R2i.y == 0)?(offset):(R5i.w));
+R127i.w = ((R1i.z == 0)?(offset):(R8i.z));
+PS0i = as_type<int>(1.0 / as_type<float>(supportBuffer.remapped[9].x));
+// 1
+R126i.x = as_type<int>(as_type<float>(R3i.w) * as_type<float>(PS0i));
+R126i.x = clampFI32(R126i.x);
+PV1iy = as_type<int>(min(as_type<float>(R127i.y), as_type<float>(R127i.x)));
+R126i.z = as_type<int>(max(as_type<float>(R1i.x), -(as_type<float>(R1i.x))));
+R126i.w = as_type<int>(max(as_type<float>(R1i.y), -(as_type<float>(R1i.y))));
+R125i.z = as_type<int>(max(as_type<float>(R0i.z), -(as_type<float>(R0i.z))));
+// 2
+PV0ix = as_type<int>(min(as_type<float>(R127i.w), as_type<float>(PV1iy)));
+R126i.y = as_type<int>(max(as_type<float>(R1i.w), -(as_type<float>(R1i.w))));
+// 3
+R5i.y = as_type<int>(min(as_type<float>(R127i.z), as_type<float>(PV0ix)));
+// 4
+backupReg0i = R127i.x;
+backupReg1i = R127i.z;
+R127i.x = ((as_type<float>(R127i.y) == as_type<float>(R5i.y))?-1:0);
+R127i.y = ((as_type<float>(R127i.w) == as_type<float>(R5i.y))?-1:0);
+R127i.z = ((as_type<float>(backupReg0i) == as_type<float>(R5i.y))?-1:0);
+PV0iw = as_type<int>(as_type<float>(R5i.y) / ($sampleCount * 4.0)); // TODO: should $sampleCount be used here as well?
+R125i.y = ((as_type<float>(backupReg1i) == as_type<float>(R5i.y))?-1:0);
+// 5
+PV1iy = as_type<int>(mul_nonIEEE(as_type<float>(PV0iw), as_type<float>(R6i.y)));
+// 6
+PV0iw = as_type<int>(mul_nonIEEE(as_type<float>(R126i.x), as_type<float>(PV1iy)));
+PV0iw = clampFI32(PV0iw);
+// 7
+PV1iz = as_type<int>(mul_nonIEEE(as_type<float>(supportBuffer.remapped[5].z), as_type<float>(PV0iw)));
+// 8
+PV0ix = as_type<int>(mul_nonIEEE(as_type<float>(PV1iz), as_type<float>(R4i.w)));
+// 9
+PS1i = as_type<int>(exp2(as_type<float>(PV0ix)));
+// 10
+PV0iw = as_type<int>(mul_nonIEEE(as_type<float>(supportBuffer.remapped[5].x), as_type<float>(PS1i)));
+// 11
+PV1ix = ((as_type<float>(PV0iw) > as_type<float>(R126i.z))?-1:0);
+PV1iy = ((as_type<float>(PV0iw) > as_type<float>(R125i.z))?-1:0);
+PV1iz = ((as_type<float>(PV0iw) > as_type<float>(R126i.y))?-1:0);
+PV1iw = ((as_type<float>(PV0iw) > as_type<float>(R126i.w))?-1:0);
+// 12
+R123i.x = ((R127i.z == 0)?(0):(PV1iw));
+R127i.y = ((R127i.y == 0)?(0):(PV1iy));
+R123i.z = ((R127i.x == 0)?(0):(PV1ix));
+R126i.w = ((R125i.y == 0)?(0):(PV1iz));
+// 13
+PV1iz = R123i.z | R123i.x;
+// 14
+PV0ix = R127i.y | PV1iz;
+// 15
+R1i.y = R126i.w | PV0ix;
+}
+if( activeMaskStackC[2] == true ) {
+break;
+}
+activeMaskStackC[1] = activeMaskStack[0] == true && activeMaskStackC[0] == true;
+if( activeMaskStackC[1] == true ) {
+// 0
+R6i.z = as_type<int>(as_type<float>(R6i.z) + 1.0);
+}
+}
+if( activeMaskStackC[1] == true ) {
+// 0
+R123i.x = as_type<int>(as_type<float>(R0i.x) * 2.0 + -(1.0));
+R127i.y = as_type<int>(mul_nonIEEE(as_type<float>(R7i.x),as_type<float>(R5i.y)) + as_type<float>(R6i.x));
+PV0iz = as_type<int>(as_type<float>(R5i.y) / ($sampleCount * 4.0));
+R123i.w = as_type<int>(as_type<float>(R0i.y) * 2.0 + -(1.0));
+PS0i = as_type<int>(1.0 / as_type<float>(R3i.z));
+// 1
+R123i.x = as_type<int>(mul_nonIEEE(-(as_type<float>(R123i.x)),as_type<float>(R123i.x)) + 1.0);
+PV1iy = as_type<int>(-(as_type<float>(PV0iz)) + 1.0);
+R123i.z = as_type<int>(mul_nonIEEE(-(as_type<float>(R123i.w)),as_type<float>(R123i.w)) + 1.0);
+PV1iw = as_type<int>(as_type<float>(supportBuffer.remapped[9].w) * as_type<float>(PS0i));
+PV1iw = clampFI32(PV1iw);
+R126i.y = as_type<int>(mul_nonIEEE(as_type<float>(R8i.y),as_type<float>(R5i.y)) + as_type<float>(R7i.y));
+// 2
+backupReg0i = R1i.y;
+PV0ix = as_type<int>(max(as_type<float>(PV1iy), as_type<float>(0x3dcccccd)));
+R1i.y = as_type<int>(mul_nonIEEE(as_type<float>(R123i.z), as_type<float>(R123i.x)));
+R2i.z = as_type<int>(-(as_type<float>(PV1iw)) + 1.0);
+R0i.w = ((backupReg0i == 0)?(0):(int(0x3f800000)));
+PS0i = R127i.y;
+PS0i = as_type<int>(as_type<float>(PS0i) / 2.0);
+// 3
+PV1ix = as_type<int>(-(as_type<float>(R126i.y)));
+PV1ix = as_type<int>(as_type<float>(PV1ix) / 2.0);
+R0i.z = as_type<int>(rint(1.0));
+PV1iw = as_type<int>(min(as_type<float>(PV0ix), 1.0));
+R0i.x = as_type<int>(as_type<float>(PS0i) + 0.5);
+// 4
+R0i.y = as_type<int>(as_type<float>(PV1ix) + 0.5);
+R1i.z = as_type<int>(mul_nonIEEE(as_type<float>(PV1iw), as_type<float>(PV1iw)));
+}
+if( activeMaskStackC[1] == true ) {
+R0i.xyz = as_type<int3>(tex0.sample(samplr0, float2(as_type<float>(R0i.x), as_type<float>(R0i.y)), uint(rint(as_type<float>(R0i.z)))).xyz);
+}
+if( activeMaskStackC[1] == true ) {
+// 0
+PV0iw = as_type<int>(mul_nonIEEE(as_type<float>(R1i.z), as_type<float>(supportBuffer.remapped[10].w)));
+PV0iw = clampFI32(PV0iw);
+// 1
+PV1iy = as_type<int>(mul_nonIEEE(as_type<float>(R7i.z), as_type<float>(PV0iw)));
+// 2
+PV0iw = as_type<int>(mul_nonIEEE(as_type<float>(PV1iy), as_type<float>(R1i.y)));
+// 3
+PV1iw = as_type<int>(mul_nonIEEE(as_type<float>(PV0iw), as_type<float>(R2i.z)));
+// 4
+PV0iy = as_type<int>(mul_nonIEEE(as_type<float>(PV1iw), as_type<float>(R0i.w)));
+// 5
+PV1ix = as_type<int>(mul_nonIEEE(as_type<float>(supportBuffer.remapped[10].x), as_type<float>(PV0iy)));
+R2i.w = as_type<int>(mul_nonIEEE(as_type<float>(supportBuffer.remapped[10].y), as_type<float>(PV0iy)));
+// 6
+R2i.x = as_type<int>(mul_nonIEEE(as_type<float>(R0i.x), as_type<float>(PV1ix)));
+R2i.y = as_type<int>(mul_nonIEEE(as_type<float>(R0i.y), as_type<float>(PV1ix)));
+R2i.z = as_type<int>(mul_nonIEEE(as_type<float>(R0i.z), as_type<float>(PV1ix)));
+}
+// export
+out.passPixelColor0 = as_type<float4>(float4(as_type<float>(R2i.x), as_type<float>(R2i.y), as_type<float>(R2i.z), as_type<float>(R2i.w)));
+return out;
+}

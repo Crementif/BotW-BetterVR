@@ -1,0 +1,595 @@
+[Definition]
+titleIds = 00050000101C9300,00050000101C9400,00050000101C9500
+name = Custom Cel Shading
+path = "The Legend of Zelda: Breath of the Wild/Mods/Custom Cel Shading"
+description = Changes the type of shading on Link and the world.|Inventory Menu Workaround will make Link invisible in the inventory.||Made by SkalFate, Altros and Pig.
+version = 6
+
+[Default]
+$mode:int = 4
+$clarity = 0.05
+$menuWrkrnd:int = 0
+$shdwFix:int = 2
+$bright = 0.45
+$smode = 1
+$shadowsbrightness = 1
+$sred = 1
+$sgreen = 1
+$sblue = 1
+
+# Cel-Shading Type
+
+[Preset]
+name = Cel-Shading Disabled
+category = Preset
+default = 1
+
+[Preset]
+name = Light Shading
+category = Preset
+$mode:int = 6
+$shdwFix:int = 2 # To hide Shadow Dropdowns
+
+[Preset]
+name = Painting Shading (World)
+category = Preset
+$mode:int = 8
+$shdwFix:int = 2 # To hide Shadow Dropdowns
+
+[Preset]
+name = Painting Shading (World & Link)
+category = Preset
+$mode:int = 10
+$shdwFix:int = 2 # To hide Shadow Dropdowns
+
+# Plastic Mode
+
+[Preset]
+name = Disabled
+category = Plastic Mode
+condition = $mode == 4
+default = 1
+$clarity = 1
+
+[Preset]
+name = Plastic 100%
+category = Plastic Mode
+condition = $mode == 4
+$clarity = 0.05
+
+[Preset]
+name = Plastic 95%
+category = Plastic Mode
+condition = $mode == 4
+$clarity = 0.15
+
+[Preset]
+name = Plastic 90%
+category = Plastic Mode
+condition = $mode == 4
+$clarity = 0.30
+
+[Preset]
+name = Plastic 85%
+category = Plastic Mode
+condition = $mode == 4
+$clarity = 0.37
+
+[Preset]
+name = Plastic 75%
+category = Plastic Mode
+condition = $mode == 4
+$clarity = 0.43
+
+[Preset]
+name = Plastic 65%
+category = Plastic Mode
+condition = $mode == 4
+$clarity = 0.50
+
+[Preset]
+name = Plastic 55%
+category = Plastic Mode
+condition = $mode == 4
+$clarity = 0.57
+
+[Preset]
+name = Plastic 45%
+category = Plastic Mode
+condition = $mode == 4
+$clarity = 0.65
+
+[Preset]
+name = Plastic 35%
+category = Plastic Mode
+condition = $mode == 4
+$clarity = 0.75
+
+[Preset]
+name = Plastic 25%
+category = Plastic Mode
+condition = $mode == 4
+$clarity = 0.95
+
+[Preset]
+name = Plastic 15%
+category = Plastic Mode
+condition = $mode == 4
+$clarity = 1.15
+
+[Preset]
+name = Plastic 5%
+category = Plastic Mode
+condition = $mode == 4
+$clarity = 1.35
+
+# Menu Workaround
+
+[Preset]
+name = Disabled (Glitchy Inventory Background)
+category = Inventory Menu Workaround
+condition = $mode == 4
+default = 1
+
+[Preset]
+name = Enabled (Removes Link)
+category = Inventory Menu Workaround
+condition = $mode == 4
+$menuWrkrnd:int = 1
+
+# Shadow Fix Verison
+
+[Preset]
+name = Altros Version
+category = Shadow Fix Version
+condition = $mode == 4
+$shdwFix:int = 0
+
+[Preset]
+name = SkalFate Version
+category = Shadow Fix Version
+condition = $mode == 4
+$shdwFix:int = 1
+
+# Altros Shadow Fix
+
+[Preset]
+name = Shadows 0.25%
+category = Altros Shadow Fix
+condition = $shdwFix == 0
+$bright = 0.25
+
+[Preset]
+name = Shadows 0.35%
+category = Altros Shadow Fix
+condition = $shdwFix == 0
+$bright = 0.35
+
+[Preset]
+name = Shadows 0.45% (Default)
+category = Altros Shadow Fix
+condition = $shdwFix == 0
+default = 1
+$bright = 0.45
+
+[Preset]
+name = Shadows 0.55%
+category = Altros Shadow Fix
+condition = $shdwFix == 0
+$bright = 0.55
+
+[Preset]
+name = Shadows 0.65%
+category = Altros Shadow Fix
+condition = $shdwFix == 0
+$bright = 0.65
+
+[Preset]
+name = Shadows 0.75%
+category = Altros Shadow Fix
+condition = $shdwFix == 0
+$bright = 0.75
+
+[Preset]
+name = Shadows 0.95%
+category = Altros Shadow Fix
+condition = $shdwFix == 0
+$bright = 0.95
+
+[Preset]
+name = Shadows 1.0% (Game Original)
+category = Altros Shadow Fix
+condition = $shdwFix == 0
+$bright = 1.0
+
+[Preset]
+name = Shadows 1.15%
+category = Altros Shadow Fix
+condition = $shdwFix == 0
+$bright = 1.15
+
+[Preset]
+name = Shadows 1.25%
+category = Altros Shadow Fix
+condition = $shdwFix == 0
+$bright = 1.25
+
+[Preset]
+name = Shadows 1.35%
+category = Altros Shadow Fix
+condition = $shdwFix == 0
+$bright = 1.35
+
+[Preset]
+name = Shadows 1.45%
+category = Altros Shadow Fix
+condition = $shdwFix == 0
+$bright = 1.45
+
+[Preset]
+name = Shadows 1.55%
+category = Altros Shadow Fix
+condition = $shdwFix == 0
+$bright = 1.55
+
+[Preset]
+name = Shadows 1.65%
+category = Altros Shadow Fix
+condition = $shdwFix == 0
+$bright = 1.65
+
+[Preset]
+name = Shadows 1.75%
+category = Altros Shadow Fix
+condition = $shdwFix == 0
+$bright = 1.75
+
+# SkalFate Shadow Fix
+
+# Shadow Mode (smode) -- Various visual styles can be achieved with mode 1-5
+#
+# Shadow Brihtness (shadowbrightness) - Controls how  brightened up link and his back side will be
+#
+# RGB - sred, sgreen, sblue - adjusting this will add more intensity of the specific color.
+# ------ Values are multiplied, so if you want to lower values use [0.01 - 1.0], or if you want to raise then use [1.00 - X.X]
+
+[Preset]
+name = Mode 1 - Shadows X1 (Best Mode)
+category = SkalFate Shadow Fix
+condition = $shdwFix == 1
+default = 1
+$smode = 1
+$shadowsbrightness = 1
+$sred = 1
+$sgreen = 1
+$sblue = 1
+
+[Preset]
+name = Mode 2 - Shadows X1 (No Highlights)
+category = SkalFate Shadow Fix
+condition = $shdwFix == 1
+$smode = 2
+$shadowsbrightness = 1
+$sred = 1
+$sgreen = 1
+$sblue = 1
+
+[Preset]
+name = Mode 3 - Shadows X1 (Strong Highlights)
+category = SkalFate Shadow Fix
+condition = $shdwFix == 1
+$smode = 3
+$shadowsbrightness = 1
+$sred = 1
+$sgreen = 1
+$sblue = 1
+
+[Preset]
+name = Mode 4 - Shadows X1 (LightShade)
+category = SkalFate Shadow Fix
+condition = $shdwFix == 1
+$smode = 4
+$shadowsbrightness = 1
+$sred = 1
+$sgreen = 1
+$sblue = 1
+
+[Preset]
+name = Mode 5 - Shadows X1 (DarkShade)
+category = SkalFate Shadow Fix
+condition = $shdwFix == 1
+$smode = 5
+$shadowsbrightness = 1
+$sred = 1
+$sgreen = 1
+$sblue = 1
+
+[Preset]
+name = ----------------------------------------
+category = SkalFate Shadow Fix
+condition = $shdwFix == 1
+$smode = 1
+$shadowsbrightness = 1
+$sred = 1
+$sgreen = 1
+$sblue = 1
+
+[Preset]
+name = Mode 1 - Shadows X2 (Best Mode)
+category = SkalFate Shadow Fix
+condition = $shdwFix == 1
+$smode = 1
+$shadowsbrightness = 2
+$sred = 1
+$sgreen = 1
+$sblue = 1
+
+[Preset]
+name = Mode 2 - Shadows X2 (No Highlights)
+category = SkalFate Shadow Fix
+condition = $shdwFix == 1
+$smode = 2
+$shadowsbrightness = 2
+$sred = 1
+$sgreen = 1
+$sblue = 1
+
+[Preset]
+name = Mode 3 - Shadows X2 (Strong Highlights)
+category = SkalFate Shadow Fix
+condition = $shdwFix == 1
+$smode = 3
+$shadowsbrightness = 2
+$sred = 1
+$sgreen = 1
+$sblue = 1
+
+[Preset]
+name = Mode 4 - Shadows X2 (LightShade)
+category = SkalFate Shadow Fix
+condition = $shdwFix == 1
+$smode = 4
+$shadowsbrightness = 2
+$sred = 1
+$sgreen = 1
+$sblue = 1
+
+[Preset]
+name = Mode 5 - Shadows X2 (DarkShade)
+category = SkalFate Shadow Fix
+condition = $shdwFix == 1
+$smode = 5
+$shadowsbrightness = 2
+$sred = 1
+$sgreen = 1
+$sblue = 1
+
+[Preset]
+name = ----------------------------------------
+category = SkalFate Shadow Fix
+condition = $shdwFix == 1
+$smode = 1
+$shadowsbrightness = 1
+$sred = 1
+$sgreen = 1
+$sblue = 1
+
+[Preset]
+name = Mode 1 - Shadows X4 (Best Mode)
+category = SkalFate Shadow Fix
+condition = $shdwFix == 1
+$smode = 1
+$shadowsbrightness = 4
+$sred = 1
+$sgreen = 1
+$sblue = 1
+
+[Preset]
+name = Mode 2 - Shadows X4 (No Highlights)
+category = SkalFate Shadow Fix
+condition = $shdwFix == 1
+$smode = 2
+$shadowsbrightness = 4
+$sred = 1
+$sgreen = 1
+$sblue = 1
+
+[Preset]
+name = Mode 3 - Shadows X4 (Strong Highlights)
+category = SkalFate Shadow Fix
+condition = $shdwFix == 1
+$smode = 3
+$shadowsbrightness = 4
+$sred = 1
+$sgreen = 1
+$sblue = 1
+
+[Preset]
+name = Mode 4 - Shadows X4 (LightShade)
+category = SkalFate Shadow Fix
+condition = $shdwFix == 1
+$smode = 4
+$shadowsbrightness = 4
+$sred = 1
+$sgreen = 1
+$sblue = 1
+
+[Preset]
+name = Mode 5 - Shadows X4 (DarkShade)
+category = SkalFate Shadow Fix
+condition = $shdwFix == 1
+$smode = 5
+$shadowsbrightness = 4
+$sred = 1
+$sgreen = 1
+$sblue = 1
+
+[Preset]
+name = ----------------------------------------
+category = SkalFate Shadow Fix
+condition = $shdwFix == 1
+$smode = 1
+$shadowsbrightness = 1
+$sred = 1
+$sgreen = 1
+$sblue = 1
+
+[Preset]
+name = Mode 1 - Shadows X8  (Best Mode)
+category = SkalFate Shadow Fix
+condition = $shdwFix == 1
+$smode = 1
+$shadowsbrightness = 8
+$sred = 1
+$sgreen = 1
+$sblue = 1
+
+[Preset]
+name = Mode 2 - Shadows X8 (No Highlights)
+category = SkalFate Shadow Fix
+condition = $shdwFix == 1
+$smode = 2
+$shadowsbrightness = 8
+$sred = 1
+$sgreen = 1
+$sblue = 1
+
+[Preset]
+name = Mode 3 - Shadows X8 (Strong Highlights)
+category = SkalFate Shadow Fix
+condition = $shdwFix == 1
+$smode = 3
+$shadowsbrightness = 8
+$sred = 1
+$sgreen = 1
+$sblue = 1
+
+[Preset]
+name = Mode 4 - Shadows X8 (LightShade)
+category = SkalFate Shadow Fix
+condition = $shdwFix == 1
+$smode = 4
+$shadowsbrightness = 8
+$sred = 1
+$sgreen = 1
+$sblue = 1
+
+[Preset]
+name = Mode 5 - Shadows X8 (DarkShade)
+category = SkalFate Shadow Fix
+condition = $shdwFix == 1
+$smode = 5
+$shadowsbrightness = 8
+$sred = 1
+$sgreen = 1
+$sblue = 1
+
+[Preset]
+name = ----------------------------------------
+category = SkalFate Shadow Fix
+condition = $shdwFix == 1
+$smode = 1
+$shadowsbrightness = 1
+$sred = 1
+$sgreen = 1
+$sblue = 1
+
+[Preset]
+name = Red Link
+category = SkalFate Shadow Fix
+condition = $shdwFix == 1
+$smode = 1
+$shadowsbrightness = 2
+$sred = 10
+$sgreen = 1
+$sblue = 1
+
+[Preset]
+name = Red Link X2
+category = SkalFate Shadow Fix
+condition = $shdwFix == 1
+$smode = 1
+$shadowsbrightness = 2
+$sred = 20
+$sgreen = 1
+$sblue = 1
+
+[Preset]
+name = Green Link
+category = SkalFate Shadow Fix
+condition = $shdwFix == 1
+$smode = 1
+$shadowsbrightness = 2
+$sred = 1
+$sgreen = 10
+$sblue = 1
+
+[Preset]
+name = Green Link X2
+category = SkalFate Shadow Fix
+condition = $shdwFix == 1
+$smode = 1
+$shadowsbrightness = 2
+$sred = 1
+$sgreen = 20
+$sblue = 1
+
+[Preset]
+name = Blue Link
+category = SkalFate Shadow Fix
+condition = $shdwFix == 1
+$smode = 1
+$shadowsbrightness = 2
+$sred = 1
+$sgreen = 1
+$sblue = 10
+
+[Preset]
+name = Blue Link X2
+category = SkalFate Shadow Fix
+condition = $shdwFix == 1
+$smode = 1
+$shadowsbrightness = 2
+$sred = 1
+$sgreen = 1
+$sblue = 20
+
+[Preset]
+name = ----------------------------------------
+category = SkalFate Shadow Fix
+condition = $shdwFix == 1
+$smode = 1
+$shadowsbrightness = 1
+$sred = 1
+$sgreen = 1
+$sblue = 1
+
+[Preset]
+name = Original Game Mode
+category = SkalFate Shadow Fix
+condition = $shdwFix == 1
+$smode = 0
+$shadowsbrightness = 1
+$sred = 1
+$sgreen = 1
+$sblue = 1
+
+[Preset]
+name = ----------------------------------------
+category = SkalFate Shadow Fix
+condition = $shdwFix == 1
+$smode = 1
+$shadowsbrightness = 1
+$sred = 1
+$sgreen = 1
+$sblue = 1
+
+[Preset]
+name = Custom Settings
+category = SkalFate Shadow Fix
+condition = $shdwFix == 1
+$smode = 1
+$shadowsbrightness = 1
+$sred = 1
+$sgreen = 1
+$sblue = 1

@@ -1,0 +1,117 @@
+[Definition]
+titleIds = 00050000101C9300,00050000101C9400,00050000101C9500
+name = "Master Mode Options"
+path = "The Legend of Zelda: Breath of the Wild/Cheats/Master Mode Options"
+description = Allows you to pick and choose which of Nintendo's changes are applied to Master Mode (Does nothing in Normal Mode). A reboot is required to apply changes made while the game is running. ||By Torphedo and Fleevoid, with lots of help from Exzap and leoetlino. 1.5x damage multiplier hack by NiceneNerd.
+version = 7
+
+[Default]
+$debug:int = 0
+$bit0:int = 0x1
+$bit1:int = 0x0
+$bit3:int = 0x8
+$bit4:int = 0x10
+$bit5:int = 0x20
+$bit6:int = 0x40
+$bit7:int = 0x80
+$bit8:int = 0x100
+$mmdamage = 0
+
+[Preset]
+name = Disabled (Default)
+category = Show Debug Options
+$debug:int = 0
+
+[Preset]
+name = Enabled (shows broken options)
+category = Show Debug Options
+$debug:int = 1
+
+[Preset]
+name = Disabled (Default)
+category = 1-Hit-Kill Protection
+$bit3:int = 0x8
+
+[Preset]
+name = Enabled
+category = 1-Hit-Kill Protection
+$bit3:int = 0x0
+
+[Preset]
+name = Enabled (Default)
+category = No Ganon Stun Lock
+$bit4:int = 0x10
+
+[Preset]
+name = Disabled
+category = No Ganon Stun Lock
+$bit4:int = 0x0
+
+[Preset]
+Name = Enabled (Default)
+category = Health Regeneration
+$bit5:int = 0x20
+
+[Preset]
+Name = Disabled
+category = Health Regeneration
+$bit5:int = 0x0
+
+[Preset]
+name = Enabled (Default)
+category = Randomized Guardian Fire Timing
+$bit6:int = 0x40
+
+[Preset]
+name = Disabled
+category = Randomized Guardian Fire Timing
+$bit6:int = 0x0
+
+[Preset]
+name = Enabled (Default)
+category = 1.5x Damage Multiplier from Bosses and Tests of Strength
+$bit7:int = 0x80
+
+[Preset]
+name = Apply to all enemies
+category = 1.5x Damage Multiplier from Bosses and Tests of Strength
+$mmdamage = 1
+
+[Preset]
+name = Disabled
+category = 1.5x Damage Multiplier from Bosses and Tests of Strength
+$bit7:int = 0x0
+
+[Preset]
+name = Enabled (Default)
+category = Shorter Enemy Notice
+$bit8:int = 0x100
+
+[Preset]
+name = Disabled
+category = Shorter Enemy Notice
+$bit8:int = 0x0
+
+[Preset]
+name = Enabled (Default)
+category = IsLastPlayHardMode (Does nothing)
+condition = $debug == 1
+$bit0:int = 0x1
+
+[Preset]
+name = Disabled
+category = IsLastPlayHardMode (Does nothing)
+condition = $debug == 1
+$bit0:int = 0x0
+
+[Preset]
+name = Disabled (Default)
+category = Nerf Cooking (Appears to be broken or unimplemented)
+condition = $debug == 1
+$bit1:int = 0x0
+
+[Preset]
+name = Enabled
+category = Nerf Cooking (Appears to be broken or unimplemented)
+condition = $debug == 1
+$bit1:int = 0x2

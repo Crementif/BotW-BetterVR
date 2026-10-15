@@ -1,0 +1,1353 @@
+#version 430
+#extension GL_ARB_texture_gather : enable
+#extension GL_ARB_separate_shader_objects : enable
+// shader 1c7db40ff5d693ab
+// Used for: Link and all NPCs Shadows Renderer, NPC Distant Fog RGB Renderer, Body RGB renderer - Dumped with Cemu 1.20.1
+
+// start of shader inputs/outputs, predetermined by Cemu. Do not touch
+#ifdef VULKAN
+#define ATTR_LAYOUT(__vkSet, __location) layout(set = __vkSet, location = __location)
+#define UNIFORM_BUFFER_LAYOUT(__glLocation, __vkSet, __vkLocation) layout(set = __vkSet, binding = __vkLocation, std140)
+#define TEXTURE_LAYOUT(__glLocation, __vkSet, __vkLocation) layout(set = __vkSet, binding = __vkLocation)
+#define GET_FRAGCOORD() vec4(gl_FragCoord.xy*uf_fragCoordScale.xy,gl_FragCoord.zw)
+#else
+#define ATTR_LAYOUT(__vkSet, __location) layout(location = __location)
+#define UNIFORM_BUFFER_LAYOUT(__glLocation, __vkSet, __vkLocation) layout(binding = __glLocation, std140) 
+#define TEXTURE_LAYOUT(__glLocation, __vkSet, __vkLocation) layout(binding = __glLocation)
+#define GET_FRAGCOORD() vec4(gl_FragCoord.xy*uf_fragCoordScale,gl_FragCoord.zw)
+#endif
+#ifdef VULKAN
+layout(set = 1, binding = 11) uniform ufBlock
+{
+uniform ivec4 uf_remappedPS[33];
+uniform vec4 uf_fragCoordScale;
+};
+#else
+uniform ivec4 uf_remappedPS[33];
+uniform vec2 uf_fragCoordScale;
+#endif
+
+#define bright $bright
+#define shdwFix $shdwFix
+#define smode $smode
+#define shadowsbrightness $shadowsbrightness
+#define sred $sred
+#define sgreen $sgreen
+#define sblue $sblue
+
+#ifndef smode
+    #define smode 0
+#endif
+#ifndef shadowsbrightness
+    #define shadowsbrightness 1
+#endif
+#ifndef sred
+    #define sred 1
+#endif
+#ifndef sgreen
+    #define sgreen 1
+#endif
+#ifndef sblue
+    #define sblue 1
+#endif
+
+TEXTURE_LAYOUT(0, 1, 0) uniform sampler2D textureUnitPS0;
+TEXTURE_LAYOUT(2, 1, 1) uniform sampler2D textureUnitPS2;
+TEXTURE_LAYOUT(3, 1, 2) uniform sampler2D textureUnitPS3;
+TEXTURE_LAYOUT(4, 1, 3) uniform sampler2D textureUnitPS4;
+TEXTURE_LAYOUT(5, 1, 4) uniform sampler2D textureUnitPS5;
+TEXTURE_LAYOUT(6, 1, 5) uniform sampler2D textureUnitPS6;
+TEXTURE_LAYOUT(7, 1, 6) uniform samplerCubeArray textureUnitPS7;
+TEXTURE_LAYOUT(11, 1, 7) uniform sampler2D textureUnitPS11;
+TEXTURE_LAYOUT(12, 1, 8) uniform sampler2D textureUnitPS12;
+TEXTURE_LAYOUT(14, 1, 9) uniform sampler2D textureUnitPS14;
+TEXTURE_LAYOUT(15, 1, 10) uniform sampler2D textureUnitPS15;
+layout(location = 0) in vec4 passParameterSem0;
+layout(location = 1) in vec4 passParameterSem2;
+layout(location = 2) in vec4 passParameterSem6;
+layout(location = 0) out vec4 passPixelColor0;
+layout(location = 1) out vec4 passPixelColor1;
+layout(location = 2) out vec4 passPixelColor2;
+layout(location = 3) out vec4 passPixelColor3;
+layout(location = 4) out vec4 passPixelColor4;
+// end of shader inputs/outputs
+void redcCUBE(vec4 src0, vec4 src1, out vec3 stm, out int faceId)
+{
+// stm -> x .. s, y .. t, z .. MajorAxis*2.0
+vec3 inputCoord = normalize(vec3(src1.y, src1.x, src0.x));
+float rx = inputCoord.x;
+float ry = inputCoord.y;
+float rz = inputCoord.z;
+if( abs(rx) > abs(ry) && abs(rx) > abs(rz) )
+{
+stm.z = rx*2.0;
+stm.xy = vec2(ry,rz);	
+if( rx >= 0.0 )
+{
+faceId = 0;
+}
+else
+{
+faceId = 1;
+}
+}
+else if( abs(ry) > abs(rx) && abs(ry) > abs(rz) )
+{
+stm.z = ry*2.0;
+stm.xy = vec2(rx,rz);	
+if( ry >= 0.0 )
+{
+faceId = 2;
+}
+else
+{
+faceId = 3;
+}
+}
+else //if( abs(rz) > abs(ry) && abs(rz) > abs(rx) )
+{
+stm.z = rz*2.0;
+stm.xy = vec2(rx,ry);	
+if( rz >= 0.0 )
+{
+faceId = 4;
+}
+else
+{
+faceId = 5;
+}
+}
+}
+vec3 redcCUBEReverse(vec2 st, int faceId)
+{
+st.yx = st.xy;
+vec3 v;
+float majorAxis = 1.0;
+if( faceId == 0 )
+{
+v.yz = (st-vec2(1.5))*(majorAxis*2.0);
+v.x = 1.0;
+}
+else if( faceId == 1 )
+{
+v.yz = (st-vec2(1.5))*(majorAxis*2.0);
+v.x = -1.0;
+}
+else if( faceId == 2 )
+{
+v.xz = (st-vec2(1.5))*(majorAxis*2.0);
+v.y = 1.0;
+}
+else if( faceId == 3 )
+{
+v.xz = (st-vec2(1.5))*(majorAxis*2.0);
+v.y = -1.0;
+}
+else if( faceId == 4 )
+{
+v.xy = (st-vec2(1.5))*(majorAxis*2.0);
+v.z = 1.0;
+}
+else
+{
+v.xy = (st-vec2(1.5))*(majorAxis*2.0);
+v.z = -1.0;
+}
+return v;
+}
+int clampFI32(int v)
+{
+if( v == 0x7FFFFFFF )
+	return floatBitsToInt(1.0);
+else if( v == 0xFFFFFFFF )
+	return floatBitsToInt(0.0);
+return floatBitsToInt(clamp(intBitsToFloat(v), 0.0, 1.0));
+}
+float mul_nonIEEE(float a, float b){ if( a == 0.0 || b == 0.0 ) return 0.0; return a*b; }
+void main()
+{
+
+#if (shdwFix == 0) // Initiate Altros
+
+ivec4 Temp0i = ivec4(0);
+ivec4 Temp1i = ivec4(0);
+ivec4 High0i = ivec4(0);
+ivec4 Low0i = ivec4(0);
+ivec4 Left0i = ivec4(0);
+ivec4 Right0i = ivec4(0);
+ivec4 YHigh0i = ivec4(0);
+ivec4 YLow0i = ivec4(0);
+ivec4 YLeft0i = ivec4(0);
+ivec4 YRight0i = ivec4(0);
+ivec4 BHigh0i = ivec4(0);
+ivec4 BLow0i = ivec4(0);
+ivec4 BLeft0i = ivec4(0);
+ivec4 BRight0i = ivec4(0);
+ivec4 LtBlueShadow = ivec4(0);
+
+#endif
+
+ivec4 R0i = ivec4(0);
+ivec4 R1i = ivec4(0);
+ivec4 R2i = ivec4(0);
+ivec4 R3i = ivec4(0);
+ivec4 R4i = ivec4(0);
+ivec4 R5i = ivec4(0);
+ivec4 R6i = ivec4(0);
+ivec4 R7i = ivec4(0);
+ivec4 R8i = ivec4(0);
+ivec4 R9i = ivec4(0);
+ivec4 R10i = ivec4(0);
+ivec4 R11i = ivec4(0);
+ivec4 R12i = ivec4(0);
+ivec4 R13i = ivec4(0);
+ivec4 R14i = ivec4(0);
+ivec4 R15i = ivec4(0);
+ivec4 R16i = ivec4(0);
+ivec4 R17i = ivec4(0);
+ivec4 R122i = ivec4(0);
+ivec4 R123i = ivec4(0);
+ivec4 R124i = ivec4(0);
+ivec4 R125i = ivec4(0);
+ivec4 R126i = ivec4(0);
+ivec4 R127i = ivec4(0);
+int backupReg0i, backupReg1i, backupReg2i, backupReg3i, backupReg4i;
+ivec4 PV0i = ivec4(0), PV1i = ivec4(0);
+int PS0i = 0, PS1i = 0;
+ivec4 tempi = ivec4(0);
+float tempResultf;
+int tempResulti;
+ivec4 ARi = ivec4(0);
+bool predResult = true;
+bool activeMaskStack[2];
+bool activeMaskStackC[3];
+activeMaskStack[0] = false;
+activeMaskStackC[0] = false;
+activeMaskStackC[1] = false;
+activeMaskStack[0] = true;
+activeMaskStackC[0] = true;
+activeMaskStackC[1] = true;
+vec3 cubeMapSTM;
+int cubeMapFaceId;
+float cubeMapArrayIndex7 = 0.0;
+R0i = floatBitsToInt(passParameterSem0); // Links cutout comes from passparamsem0
+R1i = floatBitsToInt(passParameterSem2); // no cel shading
+R2i = floatBitsToInt(passParameterSem6);
+
+#if (shdwFix == 1) // SkalFate math magic
+
+ivec4 Temp0i = ivec4(0); // initializes a temp vector for shadow mathe-magics
+
+#endif
+
+// ------------------------------------------------------------------------------------------------------------- dynamic shadows on link
+if( activeMaskStackC[1] == true ) {
+R3i.w = floatBitsToInt(texture(textureUnitPS6, intBitsToFloat(R0i.xy)).x); // seems to affect links head area
+R7i.xyzw = floatBitsToInt(texture(textureUnitPS3, intBitsToFloat(R2i.zw)).xyzw); // seems to affect shadows on link body
+R15i.xyzw = floatBitsToInt(texture(textureUnitPS2, intBitsToFloat(R2i.zw)).xyzw);
+R2i.xy = floatBitsToInt(texture(textureUnitPS14, intBitsToFloat(R0i.xy)).xw);
+R4i.xy = floatBitsToInt(texture(textureUnitPS15, intBitsToFloat(R0i.xy)).xy);
+R16i.xyz = floatBitsToInt(texture(textureUnitPS4, intBitsToFloat(R2i.zw)).xyz);
+R14i.x = floatBitsToInt(texture(textureUnitPS11, intBitsToFloat(R2i.zw)).x);
+}
+
+// ------------------------------------------------------------------------------------------------------------- false makes link grey
+if( activeMaskStackC[1] == true ) {
+// 0
+R124i.x = floatBitsToInt((intBitsToFloat(R7i.x) * 2.0 + -(1.0)));
+R125i.y = floatBitsToInt((mul_nonIEEE(intBitsToFloat(R3i.w),intBitsToFloat(uf_remappedPS[0].x)) + intBitsToFloat(uf_remappedPS[1].x)));
+PV0i.y = R125i.y;
+R3i.z = 0;
+R5i.w = 0x3f800000;
+R126i.y = floatBitsToInt((intBitsToFloat(R7i.y) * 2.0 + -(1.0)));
+PS0i = R126i.y;
+// 1
+R126i.x = floatBitsToInt(mul_nonIEEE(intBitsToFloat(R0i.z), -(intBitsToFloat(PV0i.y))));
+PV1i.x = R126i.x;
+R127i.y = floatBitsToInt(mul_nonIEEE(intBitsToFloat(R0i.w), -(intBitsToFloat(PV0i.y))));
+PV1i.y = R127i.y;
+R127i.z = floatBitsToInt(-(intBitsToFloat(PV0i.y)));
+PV1i.z = R127i.z;
+R127i.w = floatBitsToInt((mul_nonIEEE(intBitsToFloat(PV0i.y),intBitsToFloat(uf_remappedPS[2].x)) + -(intBitsToFloat(uf_remappedPS[2].y))));
+R127i.w = clampFI32(R127i.w);
+R126i.z = floatBitsToInt(-(intBitsToFloat(uf_remappedPS[3].w)) + 1.0);
+PS1i = R126i.z;
+// 2
+tempi.x = floatBitsToInt(dot(vec4(intBitsToFloat(PV1i.x),intBitsToFloat(PV1i.y),intBitsToFloat(PV1i.z),-0.0),vec4(intBitsToFloat(PV1i.x),intBitsToFloat(PV1i.y),intBitsToFloat(PV1i.z),0.0)));
+PV0i.x = tempi.x;
+PV0i.y = tempi.x;
+PV0i.z = tempi.x;
+PV0i.w = tempi.x;
+PS0i = floatBitsToInt(mul_nonIEEE(intBitsToFloat(PV1i.x), intBitsToFloat(uf_remappedPS[4].x)));
+// 3
+R127i.x = floatBitsToInt((mul_nonIEEE(intBitsToFloat(R127i.y),intBitsToFloat(uf_remappedPS[4].y)) + intBitsToFloat(PS0i)));
+R3i.y = floatBitsToInt(-(intBitsToFloat(R127i.w)) + 1.0);
+PV1i.z = floatBitsToInt(mul_nonIEEE(intBitsToFloat(R126i.x), intBitsToFloat(uf_remappedPS[5].x)));
+R10i.w = floatBitsToInt(-(intBitsToFloat(R127i.z)) * intBitsToFloat(0x3ba3d70a));
+PS1i = floatBitsToInt(sqrt(intBitsToFloat(PV0i.x)));
+// 4
+R125i.x = floatBitsToInt((mul_nonIEEE(intBitsToFloat(R127i.y),intBitsToFloat(uf_remappedPS[5].y)) + intBitsToFloat(PV1i.z)));
+PV0i.y = floatBitsToInt(mul_nonIEEE(intBitsToFloat(R126i.x), intBitsToFloat(uf_remappedPS[6].x)));
+R125i.z = floatBitsToInt((intBitsToFloat(R7i.z) * 2.0 + -(1.0)));
+R127i.w = floatBitsToInt(max(intBitsToFloat(R15i.y), intBitsToFloat(R15i.z)));
+PS0i = floatBitsToInt(1.0 / intBitsToFloat(PS1i));
+// 5
+backupReg0i = R127i.x;
+R127i.x = floatBitsToInt((mul_nonIEEE(intBitsToFloat(R127i.y),intBitsToFloat(uf_remappedPS[6].y)) + intBitsToFloat(PV0i.y)));
+R0i.y = floatBitsToInt(mul_nonIEEE(intBitsToFloat(R127i.y), intBitsToFloat(PS0i)));
+PV1i.y = R0i.y;
+R5i.z = floatBitsToInt(mul_nonIEEE(intBitsToFloat(R127i.z), intBitsToFloat(PS0i)));
+R123i.w = floatBitsToInt((mul_nonIEEE(-(intBitsToFloat(R125i.y)),intBitsToFloat(uf_remappedPS[4].z)) + intBitsToFloat(backupReg0i)));
+PV1i.w = R123i.w;
+R3i.x = floatBitsToInt(mul_nonIEEE(intBitsToFloat(R126i.x), intBitsToFloat(PS0i)));
+PS1i = R3i.x;
+// 6
+R123i.x = floatBitsToInt((mul_nonIEEE(-(intBitsToFloat(PV1i.y)),intBitsToFloat(PV1i.y)) + 1.0));
+PV0i.x = R123i.x;
+R6i.y = floatBitsToInt(max(intBitsToFloat(R15i.x), intBitsToFloat(R127i.w)));
+R9i.z = floatBitsToInt(intBitsToFloat(uf_remappedPS[4].w) + intBitsToFloat(PV1i.w));
+PV0i.z = R9i.z;
+R123i.w = floatBitsToInt((mul_nonIEEE(-(intBitsToFloat(R125i.y)),intBitsToFloat(uf_remappedPS[5].z)) + intBitsToFloat(R125i.x)));
+PV0i.w = R123i.w;
+
+#if (shdwFix == 0 || shdwFix == 1) // Altros and SkalFate
+
+tempResultf = log2(intBitsToFloat(R3i.y));
+
+#else 
+
+tempResultf = max(0.0, intBitsToFloat(R3i.y));
+tempResultf = log2(tempResultf);
+
+#endif
+
+if( isinf(tempResultf) == true ) tempResultf = -3.40282347E+38F;
+R127i.y = floatBitsToInt(tempResultf);
+PS0i = R127i.y;
+// 7
+R5i.x = floatBitsToInt(intBitsToFloat(uf_remappedPS[5].w) + intBitsToFloat(PV0i.w));
+PV1i.x = R5i.x;
+R8i.y = PV0i.z;
+R123i.z = floatBitsToInt((mul_nonIEEE(-(intBitsToFloat(R125i.y)),intBitsToFloat(uf_remappedPS[6].z)) + intBitsToFloat(R127i.x)));
+PV1i.z = R123i.z;
+R126i.w = floatBitsToInt(intBitsToFloat(R1i.w) + intBitsToFloat(0xbe99999a));
+tempResultf = 1.0 / sqrt(intBitsToFloat(PV0i.x));
+R4i.z = floatBitsToInt(tempResultf);
+PS1i = R4i.z;
+// 8
+R9i.x = floatBitsToInt(intBitsToFloat(PV1i.x) * intBitsToFloat(0x3a83126f));
+PV0i.y = floatBitsToInt(mul_nonIEEE(intBitsToFloat(uf_remappedPS[3].y), intBitsToFloat(R127i.y)));
+R8i.z = floatBitsToInt(intBitsToFloat(uf_remappedPS[6].w) + intBitsToFloat(PV1i.z));
+PV0i.z = R8i.z;
+R127i.w = floatBitsToInt(mul_nonIEEE(intBitsToFloat(uf_remappedPS[3].x), intBitsToFloat(R127i.y)));
+R13i.x = floatBitsToInt(min(intBitsToFloat(R2i.x), intBitsToFloat(R2i.y)));
+PS0i = R13i.x;
+// 9
+R127i.x = uf_remappedPS[7].y;
+R9i.y = floatBitsToInt(intBitsToFloat(PV0i.z) * intBitsToFloat(0x3a83126f));
+R127i.z = uf_remappedPS[8].y;
+R125i.w = floatBitsToInt(min(intBitsToFloat(R15i.y), intBitsToFloat(R15i.z)));
+PS1i = floatBitsToInt(exp2(intBitsToFloat(PV0i.y)));
+// 10
+backupReg0i = R127i.w;
+R123i.x = floatBitsToInt((mul_nonIEEE(intBitsToFloat(R126i.z),intBitsToFloat(PS1i)) + intBitsToFloat(uf_remappedPS[3].w))/2.0);
+PV0i.x = R123i.x;
+R2i.y = floatBitsToInt(intBitsToFloat(R6i.y) + intBitsToFloat(0x2edbe6ff));
+R126i.z = uf_remappedPS[9].y;
+R127i.w = floatBitsToInt(intBitsToFloat(R13i.x) + intBitsToFloat(0xbecccccd));
+R125i.x = floatBitsToInt(exp2(intBitsToFloat(backupReg0i)));
+PS0i = R125i.x;
+// 11
+backupReg0i = R126i.w;
+R123i.x = floatBitsToInt((mul_nonIEEE(intBitsToFloat(R125i.y),intBitsToFloat(uf_remappedPS[10].x)) + -(intBitsToFloat(uf_remappedPS[10].y))));
+R123i.x = clampFI32(R123i.x);
+PV1i.x = R123i.x;
+R11i.y = floatBitsToInt(intBitsToFloat(PV0i.x) + 0.5);
+R124i.z = floatBitsToInt(mul_nonIEEE(intBitsToFloat(R125i.y), intBitsToFloat(uf_remappedPS[11].y)));
+R126i.w = floatBitsToInt(intBitsToFloat(backupReg0i) * intBitsToFloat(0x40200001));
+R126i.w = clampFI32(R126i.w);
+R14i.y = floatBitsToInt((intBitsToFloat(0xbf59999a) * intBitsToFloat(R4i.y) + 1.0));
+PS1i = R14i.y;
+// 12
+backupReg0i = R0i.y;
+tempi.x = floatBitsToInt(dot(vec4(intBitsToFloat(R127i.x),intBitsToFloat(R127i.z),intBitsToFloat(R126i.z),-0.0),vec4(intBitsToFloat(R3i.x),intBitsToFloat(backupReg0i),intBitsToFloat(R5i.z),0.0)));
+tempi.x = clampFI32(tempi.x);
+PV0i.x = tempi.x;
+PV0i.y = tempi.x;
+PV0i.z = tempi.x;
+PV0i.w = tempi.x;
+R127i.x = floatBitsToInt(-(intBitsToFloat(PV1i.x)) + 1.0);
+PS0i = R127i.x;
+// 13
+tempi.x = floatBitsToInt(dot(vec4(intBitsToFloat(R124i.x),intBitsToFloat(R126i.y),intBitsToFloat(R125i.z),-0.0),vec4(intBitsToFloat(R124i.x),intBitsToFloat(R126i.y),intBitsToFloat(R125i.z),0.0)));
+PV1i.x = tempi.x;
+PV1i.y = tempi.x;
+PV1i.z = tempi.x;
+PV1i.w = tempi.x;
+
+#if (shdwFix == 0 || shdwFix == 1) // Altros and SkalFate
+
+tempResultf = log2(intBitsToFloat(PV0i.x));
+
+#else 
+
+tempResultf = max(0.0, intBitsToFloat(PV0i.x));
+tempResultf = log2(tempResultf);
+
+#endif
+
+if( isinf(tempResultf) == true ) tempResultf = -3.40282347E+38F;
+PS1i = floatBitsToInt(tempResultf);
+// 14
+R0i.x = floatBitsToInt(min(intBitsToFloat(R15i.x), intBitsToFloat(R125i.w)));
+R12i.y = floatBitsToInt(intBitsToFloat(R127i.w) * intBitsToFloat(0x41200000));
+R12i.y = clampFI32(R12i.y);
+R127i.z = floatBitsToInt(mul_nonIEEE(intBitsToFloat(uf_remappedPS[12].z), intBitsToFloat(PS1i)));
+R123i.w = floatBitsToInt((mul_nonIEEE(intBitsToFloat(uf_remappedPS[3].z),-(intBitsToFloat(R125i.x))) + intBitsToFloat(uf_remappedPS[3].z)));
+PV0i.w = R123i.w;
+PS0i = floatBitsToInt(sqrt(intBitsToFloat(PV1i.x)));
+// 15
+R125i.x = floatBitsToInt((mul_nonIEEE(intBitsToFloat(R125i.y),intBitsToFloat(uf_remappedPS[13].x)) + intBitsToFloat(uf_remappedPS[14].w)));
+R125i.x = clampFI32(R125i.x);
+R127i.y = floatBitsToInt((intBitsToFloat(PS0i) * 4.0 + intBitsToFloat(0xc0400000)));
+R127i.y = clampFI32(R127i.y);
+R126i.z = floatBitsToInt(intBitsToFloat(R126i.w) * intBitsToFloat(0x3dcccccd));
+R2i.w = floatBitsToInt(mul_nonIEEE(intBitsToFloat(PV0i.w), intBitsToFloat(R14i.y)));
+PS1i = floatBitsToInt(1.0 / intBitsToFloat(PS0i));
+// 16
+R17i.x = floatBitsToInt(mul_nonIEEE(intBitsToFloat(R124i.x), intBitsToFloat(PS1i)));
+R17i.y = floatBitsToInt(mul_nonIEEE(intBitsToFloat(R126i.y), intBitsToFloat(PS1i)));
+R13i.z = floatBitsToInt(mul_nonIEEE(intBitsToFloat(R125i.z), intBitsToFloat(PS1i)));
+R127i.w = floatBitsToInt((intBitsToFloat(R125i.y) * intBitsToFloat(0x3ba3d70a) + intBitsToFloat(0xbfe66666)));
+
+#if (shdwFix == 0 || shdwFix == 1) // Altros and SkalFate
+
+tempResultf = log2(intBitsToFloat(R127i.x));
+
+#else
+
+tempResultf = max(0.0, intBitsToFloat(R127i.x));
+tempResultf = log2(tempResultf);
+
+#endif
+
+if( isinf(tempResultf) == true ) tempResultf = -3.40282347E+38F;
+PS0i = floatBitsToInt(tempResultf);
+// 17
+R6i.x = floatBitsToInt(intBitsToFloat(R1i.x) * intBitsToFloat(0x3f4ccccd));
+R13i.y = floatBitsToInt(intBitsToFloat(R127i.y) + -(0.5));
+R13i.y = floatBitsToInt(intBitsToFloat(R13i.y) * 4.0);
+R13i.y = clampFI32(R13i.y);
+PV1i.z = floatBitsToInt(mul_nonIEEE(intBitsToFloat(uf_remappedPS[12].x), intBitsToFloat(PS0i)));
+R6i.w = floatBitsToInt(intBitsToFloat(R1i.y) * intBitsToFloat(0x3f4ccccd));
+PS1i = floatBitsToInt(exp2(intBitsToFloat(R127i.z)));
+// 18
+R8i.x = floatBitsToInt(intBitsToFloat(R1i.z) * intBitsToFloat(0x3f4ccccd));
+R123i.y = floatBitsToInt((mul_nonIEEE(-(intBitsToFloat(R126i.z)),intBitsToFloat(R127i.w)) + intBitsToFloat(R127i.w)));
+R123i.y = clampFI32(R123i.y);
+PV0i.y = R123i.y;
+R2i.z = floatBitsToInt(-(intBitsToFloat(R2i.w)) + 1.0);
+R123i.w = floatBitsToInt((mul_nonIEEE(-(intBitsToFloat(uf_remappedPS[12].w)),intBitsToFloat(PS1i)) + 1.0));
+PV0i.w = R123i.w;
+PS0i = floatBitsToInt(exp2(intBitsToFloat(PV1i.z)));
+// 19
+R12i.x = R1i.w;
+R12i.x = clampFI32(R12i.x);
+R123i.y = floatBitsToInt((mul_nonIEEE(-(intBitsToFloat(PS0i)),intBitsToFloat(PV0i.w)) + intBitsToFloat(PV0i.w)));
+PV1i.y = R123i.y;
+R6i.z = floatBitsToInt((intBitsToFloat(R126i.w) * intBitsToFloat(0x3dcccccd) + intBitsToFloat(PV0i.y)));
+PV1i.w = floatBitsToInt(intBitsToFloat(R13i.y) + intBitsToFloat(0x3f4ccccd));
+PV1i.w = clampFI32(PV1i.w);
+PS1i = floatBitsToInt(1.0 / intBitsToFloat(R124i.z));
+// 20
+R2i.x = floatBitsToInt((intBitsToFloat(PS1i) * intBitsToFloat(0x3dcccccd) + 1.0));
+R5i.y = R6i.y;
+R5i.y = clampFI32(R5i.y);
+R0i.z = floatBitsToInt(mul_nonIEEE(intBitsToFloat(PV1i.y), intBitsToFloat(uf_remappedPS[15].w)));
+R3i.w = floatBitsToInt(intBitsToFloat(PV1i.w) + -(1.0));
+
+#if (shdwFix == 0 || shdwFix == 1) // Altros and SkalFate
+
+tempResultf = log2(intBitsToFloat(R125i.x));
+
+#else
+
+tempResultf = max(0.0, intBitsToFloat(R125i.x));
+tempResultf = log2(tempResultf);
+
+#endif
+
+if( isinf(tempResultf) == true ) tempResultf = -3.40282347E+38F;
+R0i.w = floatBitsToInt(tempResultf);
+PS0i = R0i.w;
+}
+// ------------------------------------------------------------------------------------------------------------- false turns link almost dark, lighting on link
+if( activeMaskStackC[1] == true ) {
+// 0
+R126i.x = floatBitsToInt(mul_nonIEEE(intBitsToFloat(uf_remappedPS[16].x), intBitsToFloat(uf_remappedPS[17].w)));
+PV0i.x = R126i.x;
+R125i.y = floatBitsToInt(mul_nonIEEE(intBitsToFloat(uf_remappedPS[16].y), intBitsToFloat(uf_remappedPS[17].w)));
+PV0i.y = R125i.y;
+R10i.z = floatBitsToInt(mul_nonIEEE(intBitsToFloat(R0i.z), intBitsToFloat(R14i.y)));
+PV0i.z = R10i.z;
+R4i.w = floatBitsToInt(intBitsToFloat(R2i.x) * intBitsToFloat(0x42960000));
+R126i.w = floatBitsToInt(1.0 / intBitsToFloat(R2i.y));
+PS0i = R126i.w;
+// 1
+R125i.x = PV0i.x;
+R127i.y = floatBitsToInt((mul_nonIEEE(-(intBitsToFloat(R0i.x)),intBitsToFloat(PS0i)) + 1.0));
+R126i.z = floatBitsToInt(mul_nonIEEE(intBitsToFloat(uf_remappedPS[16].z), intBitsToFloat(uf_remappedPS[17].w)));
+PV1i.z = R126i.z;
+R123i.w = floatBitsToInt((mul_nonIEEE(-(intBitsToFloat(PV0i.y)),intBitsToFloat(PV0i.y)) + 1.0));
+PV1i.w = R123i.w;
+R0i.z = floatBitsToInt((mul_nonIEEE(-(intBitsToFloat(PV0i.z)),intBitsToFloat(R2i.z)) + intBitsToFloat(R2i.z)));
+PS1i = R0i.z;
+// 2
+R127i.x = floatBitsToInt(mul_nonIEEE(intBitsToFloat(uf_remappedPS[13].y), intBitsToFloat(R0i.w)));
+PV0i.y = PV1i.z;
+R2i.z = floatBitsToInt(intBitsToFloat(uf_remappedPS[18].x) + -(intBitsToFloat(R6i.x)));
+R0i.w = floatBitsToInt(intBitsToFloat(uf_remappedPS[18].y) + -(intBitsToFloat(R6i.w)));
+tempResultf = 1.0 / sqrt(intBitsToFloat(PV1i.w));
+PS0i = floatBitsToInt(tempResultf);
+// 3
+tempi.x = floatBitsToInt(dot(vec4(intBitsToFloat(R3i.x),intBitsToFloat(R5i.z),intBitsToFloat(R5i.z),-0.0),vec4(intBitsToFloat(R125i.x),intBitsToFloat(PV0i.y),intBitsToFloat(R3i.z),0.0)));
+PV1i.x = tempi.x;
+PV1i.y = tempi.x;
+PV1i.z = tempi.x;
+PV1i.w = tempi.x;
+PS1i = floatBitsToInt(mul_nonIEEE(intBitsToFloat(PS0i), intBitsToFloat(R4i.z)));
+// 4
+backupReg0i = R127i.y;
+backupReg1i = R127i.x;
+R127i.x = floatBitsToInt(intBitsToFloat(R127i.y) + intBitsToFloat(0x2edbe6ff));
+R127i.y = floatBitsToInt(mul_nonIEEE(intBitsToFloat(PS1i), intBitsToFloat(PV1i.x)));
+R124i.z = backupReg0i;
+R124i.z = clampFI32(R124i.z);
+R8i.w = floatBitsToInt(intBitsToFloat(uf_remappedPS[18].z) + -(intBitsToFloat(R8i.x)));
+PS0i = floatBitsToInt(exp2(intBitsToFloat(backupReg1i)));
+// 5
+backupReg0i = R0i.y;
+tempi.x = floatBitsToInt(dot(vec4(intBitsToFloat(R3i.x),intBitsToFloat(backupReg0i),intBitsToFloat(R5i.z),-0.0),vec4(intBitsToFloat(R126i.x),intBitsToFloat(R125i.y),intBitsToFloat(R126i.z),0.0)));
+PV1i.x = tempi.x;
+PV1i.y = tempi.x;
+PV1i.z = tempi.x;
+PV1i.w = tempi.x;
+PS1i = floatBitsToInt(mul_nonIEEE(intBitsToFloat(PS0i), intBitsToFloat(uf_remappedPS[19].w)));
+// 6
+R3i.x = floatBitsToInt(mul_nonIEEE(intBitsToFloat(R4i.y), intBitsToFloat(PS1i)));
+R126i.y = R4i.x;
+R126i.y = clampFI32(R126i.y);
+PV0i.z = floatBitsToInt(max(-(intBitsToFloat(PV1i.x)), 0.0));
+PV0i.w = floatBitsToInt(intBitsToFloat(PV1i.x) + -(intBitsToFloat(R127i.y)));
+PS0i = floatBitsToInt(1.0 / intBitsToFloat(R127i.x));
+// 7
+R125i.x = floatBitsToInt(mul_nonIEEE(intBitsToFloat(R124i.z), intBitsToFloat(PS0i)));
+PV1i.y = floatBitsToInt(min(intBitsToFloat(PV0i.z), 1.0));
+R123i.z = floatBitsToInt((mul_nonIEEE(intBitsToFloat(PV0i.w),intBitsToFloat(R3i.y)) + intBitsToFloat(R127i.y)));
+PV1i.z = R123i.z;
+R127i.w = floatBitsToInt(intBitsToFloat(R15i.w) * intBitsToFloat(0x437f0000));
+R127i.y = floatBitsToInt(-(intBitsToFloat(R6i.z)) + 1.0);
+PS1i = R127i.y;
+// 8
+R127i.x = floatBitsToInt(intBitsToFloat(R15i.x) + -(intBitsToFloat(R6i.y)));
+PV0i.y = floatBitsToInt(max(-(intBitsToFloat(PV1i.z)), intBitsToFloat(0xbf7d70a4)));
+PV0i.y = floatBitsToInt(intBitsToFloat(PV0i.y) / 2.0);
+PV0i.z = floatBitsToInt(intBitsToFloat(PV1i.y) * intBitsToFloat(0x40a00000));
+PV0i.z = clampFI32(PV0i.z);
+R125i.w = floatBitsToInt(intBitsToFloat(R15i.y) + -(intBitsToFloat(R6i.y)));
+R124i.w = floatBitsToInt(intBitsToFloat(R15i.z) + -(intBitsToFloat(R6i.y)));
+PS0i = R124i.w;
+// 9
+backupReg0i = R127i.y;
+backupReg1i = R6i.z;
+R124i.x = floatBitsToInt((mul_nonIEEE(intBitsToFloat(R3i.w),intBitsToFloat(PV0i.z)) + 1.0));
+R127i.y = floatBitsToInt(mul_nonIEEE(intBitsToFloat(R126i.w), intBitsToFloat(R5i.y)));
+R6i.z = floatBitsToInt((mul_nonIEEE(intBitsToFloat(backupReg0i),intBitsToFloat(R126i.y)) + intBitsToFloat(backupReg1i)));
+R126i.w = floatBitsToInt(intBitsToFloat(PV0i.y) + 0.5);
+PV1i.w = R126i.w;
+R3i.w = 0;
+PS1i = R3i.w;
+// 10
+backupReg0i = R127i.x;
+backupReg1i = R127i.w;
+R127i.x = floatBitsToInt((mul_nonIEEE(intBitsToFloat(backupReg0i),intBitsToFloat(R125i.x)) + intBitsToFloat(R6i.y)));
+R126i.y = floatBitsToInt((mul_nonIEEE(intBitsToFloat(R125i.w),intBitsToFloat(R125i.x)) + intBitsToFloat(R6i.y)));
+PV0i.z = floatBitsToInt(-(intBitsToFloat(PV1i.w)) + 1.0);
+R123i.w = floatBitsToInt((intBitsToFloat(PV1i.w) * intBitsToFloat(0xbc996e30) + intBitsToFloat(0x3d981626)));
+PV0i.w = R123i.w;
+R127i.w = int(intBitsToFloat(backupReg1i));
+PS0i = R127i.w;
+// 11
+backupReg0i = R125i.x;
+R125i.x = floatBitsToInt((mul_nonIEEE(intBitsToFloat(R124i.w),intBitsToFloat(backupReg0i)) + intBitsToFloat(R6i.y)));
+R6i.y = floatBitsToInt(mul_nonIEEE(intBitsToFloat(R1i.y), intBitsToFloat(R124i.x)));
+R123i.z = floatBitsToInt((mul_nonIEEE(intBitsToFloat(R126i.w),intBitsToFloat(PV0i.w)) + intBitsToFloat(0xbe593484)));
+PV1i.z = R123i.z;
+R9i.w = floatBitsToInt(mul_nonIEEE(intBitsToFloat(R1i.x), intBitsToFloat(R124i.x)));
+PS1i = floatBitsToInt(sqrt(intBitsToFloat(PV0i.z)));
+// 12
+R4i.x = floatBitsToInt(mul_nonIEEE(intBitsToFloat(R1i.z), intBitsToFloat(R124i.x)));
+PV0i.y = floatBitsToInt(intBitsToFloat(PS1i) * intBitsToFloat(0x3f22f983));
+PV0i.z = floatBitsToInt(intBitsToFloat(0x3f895ef0) * intBitsToFloat(R127i.y));
+R123i.w = floatBitsToInt((mul_nonIEEE(intBitsToFloat(R126i.w),intBitsToFloat(PV1i.z)) + intBitsToFloat(0x3fc90da4)));
+PV0i.w = R123i.w;
+R127i.y = R127i.w & int(1);
+PS0i = R127i.y;
+// 13
+backupReg0i = R2i.w;
+backupReg0i = R2i.w;
+R11i.x = floatBitsToInt((mul_nonIEEE(intBitsToFloat(PV0i.y),-(intBitsToFloat(PV0i.w))) + 1.0));
+R5i.y = floatBitsToInt((mul_nonIEEE(intBitsToFloat(PV0i.z),intBitsToFloat(R127i.x)) + intBitsToFloat(0xba0a8ec8)));
+R5i.y = clampFI32(R5i.y);
+R5i.z = floatBitsToInt((mul_nonIEEE(intBitsToFloat(PV0i.z),intBitsToFloat(R126i.y)) + intBitsToFloat(0xba0a8ec8)));
+R5i.z = clampFI32(R5i.z);
+R2i.w = floatBitsToInt((mul_nonIEEE(intBitsToFloat(backupReg0i),-(intBitsToFloat(R10i.z))) + intBitsToFloat(backupReg0i)));
+R3i.z = floatBitsToInt((mul_nonIEEE(intBitsToFloat(PV0i.z),intBitsToFloat(R125i.x)) + intBitsToFloat(0xba0a8ec8)));
+R3i.z = clampFI32(R3i.z);
+PS1i = R3i.z;
+// 14
+tempi.x = floatBitsToInt(dot(vec4(intBitsToFloat(R17i.x),intBitsToFloat(R17i.y),intBitsToFloat(R13i.z),-0.0),vec4(intBitsToFloat(uf_remappedPS[16].x),intBitsToFloat(uf_remappedPS[16].y),intBitsToFloat(uf_remappedPS[16].z),0.0)));
+PV0i.x = tempi.x;
+PV0i.y = tempi.x;
+PV0i.z = tempi.x;
+PV0i.w = tempi.x;
+PS0i = floatBitsToInt(float(R127i.y));
+// 15
+R2i.x = floatBitsToInt(mul_nonIEEE(intBitsToFloat(R16i.x), intBitsToFloat(PS0i)));
+R2i.y = floatBitsToInt(mul_nonIEEE(intBitsToFloat(R16i.y), intBitsToFloat(PS0i)));
+R4i.z = floatBitsToInt(mul_nonIEEE(intBitsToFloat(R16i.z), intBitsToFloat(PS0i)));
+PV1i.w = floatBitsToInt(max(-(intBitsToFloat(PV0i.x)), 0.0));
+PS1i = floatBitsToInt(intBitsToFloat(R7i.z) * intBitsToFloat(0x3eaaaaab));
+// 16
+R123i.x = floatBitsToInt((intBitsToFloat(R7i.y) * intBitsToFloat(0x3eaaaaab) + intBitsToFloat(PS1i)));
+PV0i.x = R123i.x;
+PV0i.z = floatBitsToInt(min(intBitsToFloat(PV1i.w), 1.0));
+PS0i = floatBitsToInt(mul_nonIEEE(intBitsToFloat(R13i.z), -(intBitsToFloat(R3i.w))));
+// 17
+backupReg0i = R7i.x;
+R7i.x = floatBitsToInt((intBitsToFloat(backupReg0i) * intBitsToFloat(0x3eaaaaab) + intBitsToFloat(PV0i.x)));
+PV1i.y = floatBitsToInt(intBitsToFloat(PV0i.z) + intBitsToFloat(0xbecccccd));
+R122i.x = floatBitsToInt((mul_nonIEEE(intBitsToFloat(R13i.z),-(intBitsToFloat(R126i.z))) + intBitsToFloat(PS0i)));
+PS1i = R122i.x;
+// 18
+R123i.x = floatBitsToInt((mul_nonIEEE(intBitsToFloat(R17i.y),-(intBitsToFloat(R125i.y))) + intBitsToFloat(PS1i)));
+PV0i.x = R123i.x;
+R7i.z = floatBitsToInt(mul_nonIEEE(intBitsToFloat(PV1i.y), intBitsToFloat(R4i.w)));
+R7i.z = clampFI32(R7i.z);
+// 19
+R12i.z = floatBitsToInt((mul_nonIEEE(intBitsToFloat(R17i.x),-(intBitsToFloat(R126i.x))) + intBitsToFloat(PV0i.x)));
+PV1i.z = R12i.z;
+// 20
+PV0i.y = PV1i.z;
+PV0i.y = clampFI32(PV0i.y);
+// 21
+R14i.z = floatBitsToInt(intBitsToFloat(PV0i.y) + intBitsToFloat(0xbecccccd));
+}
+
+// -------------------------------------------------------------------------------------------------------------
+if( activeMaskStackC[1] == true ) {
+// 0
+tempi.x = floatBitsToInt(dot(vec4(intBitsToFloat(R5i.x),intBitsToFloat(R8i.y),intBitsToFloat(R8i.z),intBitsToFloat(R5i.w)),vec4(intBitsToFloat(uf_remappedPS[20].x),intBitsToFloat(uf_remappedPS[20].y),intBitsToFloat(uf_remappedPS[20].z),intBitsToFloat(uf_remappedPS[20].w))));
+PV0i.x = tempi.x;
+PV0i.y = tempi.x;
+PV0i.z = tempi.x;
+PV0i.w = tempi.x;
+// 1
+tempi.x = floatBitsToInt(dot(vec4(intBitsToFloat(R5i.x),intBitsToFloat(R8i.y),intBitsToFloat(R8i.z),intBitsToFloat(R5i.w)),vec4(intBitsToFloat(uf_remappedPS[21].x),intBitsToFloat(uf_remappedPS[21].y),intBitsToFloat(uf_remappedPS[21].z),intBitsToFloat(uf_remappedPS[21].w))));
+PV1i.x = tempi.x;
+PV1i.y = tempi.x;
+PV1i.z = tempi.x;
+PV1i.w = tempi.x;
+R126i.z = floatBitsToInt(1.0 / intBitsToFloat(PV0i.x));
+PS1i = R126i.z;
+// 2
+tempi.x = floatBitsToInt(dot(vec4(intBitsToFloat(R5i.x),intBitsToFloat(R8i.y),intBitsToFloat(R8i.z),intBitsToFloat(R5i.w)),vec4(intBitsToFloat(uf_remappedPS[22].x),intBitsToFloat(uf_remappedPS[22].y),intBitsToFloat(uf_remappedPS[22].z),intBitsToFloat(uf_remappedPS[22].w))));
+PV0i.x = tempi.x;
+PV0i.y = tempi.x;
+PV0i.z = tempi.x;
+PV0i.w = tempi.x;
+R10i.x = floatBitsToInt(mul_nonIEEE(intBitsToFloat(PV1i.x), intBitsToFloat(PS1i)));
+PS0i = R10i.x;
+// 3
+R10i.y = floatBitsToInt(mul_nonIEEE(intBitsToFloat(PV0i.x), intBitsToFloat(R126i.z)));
+}
+
+// ------------------------------------------------------------------------------------------------------------- makes link yellower
+if( activeMaskStackC[1] == true ) {
+R9i.y = floatBitsToInt(textureLod(textureUnitPS0, intBitsToFloat(R9i.xy),0.0).x);
+R10i.w = floatBitsToInt(textureLod(textureUnitPS5, intBitsToFloat(R10i.xy),intBitsToFloat(R10i.w)).x);
+R11i.xyz = floatBitsToInt(texture(textureUnitPS12, intBitsToFloat(R11i.xy)).xyz);
+}
+
+// ------------------------------------------------------------------------------------------------------------- makes link yellower
+if( activeMaskStackC[1] == true ) {
+// 0
+backupReg0i = R9i.y;
+PV0i.x = floatBitsToInt(intBitsToFloat(R10i.w) + intBitsToFloat(uf_remappedPS[23].z));
+PV0i.x = clampFI32(PV0i.x);
+R9i.y = floatBitsToInt(mul_nonIEEE(intBitsToFloat(R11i.x), intBitsToFloat(R6i.z)));
+R123i.z = floatBitsToInt((intBitsToFloat(backupReg0i) * 2.0 + -(1.0)));
+PV0i.z = R123i.z;
+R5i.w = floatBitsToInt(mul_nonIEEE(intBitsToFloat(R11i.y), intBitsToFloat(R6i.z)));
+R11i.y = floatBitsToInt(mul_nonIEEE(intBitsToFloat(R11i.z), intBitsToFloat(R6i.z)));
+PS0i = R11i.y;
+// 1
+R123i.x = floatBitsToInt((intBitsToFloat(PV0i.z) * intBitsToFloat(0x41c80000) + intBitsToFloat(R9i.z)));
+PV1i.x = R123i.x;
+R3i.y = floatBitsToInt(mul_nonIEEE(intBitsToFloat(PV0i.x), intBitsToFloat(uf_remappedPS[24].z)));
+PV1i.y = R3i.y;
+// 2
+R4i.y = PV1i.y;
+PV0i.z = floatBitsToInt(mul_nonIEEE(intBitsToFloat(PV1i.y), intBitsToFloat(R12i.y)));
+R10i.w = floatBitsToInt(-(intBitsToFloat(PV1i.x)) + intBitsToFloat(uf_remappedPS[25].x));
+// 3
+PV1i.z = floatBitsToInt(intBitsToFloat(R1i.w) + intBitsToFloat(PV0i.z));
+PV1i.z = clampFI32(PV1i.z);
+PV1i.w = floatBitsToInt(intBitsToFloat(PV0i.z) + -(1.0));
+// 4
+R123i.x = floatBitsToInt((mul_nonIEEE(intBitsToFloat(R8i.w),intBitsToFloat(PV1i.z)) + intBitsToFloat(R8i.x)));
+PV0i.x = R123i.x;
+R123i.y = floatBitsToInt((mul_nonIEEE(intBitsToFloat(R0i.w),intBitsToFloat(PV1i.z)) + intBitsToFloat(R6i.w)));
+PV0i.y = R123i.y;
+R123i.z = floatBitsToInt((mul_nonIEEE(intBitsToFloat(R2i.z),intBitsToFloat(PV1i.z)) + intBitsToFloat(R6i.x)));
+PV0i.z = R123i.z;
+R123i.w = floatBitsToInt((mul_nonIEEE(intBitsToFloat(PV1i.w),intBitsToFloat(R12i.x)) + 1.0));
+PV0i.w = R123i.w;
+// 5
+PV1i.x = floatBitsToInt(mul_nonIEEE(intBitsToFloat(PV0i.w), intBitsToFloat(R7i.z)));
+PV1i.y = floatBitsToInt(mul_nonIEEE(intBitsToFloat(PV0i.x), intBitsToFloat(uf_remappedPS[26].z)));
+PV1i.z = floatBitsToInt(mul_nonIEEE(intBitsToFloat(PV0i.y), intBitsToFloat(uf_remappedPS[26].y)));
+PV1i.w = floatBitsToInt(mul_nonIEEE(intBitsToFloat(PV0i.z), intBitsToFloat(uf_remappedPS[26].x)));
+// 6
+PV0i.x = floatBitsToInt(mul_nonIEEE(intBitsToFloat(uf_remappedPS[17].w), intBitsToFloat(PV1i.y)));
+PV0i.y = floatBitsToInt(mul_nonIEEE(intBitsToFloat(uf_remappedPS[17].w), intBitsToFloat(PV1i.z)));
+PV0i.z = floatBitsToInt(mul_nonIEEE(intBitsToFloat(uf_remappedPS[17].w), intBitsToFloat(PV1i.w)));
+PV0i.w = floatBitsToInt(mul_nonIEEE(intBitsToFloat(R13i.y), intBitsToFloat(PV1i.x)));
+// 7
+R123i.x = floatBitsToInt((mul_nonIEEE(intBitsToFloat(PV0i.z),intBitsToFloat(PV0i.w)) + intBitsToFloat(R9i.w)));
+PV1i.x = R123i.x;
+R123i.z = floatBitsToInt((mul_nonIEEE(intBitsToFloat(PV0i.x),intBitsToFloat(PV0i.w)) + intBitsToFloat(R4i.x)));
+PV1i.z = R123i.z;
+R123i.w = floatBitsToInt((mul_nonIEEE(intBitsToFloat(PV0i.y),intBitsToFloat(PV0i.w)) + intBitsToFloat(R6i.y)));
+PV1i.w = R123i.w;
+// 8
+PV0i.x = floatBitsToInt(mul_nonIEEE(intBitsToFloat(PV1i.w), intBitsToFloat(R5i.z)));
+PV0i.y = floatBitsToInt(mul_nonIEEE(intBitsToFloat(PV1i.x), intBitsToFloat(R5i.y)));
+PV0i.w = floatBitsToInt(mul_nonIEEE(intBitsToFloat(PV1i.z), intBitsToFloat(R3i.z)));
+// 9
+// setting RGB for link to use in shadow calculations
+R0i.x = floatBitsToInt((intBitsToFloat(PV0i.y) * intBitsToFloat(0x3f6e896b) + intBitsToFloat(0x3a011b1e)));
+R0i.y = floatBitsToInt((intBitsToFloat(PV0i.x) * intBitsToFloat(0x3f6e896b) + intBitsToFloat(0x3a011b1e)));
+R2i.z = floatBitsToInt((intBitsToFloat(PV0i.w) * intBitsToFloat(0x3f6e896b) + intBitsToFloat(0x3a011b1e)));
+}
+
+// ------------------------------------------------------------------------------------------------------------- makes whole link blue/pink
+if( activeMaskStackC[1] == true ) {
+activeMaskStack[1] = activeMaskStack[0];
+activeMaskStackC[2] = activeMaskStackC[1];
+// 0
+R123i.y = floatBitsToInt((mul_nonIEEE(intBitsToFloat(R10i.w),intBitsToFloat(uf_remappedPS[27].x)) + intBitsToFloat(uf_remappedPS[28].w)));
+R123i.y = clampFI32(R123i.y);
+PV0i.y = R123i.y;
+// 1
+PV1i.z = floatBitsToInt(mul_nonIEEE(intBitsToFloat(PV0i.y), intBitsToFloat(uf_remappedPS[29].w)));
+// 2
+PV0i.w = floatBitsToInt(mul_nonIEEE(intBitsToFloat(PV1i.z), intBitsToFloat(R14i.y)));
+// 3
+R123i.x = floatBitsToInt((mul_nonIEEE(-(intBitsToFloat(PV0i.w)),intBitsToFloat(R0i.z)) + intBitsToFloat(R0i.z)));
+PV1i.x = R123i.x;
+PV1i.y = floatBitsToInt(mul_nonIEEE(intBitsToFloat(PV0i.w), intBitsToFloat(R0i.z)));
+// 4
+PV0i.x = floatBitsToInt(mul_nonIEEE(intBitsToFloat(uf_remappedPS[29].y), intBitsToFloat(PV1i.y)));
+PV0i.y = floatBitsToInt(mul_nonIEEE(intBitsToFloat(uf_remappedPS[29].z), intBitsToFloat(PV1i.y)));
+PV0i.z = floatBitsToInt(mul_nonIEEE(intBitsToFloat(uf_remappedPS[29].x), intBitsToFloat(PV1i.y)));
+PV0i.w = floatBitsToInt(mul_nonIEEE(intBitsToFloat(R3i.x), intBitsToFloat(PV1i.x)));
+R5i.z = floatBitsToInt((mul_nonIEEE(-(intBitsToFloat(R3i.x)),intBitsToFloat(PV1i.x)) + intBitsToFloat(PV1i.x)));
+PS0i = R5i.z;
+// 5
+R123i.x = floatBitsToInt((mul_nonIEEE(intBitsToFloat(uf_remappedPS[19].z),intBitsToFloat(PV0i.w)) + intBitsToFloat(PV0i.y)));
+PV1i.x = R123i.x;
+R123i.y = floatBitsToInt((mul_nonIEEE(intBitsToFloat(uf_remappedPS[19].x),intBitsToFloat(PV0i.w)) + intBitsToFloat(PV0i.z)));
+PV1i.y = R123i.y;
+R123i.z = floatBitsToInt((mul_nonIEEE(intBitsToFloat(uf_remappedPS[19].y),intBitsToFloat(PV0i.w)) + intBitsToFloat(PV0i.x)));
+PV1i.z = R123i.z;
+R4i.w = 0;
+// 6
+R123i.y = floatBitsToInt((mul_nonIEEE(intBitsToFloat(R9i.y),intBitsToFloat(R2i.w)) + intBitsToFloat(PV1i.y)));
+PV0i.y = R123i.y; // links whole body red
+R123i.z = floatBitsToInt((mul_nonIEEE(intBitsToFloat(R5i.w),intBitsToFloat(R2i.w)) + intBitsToFloat(PV1i.z)));
+PV0i.z = R123i.z; // links whole body green
+R123i.w = floatBitsToInt((mul_nonIEEE(intBitsToFloat(R11i.y),intBitsToFloat(R2i.w)) + intBitsToFloat(PV1i.x)));
+PV0i.w = R123i.w; // links whole body blue
+// 7
+R4i.x = floatBitsToInt((mul_nonIEEE(intBitsToFloat(uf_remappedPS[15].x),intBitsToFloat(R10i.z)) + intBitsToFloat(PV0i.y)));
+R5i.y = floatBitsToInt((mul_nonIEEE(intBitsToFloat(uf_remappedPS[15].y),intBitsToFloat(R10i.z)) + intBitsToFloat(PV0i.z)));
+R6i.z = floatBitsToInt((mul_nonIEEE(intBitsToFloat(uf_remappedPS[15].z),intBitsToFloat(R10i.z)) + intBitsToFloat(PV0i.w)));
+// 8
+predResult = (intBitsToFloat(R14i.x) != intBitsToFloat(0x3dc0c0c1));
+activeMaskStack[1] = predResult;
+activeMaskStackC[2] = predResult == true && activeMaskStackC[1] == true;
+}
+else {
+activeMaskStack[1] = false;
+activeMaskStackC[2] = false;
+}
+// actually deals with all light. Current method just brightens all of link.
+// ------------------------------------------------------------------------------------------------------------- false makes link back-side shadow blue, light entity behind link
+if( activeMaskStackC[2] == true ) {
+// 0
+// r0i.x r0i.y, r2i.z carries RGB of ambient light on link
+R3i.xyz = floatBitsToInt(vec3(intBitsToFloat(R2i.x),intBitsToFloat(R2i.y),intBitsToFloat(R4i.z)) + vec3(intBitsToFloat(R0i.x),intBitsToFloat(R0i.y),intBitsToFloat(R2i.z)));
+R3i.w = 0x3f800000;
+R0i.x = 0;
+
+#if (shdwFix != 1) // SkalFate
+
+PS0i = R0i.x;
+
+#endif
+
+// 1
+
+#if (shdwFix == 0) // Big Altros Part here
+
+//R0i.yzw = ivec3(0,0,0);
+//R0i.xyz = R3i.xyz;
+
+// simple effective method previously in use
+//R0i.x = floatBitsToInt(mul_nonIEEE(intBitsToFloat(R1i.x),intBitsToFloat(R15i.x) * bright)+ intBitsToFloat(R1i.x) * bright);
+//R0i.y = floatBitsToInt(mul_nonIEEE(intBitsToFloat(R1i.y),intBitsToFloat(R15i.y) * bright)+ intBitsToFloat(R1i.y) * bright);
+//R0i.z = floatBitsToInt(mul_nonIEEE(intBitsToFloat(R1i.z),intBitsToFloat(R15i.z) * bright)+ intBitsToFloat(R1i.z) * bright);
+// end simple method
+
+// ***************************************************************
+// ***************************************************************
+// ***************************************************************
+// 						REFERENCE MATERIAL
+// ***************************************************************
+// ***************************************************************
+// ***************************************************************
+
+
+// R17i darkest shadows mask
+// R7i meduim shadows mask
+// R11i anything not very bright mask
+
+
+
+// ***********************
+// when set as R0i.xyz output DAY REDO
+// ***********************
+//
+//R0i.x = floatBitsToInt(intBitsToFloat(R15i.x) * bright);
+//R0i.y = floatBitsToInt(intBitsToFloat(R15i.y) * bright);
+//R0i.z = floatBitsToInt(intBitsToFloat(R15i.z) * bright);
+//
+// *********************************************************
+// skin colors
+// R0i pale dark blue
+// R1i base skin tone
+// R2i some highlights on dark skin tone
+// R3i some highlights on dark skin tone
+// R4i green R5i blue R6i green highlights
+
+// glows
+// R8i masive light blue glow
+// R9i dark blue glow
+
+// skin tones
+// R10i intense red skin
+// R11i pink skin
+// R12i dark brown skin
+// R13i teal skin
+// R14i green skin
+// R15i neutral skin tone still a bit dark****** winner
+// R16i dark tone
+// R17i highlights green and red on dark skin tone
+// R122i pretty much black
+// R123i pretty much black
+// R124i has pink
+// R125i dark purple
+// R126i dark has green night tones
+// R127i dark purple
+
+
+// ***********************
+// when miultiplied by R15i unknown time
+// ***********************
+// skin colors
+// R0i dark tone
+// R1i dark tone
+// R2i black shadow
+// R3i reasonable but a touch dark skin tone
+// R4i green overtone R5i dark shadows R6i darkens
+
+// glows
+// R8i masive light blue skin less glow
+// R8i dark blue skin less glow
+// R7i nice warm skin tones
+
+// skin tones
+// R10i intense red skin
+// R11i black shadows
+// R12i red to shadows and light red glow to skin
+// R13i add teal to shadows
+// R14i green skin all
+// R15i adds some intensity to colors mostly in the reds of the shadows
+// R16i dark tone
+// R17i highlights green and red on dark skin tone
+// R122i pretty much black
+// R123i pretty much black
+// R124i has pink
+// R125i dark purple
+// R126i dark has green night tones
+// R127i dark purple
+
+
+
+// ***********************
+// when miultiplied "mul_nonIEEE( R1i *  R##i )" by R1i in DAYLIGHT
+// ***********************
+// skin colors
+// R0i saturated shadows                             -- cel shaded
+// R1i very neutral                                                          -- NO CEL SHADING WINNER
+// R2i dark blue shadows                             -- cel shaded 
+// R3i dark warm skin tone                           -- cel shaded
+// R4i green overtone R5i dark shadows R6i darkens                           -- no cel
+// R7i blueish shadow                                -- cel shaded
+
+// glows
+// R8i masive light blue skin less glow
+// R9i dark blue skin less glow
+
+
+// skin tones
+// R10i intense red skin                                      - no cel apparent
+// R11i red sgadiws                                           - no cel apparent
+// R12i pinkish shadows possible combined with sky light color -- cel shaded
+// R13i add teal shadows                                                     -- no cel
+// R14i green skin all                                                       -- no cel
+// R15i adds some intensity to colors mostly in the reds of the shadows      -- NO CEL SHADING WINNER
+// R16i desaturated highlights in shadows                                    -- NO CEL SHADING WINNER for add highlights
+// R17i highlights green and red on dark skin tone                           -- no cel
+// R122i dark reds 															 -- no cel
+// R123i seems a reflective map                                              -- no cel goldish tones since reflecting sun
+// R124i has pink 															 -- no cel
+// R125i dark purple 														 -- no cel
+// R126i dark has green night tones 										 -- no cel
+// R127i dark red 															 -- no cel
+
+
+
+// ***********************
+// when set as R0i.xyz output at NIGHT
+// ***********************
+//
+//R0i.x = floatBitsToInt(intBitsToFloat(R15i.x) * bright);
+//R0i.y = floatBitsToInt(intBitsToFloat(R15i.y) * bright);
+//R0i.z = floatBitsToInt(intBitsToFloat(R15i.z) * bright);
+//
+// *********************************************************
+// skin colors
+// R0i skin tone with a bit too much pinks red
+// R1i base skin tone flat neutral no highlights
+// R2i some highlights on dark skin tone
+// R3i dark tone may carry brightness of environmnt light
+// R4i green R5i blue with base highlight R6i puke reen overtone
+
+// glows
+// R8i masive light blue glow... when multiplied by x only provides a green ovetone
+// R9i dark blue glow
+// R7i pinkish on shadows on bright side greenish on dark side. Kinda like R17i with irs red green 
+
+// skin tones
+// R10i intense red all skin
+// R11i very dark
+// R12i dark red with clothes and lit side ignored
+// R13i teal skin lit side ignored
+// R14i green all skin
+// R15i neutral skin tone still a bit dark****** winner
+// R16i dark tone
+// R17i highlights green and red on dark skin tone
+// R122i dark red overtones
+// R123i pretty much black
+// R124i has pink overtone
+// R125i dark blue purple overtone
+// R126i dark has green overtone
+// R127i dark red overtones
+
+// use with R15i for white
+// use with R1i for sky tone mostly yellow
+// + R17i.y  shadows low
+// - R17i.y  shadows high
+// + R17i.x  shadows left
+// - R17i.x  shadows right
+
+
+// ***********************
+// when added to "floatBitsToInt( R1i +  R##i )" by R1i in DAYLIGHT
+// ***********************
+// skin colors
+// R0i saturated shadows                             -- cel shaded
+// R1i very neutral                                                          -- NO CEL SHADING WINNER
+// R2i dark blue shadows                             -- cel shaded 
+// R3i dark warm skin tone                           -- cel shaded
+// R4i green overtone R5i blue overtones R6i yellow  overtones                         -- no cel
+// R7i add yellow to shadow and blue to light        -- cel shaded?           Shadow map
+
+// glows
+// R8i masive light blue skin less glow
+// R9i dark blue skin less glow
+
+
+// skin tones
+// R10i intense red skin                                      - no cel apparent
+// R11i red shadows                                           - no cel apparent possible use shadow map
+// R12i pinkish shadows possible combined with sky light color -- cel shaded
+// R13i add teal shadows                                                     -- no cel
+// R14i green skin all                                                       -- no cel
+// R15i adds some intensity to colors mostly in the reds of the shadows      -- NO CEL SHADING WINNER
+// R16i desaturated highlights in shadows                                    -- NO CEL SHADING WINNER for add highlights
+// R17i highlights green and red on dark skin tone                           -- no cel Shadow mask
+// R122i dark reds 															 -- no cel
+// R123i seems a reflective map                                              -- no cel goldish tones since reflecting sun
+// R124i has pink 															 -- no cel
+// R125i dark purple 														 -- no cel
+// R126i dark has green night tones 										 -- no cel
+// R127i dark red 															 -- no cel
+ 
+// ***************************************************************
+// ***************************************************************
+// ***************************************************************
+// 					END REFERENCE MATERIAL
+// ***************************************************************
+// ***************************************************************
+// ***************************************************************
+
+
+// The next sectiona make shadow masks using various base colors and directions of shadows
+
+// Section 1 		r15 for white tone with shadow on side described
+Left0i.x = floatBitsToInt(intBitsToFloat(R15i.x) + intBitsToFloat(R17i.x));
+Left0i.y = floatBitsToInt(intBitsToFloat(R15i.y) + intBitsToFloat(R17i.x));
+Left0i.z = floatBitsToInt(intBitsToFloat(R15i.z) + intBitsToFloat(R17i.x));
+
+// Low0i.x = floatBitsToInt(intBitsToFloat(R15i.x) + intBitsToFloat(R17i.y));
+// Low0i.y = floatBitsToInt(intBitsToFloat(R15i.y) + intBitsToFloat(R17i.y));
+// Low0i.z = floatBitsToInt(intBitsToFloat(R15i.z) + intBitsToFloat(R17i.y));
+
+Right0i.x = floatBitsToInt(intBitsToFloat(R15i.x) - intBitsToFloat(R17i.x));
+Right0i.y = floatBitsToInt(intBitsToFloat(R15i.y) - intBitsToFloat(R17i.x));
+Right0i.z = floatBitsToInt(intBitsToFloat(R15i.z) - intBitsToFloat(R17i.x));
+
+High0i.x = floatBitsToInt(intBitsToFloat(R15i.x) - intBitsToFloat(R17i.y));
+High0i.y = floatBitsToInt(intBitsToFloat(R15i.y) - intBitsToFloat(R17i.y));
+High0i.z = floatBitsToInt(intBitsToFloat(R15i.z) - intBitsToFloat(R17i.y));
+//********************************************************
+
+
+
+// Section 2 		R1i for yellow tone with shoadow on side described
+// YLeft0i.x = floatBitsToInt(intBitsToFloat(R1i.x) + intBitsToFloat(R17i.x));
+// YLeft0i.y = floatBitsToInt(intBitsToFloat(R1i.y) + intBitsToFloat(R17i.x));
+// YLeft0i.z = floatBitsToInt(intBitsToFloat(R1i.z) + intBitsToFloat(R17i.x));
+
+// YLow0i.x = floatBitsToInt(intBitsToFloat(R1i.x) + intBitsToFloat(R17i.y));
+// YLow0i.y = floatBitsToInt(intBitsToFloat(R1i.y) + intBitsToFloat(R17i.y));
+// YLow0i.z = floatBitsToInt(intBitsToFloat(R1i.z) + intBitsToFloat(R17i.y));
+
+YRight0i.x = floatBitsToInt(intBitsToFloat(R1i.x) - intBitsToFloat(R17i.x));
+YRight0i.y = floatBitsToInt(intBitsToFloat(R1i.y) - intBitsToFloat(R17i.x));
+YRight0i.z = floatBitsToInt(intBitsToFloat(R1i.z) - intBitsToFloat(R17i.x));
+
+YHigh0i.x = floatBitsToInt(intBitsToFloat(R1i.x) - intBitsToFloat(R17i.y));
+YHigh0i.y = floatBitsToInt(intBitsToFloat(R1i.y) - intBitsToFloat(R17i.y));
+YHigh0i.z = floatBitsToInt(intBitsToFloat(R1i.z) - intBitsToFloat(R17i.y));
+//********************************************************
+
+
+
+// Section 3		R123i Light on side described, blue light of sky or occluded (shines) becomes empty, night dark blue
+// BLeft0i.x = floatBitsToInt(intBitsToFloat(R123i.x) - intBitsToFloat(R17i.x));
+// BLeft0i.y = floatBitsToInt(intBitsToFloat(R123i.y) - intBitsToFloat(R17i.x));
+// BLeft0i.z = floatBitsToInt(intBitsToFloat(R123i.z) - intBitsToFloat(R17i.x));
+
+// BLow0i.x = floatBitsToInt(intBitsToFloat(R123i.x) - intBitsToFloat(R17i.y));
+// BLow0i.y = floatBitsToInt(intBitsToFloat(R123i.y) - intBitsToFloat(R17i.y));
+// BLow0i.z = floatBitsToInt(intBitsToFloat(R123i.z) - intBitsToFloat(R17i.y));
+
+// BRight0i.x = floatBitsToInt(intBitsToFloat(R123i.x) + intBitsToFloat(R17i.x));
+// BRight0i.y = floatBitsToInt(intBitsToFloat(R123i.y) + intBitsToFloat(R17i.x));
+// BRight0i.z = floatBitsToInt(intBitsToFloat(R123i.z) + intBitsToFloat(R17i.x));
+
+BHigh0i.x = floatBitsToInt(intBitsToFloat(R123i.x) + intBitsToFloat(R17i.y));
+BHigh0i.y = floatBitsToInt(intBitsToFloat(R123i.y) + intBitsToFloat(R17i.y));
+BHigh0i.z = floatBitsToInt(intBitsToFloat(R123i.z) + intBitsToFloat(R17i.y));
+//********************************************************
+
+
+
+// Section 4 		Blue over tone shadows with slight green rim light
+LtBlueShadow.x = floatBitsToInt(intBitsToFloat(R13i.x)*.2 + intBitsToFloat(R7i.y));
+LtBlueShadow.y = floatBitsToInt(intBitsToFloat(R13i.y)*.2 + intBitsToFloat(R7i.y));
+LtBlueShadow.z = floatBitsToInt(intBitsToFloat(R13i.y)*.2 + intBitsToFloat(R7i.y));
+//********************************************************
+
+
+//Section 5 		Darken shadows
+// Temp0i.x = floatBitsToInt(intBitsToFloat(R16i.x) + intBitsToFloat(R11i.y));
+// Temp0i.y = floatBitsToInt(intBitsToFloat(R16i.y) + intBitsToFloat(R11i.y));
+// Temp0i.z = floatBitsToInt(intBitsToFloat(R16i.z) + intBitsToFloat(R11i.y));
+//********************************************************
+
+
+// subtract white left shadow from white base using min
+R0i.x = floatBitsToInt(min(intBitsToFloat(R1i.x), intBitsToFloat(Left0i.x) * bright));
+R0i.y = floatBitsToInt(min(intBitsToFloat(R1i.y), intBitsToFloat(Left0i.y) * bright));
+R0i.z = floatBitsToInt(min(intBitsToFloat(R1i.z), intBitsToFloat(Left0i.z) * bright));
+
+// subtract white high shadow from above using min
+R0i.x = floatBitsToInt(min(intBitsToFloat(R0i.x), intBitsToFloat(High0i.x) * bright));
+R0i.y = floatBitsToInt(min(intBitsToFloat(R0i.y), intBitsToFloat(High0i.y) * bright));
+R0i.z = floatBitsToInt(min(intBitsToFloat(R0i.z), intBitsToFloat(High0i.z) * bright));
+
+// subtract yellow high shadow from above using min
+R0i.x = floatBitsToInt(min(intBitsToFloat(R0i.x), intBitsToFloat(YHigh0i.x) * bright));
+R0i.y = floatBitsToInt(min(intBitsToFloat(R0i.y), intBitsToFloat(YHigh0i.y) * bright));
+R0i.z = floatBitsToInt(min(intBitsToFloat(R0i.z), intBitsToFloat(YHigh0i.z) * bright));
+
+// subtract yellow right shadow from above using min
+R0i.x = floatBitsToInt(min(intBitsToFloat(R0i.x), intBitsToFloat(Right0i.x) * bright*.7));
+R0i.y = floatBitsToInt(min(intBitsToFloat(R0i.y), intBitsToFloat(Right0i.y) * bright*.7));
+R0i.z = floatBitsToInt(min(intBitsToFloat(R0i.z), intBitsToFloat(Right0i.z) * bright*.7));
+
+// make a base color by using mul_nonIEEE with the calculated shadow and the white base color. Add in the shadow, white, light blue masked over shadow, blue sky light masked over high locations, and what I think is a reflective map.
+R0i.x = floatBitsToInt(mul_nonIEEE(intBitsToFloat(R0i.x), intBitsToFloat(R1i.x)) * bright + intBitsToFloat(R0i.x) * bright + intBitsToFloat(R1i.x) * bright + intBitsToFloat(LtBlueShadow.x) * bright + intBitsToFloat(BHigh0i.x) * bright + intBitsToFloat(R123i.x) * bright) ;
+
+R0i.y = floatBitsToInt(mul_nonIEEE(intBitsToFloat(R0i.y), intBitsToFloat(R1i.y)) * bright + intBitsToFloat(R0i.y) * bright + intBitsToFloat(R1i.y) * bright + intBitsToFloat(LtBlueShadow.y) * bright + intBitsToFloat(BHigh0i.y) * bright + intBitsToFloat(R123i.y) * bright) ;
+
+R0i.z = floatBitsToInt(mul_nonIEEE(intBitsToFloat(R0i.z), intBitsToFloat(R1i.z)) * bright + intBitsToFloat(R0i.z) * bright + intBitsToFloat(R1i.z) * bright + intBitsToFloat(LtBlueShadow.z) * bright + intBitsToFloat(BHigh0i.z) * bright + intBitsToFloat(R123i.z) * bright) ;
+
+
+
+R0i.w = R3i.w;
+// r0i our color output from the if statement passed on for furthur use
+
+#elif (shdwFix == 1) // SkalFate Big Part
+
+if(smode == 1) // run custom code
+{
+	// -- 1. one way to do it
+	//R0i.yzw = ivec3(R3i.y,R3i.z,R3i.w);
+	
+	// -- 2. another way to do it , green and blue channels
+	// R1i=bright normal, R3i=normal, R15i=dark normal, R4i=red, R5i=blue look, R6i=green look, R7i=nocelshade R17i=nocelshade, R8i=glow, R9i= Solid blue, R11i=lightblue look, R13i=normal look with yellow outline shadows, R14i=lightgreen look
+	//R0i.yzw = R3i.yzw; // best choice R3i,R7i,R15i
+	
+	// -- 3. another way to do it - but mixing color channels
+	// R1i=bright normal, R3i=normal, R15i=normal with minor flickers, R11i=dark normal, R4i=blue, R6i=lightblue, R7i=no-celshade(looks good), R8i=blueglow, R10=BrightGreen, R12i=Green, R14i=blue, R17i=blue shadow highlights
+	//R0i.yzw = R15i.xyz; // best choice R7i.xyz and R15i.xyz
+	
+	// -- 4. another way to do it, seems best because uses all three color channels, has clay effect indoors
+	// R1i=bright normal, R3i=normal, R15i=normal, R11i=blue normal
+	// R4i=Green, R5i=Blue, R6i=Green, R7i=no-celshade(Orangish), R8i=blueglow, R9i=Solidblue, R10=Red,
+	// R13i=normal look with yellow outline shadows, R14i=Green, R16=weapon bloom, R17i=no-cel green shadow highlights
+	// R122i=red,
+	//R0i.xyz = R3i.xyz; // Best Choice R7i, R15i, R1i, R3i
+	
+	// -- 1. another way to do it
+	//R0i.yzw = ivec3(floatBitsToInt(1.4 * shadowsbrightness), floatBitsToInt(1.0 * shadowsbrightness), floatBitsToInt(1.0)); // controls the color and brightness of the backside shadows on all npcs
+	// -- 2. another way to do it
+	//R0i.xyzw = ivec4(floatBitsToInt(1.0 * shadowsbrightness), floatBitsToInt(1.0 * shadowsbrightness), floatBitsToInt(1.0 * shadowsbrightness), floatBitsToInt(1.0)); 
+	
+	
+	// -- 1. Best Mode R3i.xyz + R7i.y
+	R0i.x = floatBitsToInt(intBitsToFloat(R3i.x) + intBitsToFloat(R7i.y) * shadowsbrightness);
+	R0i.y = floatBitsToInt(intBitsToFloat(R3i.y) + intBitsToFloat(R7i.y) * shadowsbrightness);
+	R0i.z = floatBitsToInt(intBitsToFloat(R3i.z) + intBitsToFloat(R7i.y) * shadowsbrightness);
+	
+	PS0i = R0i.x;
+}
+else if (smode == 2)
+{
+	// Mode R3i.xyz + R7i.x - Best mode 2 less shadow highlights
+	R0i.x = floatBitsToInt(intBitsToFloat(R3i.x) + intBitsToFloat(R7i.x) * shadowsbrightness);
+	R0i.y = floatBitsToInt(intBitsToFloat(R3i.y) + intBitsToFloat(R7i.x) * shadowsbrightness);
+	R0i.z = floatBitsToInt(intBitsToFloat(R3i.z) + intBitsToFloat(R7i.x) * shadowsbrightness);
+}
+else if (smode == 3)
+{
+	// R3i.xyz + R17i.y - No enhancement ot the skin ,and very strong shadow higlights
+	R0i.x = floatBitsToInt(intBitsToFloat(R3i.x) + intBitsToFloat(R17i.y) * shadowsbrightness);
+	R0i.y = floatBitsToInt(intBitsToFloat(R3i.y) + intBitsToFloat(R17i.y) * shadowsbrightness);
+	R0i.z = floatBitsToInt(intBitsToFloat(R3i.z) + intBitsToFloat(R17i.y) * shadowsbrightness);
+}
+else if (smode == 4)
+{
+	// R3i.xyz + R4i.y - Light Shaded Mode
+	R0i.x = floatBitsToInt(intBitsToFloat(R3i.x) + intBitsToFloat(R4i.y) * shadowsbrightness);
+	R0i.y = floatBitsToInt(intBitsToFloat(R3i.y) + intBitsToFloat(R4i.y) * shadowsbrightness);
+	R0i.z = floatBitsToInt(intBitsToFloat(R3i.z) + intBitsToFloat(R4i.y) * shadowsbrightness);
+}
+else if (smode == 5)
+{
+	// R3i.xyz + R15i.x - Cool mode with minor flickers in the wind
+	R0i.x = floatBitsToInt(intBitsToFloat(R3i.x) + intBitsToFloat(R15i.x) * shadowsbrightness);
+	R0i.y = floatBitsToInt(intBitsToFloat(R3i.y) + intBitsToFloat(R15i.x) * shadowsbrightness);
+	R0i.z = floatBitsToInt(intBitsToFloat(R3i.z) + intBitsToFloat(R15i.x) * shadowsbrightness);
+}
+else // run the original shader code
+{
+    // original shader code
+	PS0i = R0i.x;
+	R0i.yzw = ivec3(0,0,0); // orginal code
+}
+
+#else
+
+R0i.yzw = ivec3(0,0,0);
+
+#endif
+
+}
+activeMaskStack[1] = activeMaskStack[1] == false;
+activeMaskStackC[2] = activeMaskStack[1] == true && activeMaskStackC[1] == true;
+
+// ------------------------------------------------------------------------------------------------------------- false changes links color to be more yellowish
+if( activeMaskStackC[2] == true ) {
+// 0
+tempi.x = floatBitsToInt(dot(vec4(intBitsToFloat(R17i.x),intBitsToFloat(R17i.y),intBitsToFloat(R13i.z),-0.0),vec4(intBitsToFloat(uf_remappedPS[30].x),intBitsToFloat(uf_remappedPS[30].y),intBitsToFloat(uf_remappedPS[30].z),0.0)));
+PV0i.x = tempi.x;
+PV0i.y = tempi.x;
+PV0i.z = tempi.x;
+PV0i.w = tempi.x;
+R0i.w = 0x40400000;
+PS0i = R0i.w;
+// 1
+R127i.x = floatBitsToInt(dot(vec4(intBitsToFloat(R17i.x),intBitsToFloat(R17i.y),intBitsToFloat(R13i.z),-0.0),vec4(intBitsToFloat(uf_remappedPS[31].x),intBitsToFloat(uf_remappedPS[31].y),intBitsToFloat(uf_remappedPS[31].z),0.0)));
+PV1i.x = R127i.x;
+PV1i.y = R127i.x;
+PV1i.z = R127i.x;
+PV1i.w = R127i.x;
+R127i.z = floatBitsToInt(-(intBitsToFloat(PV0i.x)));
+PS1i = R127i.z;
+// 2
+tempi.x = floatBitsToInt(dot(vec4(intBitsToFloat(R17i.x),intBitsToFloat(R17i.y),intBitsToFloat(R13i.z),-0.0),vec4(intBitsToFloat(uf_remappedPS[32].x),intBitsToFloat(uf_remappedPS[32].y),intBitsToFloat(uf_remappedPS[32].z),0.0)));
+PV0i.x = tempi.x;
+PV0i.y = tempi.x;
+PV0i.z = tempi.x;
+PV0i.w = tempi.x;
+R127i.y = tempi.x;
+PS0i = floatBitsToInt(mul_nonIEEE(intBitsToFloat(R12i.z), intBitsToFloat(R13i.x)));
+// 3
+backupReg0i = R127i.x;
+backupReg0i = R127i.x;
+backupReg1i = R127i.z;
+backupReg1i = R127i.z;
+redcCUBE(vec4(intBitsToFloat(R127i.z),intBitsToFloat(R127i.z),intBitsToFloat(backupReg0i),intBitsToFloat(PV0i.x)),vec4(intBitsToFloat(PV0i.x),intBitsToFloat(backupReg0i),intBitsToFloat(backupReg1i),intBitsToFloat(backupReg1i)),cubeMapSTM,cubeMapFaceId);
+R127i.x = floatBitsToInt(cubeMapSTM.x);
+R127i.y = floatBitsToInt(cubeMapSTM.y);
+R127i.z = floatBitsToInt(cubeMapSTM.z);
+R127i.w = cubeMapFaceId;
+PV1i.x = R127i.x;
+PV1i.y = R127i.y;
+PV1i.z = R127i.z;
+PV1i.w = R127i.w;
+R2i.z = floatBitsToInt(mul_nonIEEE(intBitsToFloat(R3i.y), intBitsToFloat(PS0i)));
+R2i.z = clampFI32(R2i.z);
+PS1i = R2i.z;
+// 4
+PV0i.x = floatBitsToInt(intBitsToFloat(R14i.z) * intBitsToFloat(0x42960000));
+PV0i.x = clampFI32(PV0i.x);
+R0i.z = PV1i.w;
+PS0i = floatBitsToInt(1.0 / abs(intBitsToFloat(PV1i.z)));
+// 5
+backupReg0i = R1i.y;
+R123i.x = floatBitsToInt((mul_nonIEEE(intBitsToFloat(R127i.x),intBitsToFloat(PS0i)) + 1.5));
+PV1i.x = R123i.x;
+R1i.y = floatBitsToInt((mul_nonIEEE(intBitsToFloat(uf_remappedPS[18].y),intBitsToFloat(PV0i.x)) + intBitsToFloat(backupReg0i)));
+R123i.z = floatBitsToInt((mul_nonIEEE(intBitsToFloat(uf_remappedPS[18].x),intBitsToFloat(PV0i.x)) + intBitsToFloat(R1i.x)));
+PV1i.z = R123i.z;
+R123i.w = floatBitsToInt((mul_nonIEEE(intBitsToFloat(R127i.y),intBitsToFloat(PS0i)) + 1.5));
+PV1i.w = R123i.w;
+R1i.x = floatBitsToInt((mul_nonIEEE(intBitsToFloat(uf_remappedPS[18].z),intBitsToFloat(PV0i.x)) + intBitsToFloat(R1i.z)));
+PS1i = R1i.x;
+// 6
+R0i.x = PV1i.w;
+R0i.y = PV1i.x;
+R3i.x = floatBitsToInt(mul_nonIEEE(intBitsToFloat(R16i.x), intBitsToFloat(PV1i.z)));
+PS0i = R3i.x;
+}
+
+
+// ------------------------------------------------------------------------------------------------------------- false makes link back side brightened up and affected by light changes, front shadows and back affected.
+if( activeMaskStackC[2] == true ) {
+// can increases texture lod in attempt to get higher res tetures at a distance on enemies
+R0i.xyz = floatBitsToInt(textureLod(textureUnitPS7, vec4(redcCUBEReverse(intBitsToFloat(R0i.xy),R0i.z),cubeMapArrayIndex7),intBitsToFloat(R0i.w)).xyz);
+}
+
+// ------------------------------------------------------------------------------------------------------------- false makes link a bit brighter front and back
+if( activeMaskStackC[2] == true ) {
+// 0
+R123i.x = floatBitsToInt((mul_nonIEEE(intBitsToFloat(uf_remappedPS[18].y),intBitsToFloat(R2i.z)) + intBitsToFloat(R0i.y)));
+PV0i.x = R123i.x;
+R123i.y = floatBitsToInt((mul_nonIEEE(intBitsToFloat(uf_remappedPS[18].x),intBitsToFloat(R2i.z)) + intBitsToFloat(R0i.x)));
+PV0i.y = R123i.y;
+R3i.z = floatBitsToInt(mul_nonIEEE(intBitsToFloat(R16i.z), intBitsToFloat(R1i.x)));
+R123i.w = floatBitsToInt((mul_nonIEEE(intBitsToFloat(uf_remappedPS[18].z),intBitsToFloat(R2i.z)) + intBitsToFloat(R0i.z)));
+PV0i.w = R123i.w;
+R3i.y = floatBitsToInt(mul_nonIEEE(intBitsToFloat(R16i.y), intBitsToFloat(R1i.y)));
+PS0i = R3i.y;
+// 1
+R0i.x = floatBitsToInt((mul_nonIEEE(intBitsToFloat(R15i.x),intBitsToFloat(PV0i.y)) + intBitsToFloat(R2i.x)));
+R0i.y = floatBitsToInt((mul_nonIEEE(intBitsToFloat(R15i.y),intBitsToFloat(PV0i.x)) + intBitsToFloat(R2i.y)));
+R0i.z = floatBitsToInt((mul_nonIEEE(intBitsToFloat(R15i.z),intBitsToFloat(PV0i.w)) + intBitsToFloat(R4i.z)));
+R0i.w = 0;
+R3i.w = 0x3f800000;
+PS1i = R3i.w;
+}
+activeMaskStackC[1] = activeMaskStack[0] == true && activeMaskStackC[0] == true;
+
+// ------------------------------------------------------------------------------------------------------------- false darkens links models curves shadows
+if( activeMaskStackC[1] == true ) {
+// 0
+R1i.w = 0x3f800000;
+// 1
+backupReg0i = R3i.x;
+backupReg1i = R3i.y;
+backupReg2i = R3i.z;
+backupReg3i = R3i.w;
+R3i.xyz = ivec3(backupReg0i,backupReg1i,backupReg2i);
+R3i.w = backupReg3i;
+// 2
+R2i.xyz = ivec3(R0i.x,R0i.y,R0i.z);
+R2i.w = R0i.w;
+// 3
+backupReg0i = R1i.w;
+R1i.xyz = ivec3(R4i.x,R5i.y,R6i.z);
+R1i.w = backupReg0i;
+// 4
+R0i.xyz = ivec3(R13i.x,R4i.y,R5i.z);
+R0i.w = R4i.w;
+// 5
+R4i.xyz = ivec3(R7i.x,R7i.x,R7i.x);
+R4i.w = R7i.x;
+}
+// export
+passPixelColor0 = vec4(intBitsToFloat(R0i.x), intBitsToFloat(R0i.y), intBitsToFloat(R0i.z), intBitsToFloat(R0i.w)); // light/shadows on link front side
+
+#if (shdwFix == 1) // SkalFate
+
+passPixelColor1 = vec4(intBitsToFloat(R1i.x) * 0, intBitsToFloat(R1i.y) * 0, intBitsToFloat(R1i.z) * 0, intBitsToFloat(R1i.w)); // links and all npcs fog rgb
+passPixelColor2 = vec4(intBitsToFloat(R2i.x) * sred, intBitsToFloat(R2i.y) * sgreen, intBitsToFloat(R2i.z) * sblue, intBitsToFloat(R2i.w)) ; // Controls link RGB only in celshade mode and when original code is run (line 713). In no-celshade mode it changes the lighting on links back-side away from the sun
+
+#else
+
+passPixelColor1 = vec4(intBitsToFloat(R1i.x), intBitsToFloat(R1i.y), intBitsToFloat(R1i.z), intBitsToFloat(R1i.w)); // links and all npcs fog rgb
+passPixelColor2 = vec4(intBitsToFloat(R2i.x), intBitsToFloat(R2i.y), intBitsToFloat(R2i.z), intBitsToFloat(R2i.w)); // Controls link RGB only in celshade mode and when original code is run (line 713). In no-celshade mode it changes the lighting on links back-side away from the sun
+
+#endif
+
+passPixelColor3 = vec4(intBitsToFloat(R3i.x), intBitsToFloat(R3i.y), intBitsToFloat(R3i.z), intBitsToFloat(R3i.w));
+passPixelColor4 = vec4(intBitsToFloat(R4i.x), intBitsToFloat(R4i.y), intBitsToFloat(R4i.z), intBitsToFloat(R4i.w));
+}

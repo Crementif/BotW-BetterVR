@@ -1,0 +1,11 @@
+#version 420
+#extension GL_ARB_texture_gather : enable
+#extension GL_ARB_separate_shader_objects : enable
+#extension GL_ARB_shading_language_packing : enable
+// shader 24838b84d15a1da1
+
+void main()
+{
+// export
+gl_Position = vec4(0.0);
+}

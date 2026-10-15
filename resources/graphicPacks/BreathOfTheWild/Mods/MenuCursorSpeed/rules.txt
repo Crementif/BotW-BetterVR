@@ -1,0 +1,80 @@
+[Definition]
+titleIds = 00050000101C9300,00050000101C9400,00050000101C9500
+name = Menu Navigation Speed
+path = "The Legend of Zelda: Breath of the Wild/Mods/Menu Navigation Speed"
+description = Change the speed at which you can navigate the cursor through the menus.|Requires you to use FPS++.||Made by Exzap.
+version = 6
+
+
+[Default]
+$cursorSpeed = 1.0
+
+[Preset]
+name = 0.7x
+category = Menu Navigation Speed
+$cursorSpeed = 0.7
+
+[Preset]
+name = 0.8x
+category = Menu Navigation Speed
+$cursorSpeed = 0.8
+
+[Preset]
+name = 0.9x
+category = Menu Navigation Speed
+$cursorSpeed = 0.9
+
+[Preset]
+name = 1.0x (Default)
+category = Menu Navigation Speed
+default = 1
+
+[Preset]
+name = 1.05x
+category = Menu Navigation Speed
+$cursorSpeed = 1.05
+
+[Preset]
+name = 1.1x
+category = Menu Navigation Speed
+$cursorSpeed = 1.1
+
+[Preset]
+name = 1.15x
+category = Menu Navigation Speed
+$cursorSpeed = 1.15
+
+[Preset]
+name = 1.2x
+category = Menu Navigation Speed
+$cursorSpeed = 1.2
+
+[Preset]
+name = 1.25x
+category = Menu Navigation Speed
+$cursorSpeed = 1.2
+
+[Preset]
+name = 1.5x
+category = Menu Navigation Speed
+$cursorSpeed = 1.5
+
+[Preset]
+name = 1.75x
+category = Menu Navigation Speed
+$cursorSpeed = 1.75
+
+[Preset]
+name = 2.0x
+category = Menu Navigation Speed
+$cursorSpeed = 2.0
+
+[Preset]
+name = 2.5x
+category = Menu Navigation Speed
+$cursorSpeed = 2.5
+
+[Preset]
+name = 3x
+category = Menu Navigation Speed
+$cursorSpeed = 3

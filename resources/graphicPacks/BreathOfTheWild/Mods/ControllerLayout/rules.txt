@@ -1,0 +1,9 @@
+[Definition]
+titleIds = 00050000101C9300,00050000101C9400,00050000101C9500
+name = Xbox Controller Button Layout
+path = "The Legend of Zelda: Breath of the Wild/Mods/Xbox Controller Button Layout"
+description = Swaps the ABXY buttons from the Nintendo layout to the standard PC/Xbox layout.|You can find mods for PS4/PS5 controllers on GameBanana.
+version = 6
+
+[Default]
+$enableDebugLogging:int = 0
