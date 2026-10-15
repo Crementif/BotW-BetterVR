@@ -4,7 +4,7 @@
 // Implemented features:
 //  [!] Renderer: User texture binding. Use 'VkDescriptorSet' as ImTextureID. Call ImGui_ImplVulkan_AddTexture() to register one. Read the FAQ about ImTextureID! See https://github.com/ocornut/imgui/pull/914 for discussions.
 //  [X] Renderer: Large meshes support (64k+ vertices) even with 16-bit indices (ImGuiBackendFlags_RendererHasVtxOffset).
-//  [X] Renderer: Expose selected render state for draw callbacks to use. Access in '(ImGui_ImplXXXX_RenderState*)GetPlatformIO().Renderer_RenderState'.
+// BetterVR: this backend runs on the ImGui core Cemu pins (1.89.5), which has no render state to expose.
 
 // The aim of imgui_impl_vulkan.h/.cpp is to be usable in your engine without any modification.
 // IF YOU FEEL YOU NEED TO MAKE ANY CHANGE TO THIS CODE, please share them and your feedback at https://github.com/ocornut/imgui/
@@ -96,6 +96,8 @@
 #ifdef _MSC_VER
 #pragma warning (disable: 4127) // condition expression is constant
 #endif
+
+namespace BetterVRImGui {
 
 // Forward Declarations
 struct ImGui_ImplVulkan_FrameRenderBuffers;
@@ -662,14 +664,6 @@ void ImGui_ImplVulkan_RenderDrawData(ImDrawData* draw_data, VkCommandBuffer comm
 
     vkCmdPipelineBarrier(command_buffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 1, &memoryBarrier, 0, nullptr, 0, nullptr);
 
-    // Setup render state structure (for callbacks and custom texture bindings)
-    ImGuiPlatformIO& platform_io = ImGui::GetPlatformIO();
-    ImGui_ImplVulkan_RenderState render_state;
-    render_state.CommandBuffer = command_buffer;
-    render_state.Pipeline = pipeline;
-    render_state.PipelineLayout = bd->PipelineLayout;
-    platform_io.Renderer_RenderState = &render_state;
-
     // Will project scissor/clipping rectangles into framebuffer space
     ImVec2 clip_off = draw_data->DisplayPos;         // (0,0) unless using multi-viewports
     ImVec2 clip_scale = draw_data->FramebufferScale; // (1,1) unless using retina display which are often (2,2)
@@ -765,7 +759,6 @@ void ImGui_ImplVulkan_RenderDrawData(ImDrawData* draw_data, VkCommandBuffer comm
         global_idx_offset += draw_list->IdxBuffer.Size;
         global_vtx_offset += draw_list->VtxBuffer.Size;
     }
-    platform_io.Renderer_RenderState = nullptr;
 
     // Note: at this point both vkCmdSetViewport() and vkCmdSetScissor() have been called.
     // Our last values will leak into user/application rendering IF:
@@ -1834,5 +1827,7 @@ void ImGui_ImplVulkanH_DestroyFrameSemaphores(VkDevice device, ImGui_ImplVulkanH
 }
 
 //-----------------------------------------------------------------------------
+
+} // namespace BetterVRImGui
 
 #endif // #ifndef IMGUI_DISABLE

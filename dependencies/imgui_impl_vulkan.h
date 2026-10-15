@@ -65,6 +65,9 @@
 // It is expected that as early as Q1 2025 the backend will use a few more descriptors. Use this value + number of desired calls to ImGui_ImplVulkan_AddTexture().
 #define IMGUI_IMPL_VULKAN_MINIMUM_IMAGE_SAMPLER_POOL_SIZE   (1)     // Minimum per atlas
 
+// BetterVR: Cemu links its own, older backend with the same names
+namespace BetterVRImGui {
+
 // Initialization data, for ImGui_ImplVulkan_Init()
 // [Please zero-clear before use!]
 // - About descriptor pool:
@@ -125,16 +128,6 @@ IMGUI_IMPL_API void             ImGui_ImplVulkan_RemoveTexture(VkDescriptorSet d
 // Optional: load Vulkan functions with a custom function loader
 // This is only useful with IMGUI_IMPL_VULKAN_NO_PROTOTYPES / VK_NO_PROTOTYPES
 IMGUI_IMPL_API bool             ImGui_ImplVulkan_LoadFunctions(uint32_t api_version, PFN_vkVoidFunction(*loader_func)(const char* function_name, void* user_data), void* user_data = nullptr);
-
-// [BETA] Selected render state data shared with callbacks.
-// This is temporarily stored in GetPlatformIO().Renderer_RenderState during the ImGui_ImplVulkan_RenderDrawData() call.
-// (Please open an issue if you feel you need access to more data)
-struct ImGui_ImplVulkan_RenderState
-{
-    VkCommandBuffer     CommandBuffer;
-    VkPipeline          Pipeline;
-    VkPipelineLayout    PipelineLayout;
-};
 
 //-------------------------------------------------------------------------
 // Internal / Miscellaneous Vulkan Helpers
@@ -218,5 +211,7 @@ struct ImGui_ImplVulkanH_Window
         ClearEnable = true;
     }
 };
+
+} // namespace BetterVRImGui
 
 #endif // #ifndef IMGUI_DISABLE

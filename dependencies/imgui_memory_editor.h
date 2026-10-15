@@ -247,7 +247,7 @@ struct MemoryEditor
             footer_height += height_separator + ImGui::GetFrameHeightWithSpacing() * 1;
         if (OptShowDataPreview)
             footer_height += height_separator + ImGui::GetFrameHeightWithSpacing() * 1 + ImGui::GetTextLineHeightWithSpacing() * 3;
-        ImGui::BeginChild("##scrolling", ImVec2(-FLT_MIN, -footer_height), ImGuiChildFlags_None, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoNav);
+        ImGui::BeginChild("##scrolling", ImVec2(-FLT_MIN, -footer_height), false, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoNav);
         ImDrawList* draw_list = ImGui::GetWindowDrawList();
 
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
