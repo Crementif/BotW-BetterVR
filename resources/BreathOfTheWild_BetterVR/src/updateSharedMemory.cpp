@@ -9,6 +9,8 @@ extern "C" {
     ATTR_KEEP uint32 sStereoIssueThisFrame = 0;
     // no VR session, so draw once from the normal camera
     ATTR_KEEP uint32 sMonoWithoutSession = 1;
+    // set while recording the 3D scene, menus and loading screens don't have one
+    ATTR_KEEP uint32 sRecordedScene3D = 0;
 
     // two frames so a capture raised after this frame's prologues is still covered
     ATTR_KEEP void hook_signalMonoCapture() {
@@ -22,7 +24,9 @@ extern "C" {
         uint32 frameIdx = frameCounter % 2u;
         if (currentEye == 0) {
             sMonoWithoutSession = gVRSharedMemory.shared.vrActive != 1 ? 1u : 0u;
-            sStereoIssueThisFrame = sMonoWithoutSession == 0 ? 1u : 0u;
+            // frames without the 3D scene only need to be drawn once
+            sStereoIssueThisFrame = sMonoWithoutSession == 0 && sRecordedScene3D != 0 ? 1u : 0u;
+            sRecordedScene3D = 0;
         }
 
         DEBUG_LOG("hook_updateVRSharedMemory: eyeOffset=%f -> currentEye=%u, frameCounter=%u, frameIdx=%u",

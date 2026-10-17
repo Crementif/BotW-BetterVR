@@ -37,11 +37,14 @@ static void emitHostEvent(uint32 eventId, uint32 surfaceKind, uint32 gx2Buffer) 
     _IMPORT_GX2_GX2CopyDisplayList(packet, sizeof(packet));
 }
 
+extern "C" uint32 sRecordedScene3D;
+
 extern "C" ATTR_KEEP void hook_emitCaptureEvents3D(uint32 renderBuffer) {
     if (renderBuffer == 0) return;
     uint32 colorTarget = readU32((void*)renderBuffer, AGL_RENDER_BUFFER_COLOR);
     uint32 depthTarget = readU32((void*)renderBuffer, AGL_RENDER_BUFFER_DEPTH);
     if (colorTarget == 0 || depthTarget == 0) return;
+    sRecordedScene3D = 1;
     emitHostEvent(HOST_EVENT_CAPTURE_3D_COLOR, HOST_EVENT_SURFACE_COLOR, colorTarget + AGL_RENDER_TARGET_GX2_BUFFER);
     emitHostEvent(HOST_EVENT_CAPTURE_3D_DEPTH, HOST_EVENT_SURFACE_DEPTH, depthTarget + AGL_RENDER_TARGET_GX2_BUFFER);
     // the HUD after this only needs to be drawn once, and without foveation
