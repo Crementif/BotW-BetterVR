@@ -275,6 +275,7 @@ void Capture::OnFrameSubmitted() {
     if (renderer && renderer->m_layer3D && renderer->m_layer2D && renderer->m_imguiOverlay) {
         if (renderer->IsInitialized()) {
             renderer->EndFrame();
+            renderer->FinishGuestFrame();
         }
         renderer->StartFrame();
     }

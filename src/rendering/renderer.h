@@ -120,6 +120,7 @@ public:
 
     void StartFrame();
     void EndFrame();
+    void FinishGuestFrame();
     std::optional<std::array<XrView, 2>> UpdateViews(XrTime predictedDisplayTime);
 
     bool EnsureFrameInputLatched(bool inMenu);

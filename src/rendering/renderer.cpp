@@ -489,6 +489,17 @@ bool RND_Renderer::EnsureFrameInputLatched(bool inMenu) {
     return true;
 }
 
+// keep the images and their syncs, the 3D fallback can still use them
+void RND_Renderer::FinishGuestFrame() {
+    std::scoped_lock lock(m_frameLatchMutex);
+    for (auto& frame : m_renderFrames) {
+        // the game can signal a mono capture before the render thread gets there, EndFrame clears it
+        const bool mono = frame.isMonoCapture;
+        frame.Reset();
+        frame.isMonoCapture = mono;
+    }
+}
+
 void RND_Renderer::BeginStereoCaptureGeneration(long frameIdx) {
     std::scoped_lock lock(m_frameLatchMutex);
     auto& frame = m_renderFrames[frameIdx];
