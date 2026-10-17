@@ -18,6 +18,10 @@ public:
     static void SetFoveationExaggerated(bool exaggerated);
     // 0 shows the whole image
     static void CropWindowToAspectRatio(float aspectRatio);
+    // a new preset only applies after a restart
+    static std::vector<std::string> GetGraphicsPresets(std::string_view category);
+    static std::string GetGraphicsPreset(std::string_view category);
+    static void SetGraphicsPreset(std::string_view category, std::string_view preset);
     static std::filesystem::path GetUserDataPath();
     // only call this while handling a host event
     static void AttachToNextSubmit(VkSemaphore wait, uint64_t waitValue, VkSemaphore signal, uint64_t signalValue);

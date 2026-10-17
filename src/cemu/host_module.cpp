@@ -47,6 +47,22 @@ void CemuHost::CropWindowToAspectRatio(float aspectRatio) {
     HostModule::CropWindowToAspectRatio(aspectRatio);
 }
 
+static std::filesystem::path s_graphicsPack;
+
+std::vector<std::string> CemuHost::GetGraphicsPresets(std::string_view category) {
+    return HostModule::GetGraphicPackPresets(s_graphicsPack, category);
+}
+
+std::string CemuHost::GetGraphicsPreset(std::string_view category) {
+    return HostModule::GetGraphicPackPreset(s_graphicsPack, category);
+}
+
+void CemuHost::SetGraphicsPreset(std::string_view category, std::string_view preset) {
+    if (!HostModule::SetGraphicPackPreset(s_graphicsPack, category, preset)) {
+        Log::print<WARNING>("Graphics pack has no preset {} in {}", preset, category);
+    }
+}
+
 void CemuHost::SetFoveationExaggerated(bool exaggerated) {
     if (exaggerated) {
         HostModule::SetFoveationRadii(kExaggeratedFoveationInnerRadius, kExaggeratedFoveationOuterRadius);
@@ -204,8 +220,8 @@ public:
         try {
             const std::array<XrViewConfigurationView, 2> views = VRManager::instance().XR->GetViewConfigurations();
             for (const Game::Title& title : Game::GetTitles()) {
-                const std::filesystem::path graphicsPack = WriteGraphicsPack(packs / title.graphicsPack, views[0].recommendedImageRectWidth, views[0].recommendedImageRectHeight);
-                HostModule::RegisterGraphicPack(graphicsPack, HostModule::PackOrder::AfterUser);
+                s_graphicsPack = WriteGraphicsPack(packs / title.graphicsPack, views[0].recommendedImageRectWidth, views[0].recommendedImageRectHeight);
+                HostModule::RegisterGraphicPack(s_graphicsPack, HostModule::PackOrder::AfterUser);
             }
         }
         catch (const std::exception& e) {

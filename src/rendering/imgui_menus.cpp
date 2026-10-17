@@ -4,6 +4,7 @@
 #include "bettervr_version.h"
 
 #include "cemu/cemu_host.h"
+#include "game/game.h"
 #include "game/botw/debug/weapon_attack_debugger.h"
 #include "imgui_internal.h"
 #include "instance.h"
@@ -765,6 +766,52 @@ void RND_Renderer::ImGuiOverlay::DrawInterfacePage(bool* changed) {
     }
 }
 
+// the Graphics pack's Recording Mode presets, in the order of the pack's $recordingOutput values
+static constexpr const char* kRecordingModeCategory = "Recording Mode";
+static constexpr const char* kRecordingModeLabels[] = { "Punch In (Default)", "Wider View", "Wider View, No HUD In Window" };
+static constexpr const char* kResolutionMultiplierCategory = "VR Resolution Multiplier";
+
+// the normal and wider presets are named after their resolutions, so match them by the " (1x, ...)" part
+static void SelectRecordingMode(const std::string& preset) {
+    const std::string multiplier = CemuHost::GetGraphicsPreset(kResolutionMultiplierCategory);
+    CemuHost::SetGraphicsPreset(kRecordingModeCategory, preset);
+    const size_t stepStart = multiplier.find(" (");
+    if (stepStart == std::string::npos) {
+        return;
+    }
+    for (const std::string& candidate : CemuHost::GetGraphicsPresets(kResolutionMultiplierCategory)) {
+        if (candidate.ends_with(std::string_view(multiplier).substr(stepStart))) {
+            CemuHost::SetGraphicsPreset(kResolutionMultiplierCategory, candidate);
+            return;
+        }
+    }
+}
+
+static void DrawRecordingModeSetting() {
+    const std::vector<std::string> presets = CemuHost::GetGraphicsPresets(kRecordingModeCategory);
+    if (presets.size() != std::size(kRecordingModeLabels)) {
+        return;
+    }
+    const size_t selected = std::ranges::find(presets, CemuHost::GetGraphicsPreset(kRecordingModeCategory)) - presets.begin();
+    std::string description = "What Cemu's window shows. Wider View shows more to the sides, but runs slower.";
+    if (selected != Game::GetPresentation().recordingOutputMode) {
+        description += " Restart Cemu to apply this.";
+    }
+    DrawSetting("Recording Mode", description.c_str(), [&]() {
+        if (ImGui::BeginCombo("##value", selected < presets.size() ? kRecordingModeLabels[selected] : "")) {
+            for (size_t i = 0; i < presets.size(); i++) {
+                if (ImGui::Selectable(kRecordingModeLabels[i], i == selected) && i != selected) {
+                    SelectRecordingMode(presets[i]);
+                }
+                if (i == selected) {
+                    ImGui::SetItemDefaultFocus();
+                }
+            }
+            ImGui::EndCombo();
+        }
+    });
+}
+
 void RND_Renderer::ImGuiOverlay::DrawSystemPage(bool* changed) {
     auto& settings = GetSettings();
 
@@ -778,6 +825,7 @@ void RND_Renderer::ImGuiOverlay::DrawSystemPage(bool* changed) {
         DrawSetting("Boot Directly Into BotW", "Skips Cemu's game list on startup.", [&]() {
             settings.bootDirectlyIntoGame.AddToGUI(changed);
         });
+        DrawRecordingModeSetting();
         DrawSetting("Show FPS Overlay", [&]() {
             settings.performanceOverlay.AddComboToGUI(changed);
         });
