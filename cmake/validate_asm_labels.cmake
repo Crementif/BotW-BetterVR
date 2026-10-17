@@ -17,6 +17,7 @@ foreach(VAR_FILE ${VAR_ASM_FILES})
     file(READ "${VAR_FILE}" VAR_CONTENT)
     string(REGEX REPLACE "\r" "" VAR_CONTENT "${VAR_CONTENT}")
     string(REGEX REPLACE ";[^\n]*" "" VAR_CONTENT "${VAR_CONTENT}")
+    string(REGEX REPLACE "[][\\]" "" VAR_CONTENT "${VAR_CONTENT}")
     string(REPLACE "\n" ";" VAR_LINES "${VAR_CONTENT}")
     get_filename_component(VAR_NAME "${VAR_FILE}" NAME)
 
