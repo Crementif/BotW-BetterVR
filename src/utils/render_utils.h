@@ -21,15 +21,11 @@ namespace RenderUtils {
         float scaleY = 1.0f;
     };
 
-    inline constexpr float RecordingRenderAspectRatio = 16.0f / 9.0f;
-    inline constexpr float RecordingRenderAspectRatioTolerance = 0.01f;
+    // what Cemu's window shows, punched into the eye image or rendered wider to fill it
+    inline constexpr float WindowAspectRatio = 16.0f / 9.0f;
 
     // the fixed 854x480 capture texture ScreenAppCamera::calledFromM159 (0x02F47A0C) allocates
     inline constexpr float CapturedImageAspectRatio = 854.0f / 480.0f;
-
-    inline bool ShouldAdjustForRecordingRenderAspect(std::optional<float> renderAspectRatio) {
-        return renderAspectRatio.has_value() && std::isfinite(renderAspectRatio.value()) && fabsf(renderAspectRatio.value() - RecordingRenderAspectRatio) <= RecordingRenderAspectRatioTolerance;
-    }
 
     inline std::optional<float> SanitizeGameFovY(std::optional<float> fovY) {
         if (!fovY.has_value() || !std::isfinite(fovY.value()) || fovY.value() <= 0.0f || fovY.value() >= 3.13f) {
@@ -117,16 +113,16 @@ namespace RenderUtils {
         return transform;
     }
 
-    inline std::optional<XrFovf> GetRenderFov(const std::optional<XrFovf>& rawFov, std::optional<float> renderAspectRatio) {
+    inline std::optional<XrFovf> GetRenderFov(const std::optional<XrFovf>& rawFov, std::optional<float> widenedAspectRatio) {
         if (!rawFov.has_value()) {
             return std::nullopt;
         }
 
-        if (!ShouldAdjustForRecordingRenderAspect(renderAspectRatio)) {
+        if (!widenedAspectRatio.has_value()) {
             return rawFov;
         }
 
-        return ExpandFovToAspect(rawFov.value(), renderAspectRatio.value());
+        return ExpandFovToAspect(rawFov.value(), widenedAspectRatio.value());
     }
 
     inline UvTransform GetSubFovUvTransform(const std::optional<XrFovf>& sourceFov, const std::optional<XrFovf>& targetFov) {
@@ -137,8 +133,8 @@ namespace RenderUtils {
         return CalculateSubFovUvTransform(sourceFov.value(), targetFov.value());
     }
 
-    inline UvTransform GetPresentationUvTransform(const std::optional<XrFovf>& rawFov, std::optional<float> renderAspectRatio) {
-        return GetSubFovUvTransform(GetRenderFov(rawFov, renderAspectRatio), rawFov);
+    inline UvTransform GetPresentationUvTransform(const std::optional<XrFovf>& rawFov, std::optional<float> widenedAspectRatio) {
+        return GetSubFovUvTransform(GetRenderFov(rawFov, widenedAspectRatio), rawFov);
     }
 
     inline data_VRProjectionMatrixOut CalculateFOVAndOffset(const XrFovf& viewFOV) {

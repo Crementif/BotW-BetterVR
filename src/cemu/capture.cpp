@@ -5,6 +5,7 @@
 #include "game/game.h"
 #include "game/botw/pack_shared_memory.h"
 #include "utils/vulkan_utils.h"
+#include "cemu_host.h"
 #include "utils/debug_draw.h"
 
 using EyeSide = OpenXR::EyeSide;
@@ -36,7 +37,11 @@ static void EnsureLayers(RND_Renderer* renderer, VkCommandBuffer commandBuffer, 
         swapchainRes = VkExtent2D{ viewConfs[0].recommendedImageRectWidth, viewConfs[0].recommendedImageRectHeight };
     }
 
-    renderer->m_gameRenderAspectRatio = (float)renderRes.width / (float)renderRes.height;
+    // Recording Mode renders wider than the headset, otherwise Cemu's window is cut out of the eye image
+    const float renderAspectRatio = (float)renderRes.width / (float)renderRes.height;
+    const float headsetAspectRatio = (float)viewConfs[0].recommendedImageRectWidth / (float)viewConfs[0].recommendedImageRectHeight;
+    renderer->m_widenedRenderAspectRatio = renderAspectRatio > headsetAspectRatio * 1.05f ? std::optional(renderAspectRatio) : std::nullopt;
+    CemuHost::CropWindowToAspectRatio(renderAspectRatio < RenderUtils::WindowAspectRatio ? RenderUtils::WindowAspectRatio : 0.0f);
     renderer->m_layer3D = std::make_unique<RND_Renderer::Layer3D>(renderRes, swapchainRes);
     renderer->m_layer2D = std::make_unique<RND_Renderer::Layer2D>(renderRes, swapchainRes);
     renderer->m_layer3D->InitTextures(commandBuffer);
@@ -145,7 +150,7 @@ void Capture::On3DColor(const FrameState& state, VkCommandBuffer commandBuffer, 
         return;
     }
 
-    renderer->m_imguiOverlay->Draw3DLayerAsBackground(commandBuffer, surface.image, layer3D->GetAspectRatio(side), layer3D->GetPresentUvTransform(side), frameIdx);
+    renderer->m_imguiOverlay->Draw3DLayerAsBackground(commandBuffer, surface.image, frameIdx);
 
     // clear the image to be transparent to allow for the HUD to be rendered on top of it which results in a transparent HUD layer
     Release(commandBuffer, surface, ClearValue(false));

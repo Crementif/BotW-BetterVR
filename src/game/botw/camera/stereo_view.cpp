@@ -27,7 +27,7 @@ static std::optional<XrFovf> TryGetRenderFOV(const std::optional<Tracking::HeadV
         return std::nullopt;
     }
 
-    return RenderUtils::GetRenderFov(views->Fov(side), renderer->m_gameRenderAspectRatio);
+    return RenderUtils::GetRenderFov(views->Fov(side), renderer->m_widenedRenderAspectRatio);
 }
 
 static std::optional<XrFovf> TryGetCombinedFOV(const std::optional<Tracking::HeadViews>& views) {

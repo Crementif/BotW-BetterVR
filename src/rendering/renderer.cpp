@@ -518,13 +518,9 @@ void RND_Renderer::BeginHudCaptureGeneration(long frameIdx) {
 RND_Renderer::Layer3D::Layer3D(VkExtent2D inputRes, VkExtent2D outputRes) {
     auto viewConfs = VRManager::instance().XR->GetViewConfigurations();
 
-    const float inputAspectRatio = (float)inputRes.width / (float)inputRes.height;
-    this->m_recommendedAspectRatios[OpenXR::EyeSide::LEFT] = inputAspectRatio;
-    this->m_recommendedAspectRatios[OpenXR::EyeSide::RIGHT] = inputAspectRatio;
-
     for (int side = 0; side < 2; ++side) {
         std::optional<XrFovf> rawFov = VRManager::instance().XR->GetRenderer()->GetFOV((OpenXR::EyeSide)side);
-        m_presentUvTransforms[side] = RenderUtils::GetPresentationUvTransform(rawFov, inputAspectRatio);
+        m_presentUvTransforms[side] = RenderUtils::GetPresentationUvTransform(rawFov, VRManager::instance().XR->GetRenderer()->m_widenedRenderAspectRatio);
     }
 
     RND_VkBackend* backend = VRManager::instance().Backend.get();
@@ -648,7 +644,7 @@ void RND_Renderer::Layer3D::RecordRender(RND_VkBackend::CommandContext<false>* c
 
     m_presentPipelines[side]->SetUvTransform(RenderUtils::GetPresentationUvTransform(
         views[side].fov,
-        VRManager::instance().XR->GetRenderer()->m_gameRenderAspectRatio
+        VRManager::instance().XR->GetRenderer()->m_widenedRenderAspectRatio
     ));
 
     context->WaitFor(color.sync.get(), color.sync->GetWaitValue());

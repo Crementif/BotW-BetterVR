@@ -16,6 +16,8 @@ public:
     static void SetFoveatedShadingActive(bool active);
     // makes the foveation easy to see
     static void SetFoveationExaggerated(bool exaggerated);
+    // 0 shows the whole image
+    static void CropWindowToAspectRatio(float aspectRatio);
     static std::filesystem::path GetUserDataPath();
     // only call this while handling a host event
     static void AttachToNextSubmit(VkSemaphore wait, uint64_t waitValue, VkSemaphore signal, uint64_t signalValue);

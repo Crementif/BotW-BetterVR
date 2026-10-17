@@ -31,18 +31,18 @@ $qualityPreset:int = 2
 # Recording Output (BetterVR)
 
 [Preset]
-name = Disabled (Default)
+name = Punch In To 16:9 In Cemu's Window (Default)
 category = Recording Mode
 default = 1
 $recordingOutput:int = 0
 
 [Preset]
-name = Enabled (May Affect Performance)
+name = Render Wider 16:9 View, Shows More (Costs Performance)
 category = Recording Mode
 $recordingOutput:int = 1
 
 [Preset]
-name = Enabled, Hide HUD In 2D View (May Affect Performance)
+name = Render Wider 16:9 View, Hide HUD In Cemu's Window (Costs Performance)
 category = Recording Mode
 $recordingOutput:int = 2
 
@@ -113,26 +113,68 @@ $width = __BETTERVR_30_WIDTH__
 $height = __BETTERVR_30_HEIGHT__
 
 [Preset]
-name = 1920x1080 (16:9 Recording)
+name = __BETTERVR_WIDE_05_NAME__ (0.5x, Not Recommended Except For 8K VR headsets)
 category = VR Resolution Multiplier
 condition = ($recordingOutput != 0)
-$width = 1920
-$height = 1080
+$width = __BETTERVR_WIDE_05_WIDTH__
+$height = __BETTERVR_WIDE_05_HEIGHT__
 
 [Preset]
-name = 2560x1440 (16:9 Recording, Default)
+name = __BETTERVR_WIDE_075_NAME__ (0.75x, Lower GPU Cost)
+category = VR Resolution Multiplier
+condition = ($recordingOutput != 0)
+$width = __BETTERVR_WIDE_075_WIDTH__
+$height = __BETTERVR_WIDE_075_HEIGHT__
+
+[Preset]
+name = __BETTERVR_WIDE_10_NAME__ (1x, Native Headset Resolution, Default)
 category = VR Resolution Multiplier
 condition = ($recordingOutput != 0)
 default = 1
-$width = 2560
-$height = 1440
+$width = __BETTERVR_WIDE_10_WIDTH__
+$height = __BETTERVR_WIDE_10_HEIGHT__
 
 [Preset]
-name = 3840x2160 (16:9 Recording)
+name = __BETTERVR_WIDE_125_NAME__ (1.25x, Slightly Sharper)
 category = VR Resolution Multiplier
 condition = ($recordingOutput != 0)
-$width = 3840
-$height = 2160
+$width = __BETTERVR_WIDE_125_WIDTH__
+$height = __BETTERVR_WIDE_125_HEIGHT__
+
+[Preset]
+name = __BETTERVR_WIDE_15_NAME__ (1.5x, Balanced Quality)
+category = VR Resolution Multiplier
+condition = ($recordingOutput != 0)
+$width = __BETTERVR_WIDE_15_WIDTH__
+$height = __BETTERVR_WIDE_15_HEIGHT__
+
+[Preset]
+name = __BETTERVR_WIDE_175_NAME__ (1.75x, Sharper Image)
+category = VR Resolution Multiplier
+condition = ($recordingOutput != 0)
+$width = __BETTERVR_WIDE_175_WIDTH__
+$height = __BETTERVR_WIDE_175_HEIGHT__
+
+[Preset]
+name = __BETTERVR_WIDE_20_NAME__ (2x, Better Anti-Aliasing, Recommended)
+category = VR Resolution Multiplier
+condition = ($recordingOutput != 0)
+$width = __BETTERVR_WIDE_20_WIDTH__
+$height = __BETTERVR_WIDE_20_HEIGHT__
+
+[Preset]
+name = __BETTERVR_WIDE_225_NAME__ (2.25x, High Clarity)
+category = VR Resolution Multiplier
+condition = ($recordingOutput != 0)
+$width = __BETTERVR_WIDE_225_WIDTH__
+$height = __BETTERVR_WIDE_225_HEIGHT__
+
+[Preset]
+name = __BETTERVR_WIDE_30_NAME__ (3x, Best Anti-Aliasing, Requires A Good GPU)
+category = VR Resolution Multiplier
+condition = ($recordingOutput != 0)
+$width = __BETTERVR_WIDE_30_WIDTH__
+$height = __BETTERVR_WIDE_30_HEIGHT__
 
 # Quality Preset / Performance Hacks (BetterVR)
 

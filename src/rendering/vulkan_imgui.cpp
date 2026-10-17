@@ -415,7 +415,8 @@ void RND_Renderer::ImGuiOverlay::Update() {
     uint32_t windowWidth = pointer.available ? pointer.clientWidth : m_outputRes.width;
     uint32_t windowHeight = pointer.available ? pointer.clientHeight : m_outputRes.height;
 
-    float fbAspect = (float)m_outputRes.width / (float)m_outputRes.height;
+    // a punched-in window only shows the 16:9 center of the image
+    float fbAspect = std::max((float)m_outputRes.width / (float)m_outputRes.height, RenderUtils::WindowAspectRatio);
 
     uint32_t renderPhysicalWidth = windowWidth;
     uint32_t renderPhysicalHeight = windowHeight;
@@ -494,27 +495,8 @@ void RND_Renderer::ImGuiOverlay::Render(long frameIdx, bool renderBackground, bo
         backgroundDrawList->AddImage((ImTextureID)(withAlpha ? frame.hudFramebufferDS : frame.hudWithoutAlphaFramebufferDS), hudPos, ImVec2(hudPos.x + hudSize.x, hudPos.y + hudSize.y));
     };
 
-    auto renderMainBackground = [&](bool centerToRecordedAspect) {
-        ImVec2 bgPos = ImVec2(0, 0);
-        ImVec2 bgSize = windowSize;
-        ImVec2 uvMin = ImVec2(frame.mainFramebufferUvTransform.offsetX, frame.mainFramebufferUvTransform.offsetY);
-        ImVec2 uvMax = ImVec2(frame.mainFramebufferUvTransform.offsetX + frame.mainFramebufferUvTransform.scaleX, frame.mainFramebufferUvTransform.offsetY + frame.mainFramebufferUvTransform.scaleY);
-
-        if (centerToRecordedAspect) {
-            ImVec2 framebufferRes = ImVec2((float)m_outputRes.width, (float)m_outputRes.height);
-            float targetAspect = frame.mainFramebufferAspectRatio;
-            if (!(targetAspect > 0.0f)) {
-                targetAspect = 16.0f / 9.0f;
-            }
-
-            ImVec4 centeredRegion = CalculateCenteredAspectRegion(framebufferRes, targetAspect);
-            ImVec2 fbScale = ImGui::GetIO().DisplayFramebufferScale;
-
-            bgPos = ImVec2(centeredRegion.x / fbScale.x, centeredRegion.y / fbScale.y);
-            bgSize = ImVec2(centeredRegion.z / fbScale.x, centeredRegion.w / fbScale.y);
-        }
-
-        backgroundDrawList->AddImage((ImTextureID)frame.mainFramebufferDS, bgPos, ImVec2(bgPos.x + bgSize.x, bgPos.y + bgSize.y), uvMin, uvMax);
+    auto renderMainBackground = [&]() {
+        backgroundDrawList->AddImage((ImTextureID)frame.mainFramebufferDS, ImVec2(0, 0), windowSize);
     };
 
     const bool useBlackBars = game.blackBars;
@@ -523,7 +505,7 @@ void RND_Renderer::ImGuiOverlay::Render(long frameIdx, bool renderBackground, bo
         bool shouldRenderHUDWithAlpha = shouldRender3DBackground && !useBlackBars;
 
         if (shouldRender3DBackground) {
-            renderMainBackground(isDesktopView);
+            renderMainBackground();
         }
 
         if (!shouldHideGameUIInDesktopView) {
@@ -705,12 +687,10 @@ void RND_Renderer::ImGuiOverlay::ProcessInputs(OpenXR::InputState& inputs, const
     }
 }
 
-void RND_Renderer::ImGuiOverlay::Draw3DLayerAsBackground(VkCommandBuffer cb, VkImage srcImage, float aspectRatio, const RenderUtils::UvTransform& uvTransform, long frameIdx) {
+void RND_Renderer::ImGuiOverlay::Draw3DLayerAsBackground(VkCommandBuffer cb, VkImage srcImage, long frameIdx) {
     auto& frame = VRManager::instance().XR->GetRenderer()->GetFrame(frameIdx);
 
     frame.mainFramebuffer->vkCopyFromImage(cb, srcImage);
-    frame.mainFramebufferAspectRatio = aspectRatio;
-    frame.mainFramebufferUvTransform = uvTransform;
 }
 
 void RND_Renderer::ImGuiOverlay::DrawHUDLayerAsBackground(VkCommandBuffer cb, VkImage srcImage, long frameIdx) {

@@ -61,8 +61,6 @@ public:
         VkDescriptorSet mainFramebufferDS = VK_NULL_HANDLE;
         VkDescriptorSet hudFramebufferDS = VK_NULL_HANDLE;
         VkDescriptorSet hudWithoutAlphaFramebufferDS = VK_NULL_HANDLE;
-        float mainFramebufferAspectRatio = 1.0f;
-        RenderUtils::UvTransform mainFramebufferUvTransform = {};
 
 
         bool IsStereoRecord() const { return recordKind == CaptureRecordKind::Stereo3D; }
@@ -204,8 +202,6 @@ public:
         void RecordRender(RND_VkBackend::CommandContext<false>* context, OpenXR::EyeSide side, long frameIdx, const std::array<XrView, 2>& views, VulkanTexture* fadeTexture, const DebugDrawRenderData& debugDrawData);
         const std::array<XrCompositionLayerProjectionView, 2>& FinishRendering(const std::array<XrView, 2>& views);
 
-        float GetAspectRatio(OpenXR::EyeSide side) const { return m_recommendedAspectRatios[side]; }
-        const RenderUtils::UvTransform& GetPresentUvTransform(OpenXR::EyeSide side) const { return m_presentUvTransforms[side]; }
         long GetCurrentFrameIdx() const { return m_currentFrameIdx; }
         LayerTarget& GetColorTarget(OpenXR::EyeSide side, long frameIdx) { return m_colorTargets[side][frameIdx]; }
         LayerTarget& GetDepthTarget(OpenXR::EyeSide side, long frameIdx) { return m_depthTargets[side][frameIdx]; }
@@ -216,7 +212,6 @@ public:
         std::array<std::unique_ptr<RND_VkBackend::PresentPipeline<true>>, 2> m_presentPipelines;
         std::array<std::array<LayerTarget, 2>, 2> m_colorTargets;
         std::array<std::array<LayerTarget, 2>, 2> m_depthTargets;
-        std::array<float, 2> m_recommendedAspectRatios = { 1.0f, 1.0f };
         std::array<RenderUtils::UvTransform, 2> m_presentUvTransforms = {};
         std::unique_ptr<RND_VkBackend::DebugDrawPipeline> m_debugDrawPipeline;
 
@@ -260,7 +255,7 @@ public:
         ~ImGuiOverlay();
 
         void Update();
-        static void Draw3DLayerAsBackground(VkCommandBuffer cb, VkImage srcImage, float aspectRatio, const RenderUtils::UvTransform& uvTransform, long frameIdx);
+        static void Draw3DLayerAsBackground(VkCommandBuffer cb, VkImage srcImage, long frameIdx);
         static void DrawHUDLayerAsBackground(VkCommandBuffer cb, VkImage srcImage, long frameIdx);
         void Render(long frameIdx, bool renderBackground, bool isDesktopView);
         void DrawAndCopyToImage(VkCommandBuffer cb, VkImage destImage, long frameIdx, bool isDesktopView);
@@ -296,7 +291,8 @@ public:
     std::unique_ptr<Layer3D> m_layer3D;
     std::unique_ptr<Layer2D> m_layer2D;
     std::unique_ptr<ImGuiOverlay> m_imguiOverlay;
-    float m_gameRenderAspectRatio = 16.0f / 9.0f;
+    // set when the Graphics pack renders the eyes wider than the headset sees, for Cemu's window
+    std::optional<float> m_widenedRenderAspectRatio;
 
     bool IsRendering3D(long frameIdx) {
         return m_lastPresented3D;

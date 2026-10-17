@@ -127,20 +127,30 @@ namespace EyeResolution {
         return replacedAny;
     }
 
+    // the Recording Mode presets' tokens, __BETTERVR_WIDE_ in place of __BETTERVR_
+    inline std::string WideToken(std::string_view token) {
+        constexpr std::string_view prefix = "__BETTERVR_";
+        return std::string("__BETTERVR_WIDE_").append(token.substr(prefix.size()));
+    }
+
     // fills in the Graphics pack's presets for the headset's eye resolution, wide presets are widened to 16:9 for Recording Mode
-    // onPreset(preset, "<width>x<height>") for each preset. False when the rules had no placeholders.
+    // returns false if there were no placeholders
     template <typename OnPreset>
     bool FillGraphicsRules(std::string& rules, uint32_t eyeWidth, uint32_t eyeHeight, double minimumWidth, OnPreset&& onPreset) {
         bool replacedAny = false;
         for (const Preset& preset : kPresets) {
-            const auto [width, height] = GetNearestRulesCompatible(double(eyeWidth) * preset.multiplier, double(eyeHeight) * preset.multiplier, minimumWidth);
-            const std::string widthText = std::to_string(width);
-            const std::string heightText = std::to_string(height);
-            const std::string label = widthText + "x" + heightText;
-            onPreset(preset, label);
-            replacedAny |= ReplaceToken(rules, preset.nameToken, label);
-            replacedAny |= ReplaceToken(rules, preset.widthToken, widthText);
-            replacedAny |= ReplaceToken(rules, preset.heightToken, heightText);
+            for (const bool wide : { false, true }) {
+                const double height = double(eyeHeight) * preset.multiplier;
+                const double width = wide ? std::max(double(eyeWidth) * preset.multiplier, height * 16.0 / 9.0) : double(eyeWidth) * preset.multiplier;
+                const auto [roundedWidth, roundedHeight] = GetNearestRulesCompatible(width, height, minimumWidth);
+                const std::string widthText = std::to_string(roundedWidth);
+                const std::string heightText = std::to_string(roundedHeight);
+                const std::string label = widthText + "x" + heightText;
+                onPreset(preset, label, wide);
+                replacedAny |= ReplaceToken(rules, wide ? WideToken(preset.nameToken) : preset.nameToken, label);
+                replacedAny |= ReplaceToken(rules, wide ? WideToken(preset.widthToken) : preset.widthToken, widthText);
+                replacedAny |= ReplaceToken(rules, wide ? WideToken(preset.heightToken) : preset.heightToken, heightText);
+            }
         }
         return replacedAny;
     }
