@@ -635,6 +635,8 @@ _d5c7c781c35f4a01_Lfunc_begin3:
 	li r3, 2
 	li r4, 2
 	bl _d5c7c781c35f4a01_ZL13emitHostEventjjj
+	li r3, 1
+	bl gpuWriteMonoSection
 _d5c7c781c35f4a01_LBB3_4:
 	lwz r30, 24(r1)
 	lwz r29, 20(r1)
