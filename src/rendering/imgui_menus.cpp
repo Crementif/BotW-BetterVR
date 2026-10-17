@@ -2,6 +2,7 @@
 
 #include "imgui_menus.h"
 
+#include "cemu/cemu_host.h"
 #include "game/botw/debug/weapon_attack_debugger.h"
 #include "imgui_internal.h"
 #include "instance.h"
@@ -769,6 +770,9 @@ void RND_Renderer::ImGuiOverlay::DrawSystemPage(bool* changed) {
     DrawPageHeader(ICON_KI_COG, "System");
 
     if (BeginSettingsSection("##General")) {
+        DrawSetting("Boot Directly Into BotW", "Skips Cemu's game list on startup.", [&]() {
+            settings.bootDirectlyIntoGame.AddToGUI(changed);
+        });
         DrawSetting("Show FPS Overlay", [&]() {
             settings.performanceOverlay.AddComboToGUI(changed);
         });
@@ -1119,6 +1123,10 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
         ImGui::PopID();
         ImGui::PopStyleVar();
 
+        if (settings.bootDirectlyIntoGame && settings.bootDirectlyTitleId != CemuHost::GetCurrentTitleId()) {
+            settings.bootDirectlyTitleId = CemuHost::GetCurrentTitleId();
+            changed = true;
+        }
         if (changed) {
             shouldLogSavedSettingsOnClose = true;
             ImGui::SaveIniSettingsToDisk(ImGui::GetIO().IniFilename);

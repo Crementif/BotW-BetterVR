@@ -4,6 +4,8 @@
 #include "instance.h"
 #include "utils/mod_settings.h"
 
+#include <fstream>
+
 ModSettings g_settings = {};
 
 bool ModSettings::IsDebuggingToolsEnabled() const {
@@ -85,6 +87,22 @@ static void Settings_WriteAll(ImGuiContext* ctx, ImGuiSettingsHandler* handler, 
 static void Settings_ReadFinish(ImGuiContext* ctx, ImGuiSettingsHandler* handler) {
     auto& s = GetSettings();
     Log::print<INFO>("VR Settings Loaded:\n{}", s.ToString());
+}
+
+void Settings_ReadFile(const std::filesystem::path& iniPath) {
+    std::ifstream ini(iniPath);
+    bool inSettings = false;
+    for (std::string line; std::getline(ini, line);) {
+        if (!line.empty() && line.back() == '\r') {
+            line.pop_back();
+        }
+        if (line.starts_with('[')) {
+            inSettings = line == "[BetterVR][Settings]";
+        }
+        else if (inSettings) {
+            Settings_ReadLine(nullptr, nullptr, &GetSettings(), line.c_str());
+        }
+    }
 }
 
 void InitSettings() {

@@ -553,6 +553,8 @@ struct ModSettings {
     BoolSetting logTimestamps{ "LogTimestamps", true, &Log::SetShowTimestamps };
     BoolSetting logThreadIds{ "LogThreadIds", false, &Log::SetShowThreadIds };
     BoolSetting tutorialPromptShown{ "TutorialPromptShown", false };
+    BoolSetting bootDirectlyIntoGame{ "BootDirectlyIntoGame", false };
+    NumberSetting<uint64_t> bootDirectlyTitleId{ "BootDirectlyTitleId", 0 };
 
     FloatSetting axisThreshold{ "AxisThreshold", kDefaultAxisThreshold, 0.0f, 1.0f };
     FloatSetting stickDeadzone{ "StickDeadzone", kDefaultStickDeadzone, 0.0f, 1.0f };
@@ -624,4 +626,6 @@ struct ModSettings {
 
 extern ModSettings& GetSettings();
 extern void InitSettings();
+// for reading the settings before the overlay exists
+extern void Settings_ReadFile(const std::filesystem::path& iniPath);
 extern void Settings_LogSavedSettings();

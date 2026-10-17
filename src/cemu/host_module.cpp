@@ -8,6 +8,7 @@
 #include "game/game.h"
 #include "game/botw/pack_shared_memory.h"
 #include "utils/eye_resolution.h"
+#include "utils/mod_settings.h"
 #include "utils/platform.h"
 #include "utils/update_check.h"
 
@@ -185,6 +186,10 @@ public:
         if (!std::ranges::all_of(Game::GetTitles(), [&](const Game::Title& title) { return std::filesystem::exists(packs / title.vrPack / "rules.txt", error); })) {
             HostModule::ShowErrorDialog("BetterVR is missing its files", "The BetterVR folder that came with BetterVR_Launcher.exe is missing, so it runs without BetterVR and its graphic packs. Keep the BetterVR folder next to BetterVR_Launcher.exe, as it is in the download.");
             return;
+        }
+        Settings_ReadFile(HostModule::GetUserDataPath() / "BetterVR_settings.ini");
+        if (GetSettings().bootDirectlyIntoGame && Game::FindTitle(GetSettings().bootDirectlyTitleId) != nullptr) {
+            HostModule::BootTitleOnStart(GetSettings().bootDirectlyTitleId);
         }
         UpdateCheck::Start();
         HostModule::RegisterBundledGraphicPacks(packs / "graphicPacks");
