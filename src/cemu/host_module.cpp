@@ -7,6 +7,7 @@
 #include "vulkan_loader.h"
 #include "game/game.h"
 #include "game/botw/pack_shared_memory.h"
+#include "bettervr_version.h"
 #include "utils/eye_resolution.h"
 #include "utils/mod_settings.h"
 #include "utils/platform.h"
@@ -191,7 +192,10 @@ public:
         if (GetSettings().bootDirectlyIntoGame && Game::FindTitle(GetSettings().bootDirectlyTitleId) != nullptr) {
             HostModule::BootTitleOnStart(GetSettings().bootDirectlyTitleId);
         }
-        UpdateCheck::Start();
+        UpdateCheck::Start([](const std::string& tag) {
+            const std::string message = fmt::format("BetterVR {} is out. You're on {}.", tag, BETTERVR_VERSION_STRING);
+            HostModule::ShowLinkDialog("BetterVR update", message.c_str(), "Open release page", UpdateCheck::kReleasesUrl);
+        });
         HostModule::RegisterBundledGraphicPacks(packs / "graphicPacks");
         try {
             const std::array<XrViewConfigurationView, 2> views = VRManager::instance().XR->GetViewConfigurations();

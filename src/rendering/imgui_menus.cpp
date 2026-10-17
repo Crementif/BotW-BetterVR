@@ -1,6 +1,7 @@
 #include "pch.h"
 
 #include "imgui_menus.h"
+#include "bettervr_version.h"
 
 #include "cemu/cemu_host.h"
 #include "game/botw/debug/weapon_attack_debugger.h"
@@ -768,6 +769,10 @@ void RND_Renderer::ImGuiOverlay::DrawSystemPage(bool* changed) {
     auto& settings = GetSettings();
 
     DrawPageHeader(ICON_KI_COG, "System");
+    if (const std::optional<std::string> newerRelease = UpdateCheck::GetNewerRelease()) {
+        ImGui::TextColored(ImVec4(0.45f, 0.75f, 1.0f, 1.0f), ICON_KI_INFO_CIRCLE "  BetterVR %s is out, you're on %s. Get it from %s", newerRelease->c_str(), BETTERVR_VERSION_STRING, UpdateCheck::kReleasesUrl);
+        ImGui::Spacing();
+    }
 
     if (BeginSettingsSection("##General")) {
         DrawSetting("Boot Directly Into BotW", "Skips Cemu's game list on startup.", [&]() {
@@ -1004,12 +1009,50 @@ static void DrawTutorialPromptAndControllerVerification(bool isMenuOpen) {
         else {
             ImGui::Text("%s", GetControllerModMenuPrompt());
         }
-        if (const std::optional<std::string> newerRelease = UpdateCheck::GetNewerRelease()) {
-            ImGui::Spacing();
-            ImGui::Text("BetterVR %s is out! Get it from github.com/Crementif/BotW-BetterVR/releases", newerRelease->c_str());
-        }
     }
     ImGui::End();
+}
+
+static void DrawUpdateBanner(bool isMenuOpen) {
+    constexpr double kShownFor = 20.0;
+    constexpr double kFadeOutFor = 2.0;
+    static double s_shownSince = -1.0;
+    static bool s_dismissed = false;
+
+    const std::optional<std::string> newerRelease = UpdateCheck::GetNewerRelease();
+    s_dismissed |= isMenuOpen;
+    if (!newerRelease || s_dismissed) {
+        return;
+    }
+    if (s_shownSince < 0.0) {
+        s_shownSince = ImGui::GetTime();
+    }
+    const double shownFor = ImGui::GetTime() - s_shownSince;
+    if (shownFor >= kShownFor) {
+        s_dismissed = true;
+        return;
+    }
+
+    const ImVec2 displaySize = ImGui::GetIO().DisplaySize;
+    ImGui::PushStyleVar(ImGuiStyleVar_Alpha, (float)std::clamp((kShownFor - shownFor) / kFadeOutFor, 0.0, 1.0));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(24.0f, 16.0f));
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.10f, 0.24f, 0.42f, 0.96f));
+    ImGui::SetNextWindowPos(ImVec2(displaySize.x * 0.5f, displaySize.y * 0.12f), ImGuiCond_Always, ImVec2(0.5f, 0.0f));
+    if (ImGui::Begin("UpdateBanner", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoInputs)) {
+        if (ImGuiMenus::g_titleFont != nullptr) {
+            ImGui::PushFont(ImGuiMenus::g_titleFont);
+        }
+        ImGui::Text(ICON_KI_INFO_CIRCLE "  BetterVR %s is out!", newerRelease->c_str());
+        if (ImGuiMenus::g_titleFont != nullptr) {
+            ImGui::PopFont();
+        }
+        ImGui::Spacing();
+        ImGui::Text("You're on %s. Get the new version from %s", BETTERVR_VERSION_STRING, UpdateCheck::kReleasesUrl);
+        ImGui::Text("Cemu's window has a button that opens the page.");
+    }
+    ImGui::End();
+    ImGui::PopStyleColor();
+    ImGui::PopStyleVar(2);
 }
 
 void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
@@ -1017,6 +1060,7 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
     auto& settings = GetSettings();
 
     DrawTutorialPromptAndControllerVerification(isMenuOpen);
+    DrawUpdateBanner(isMenuOpen);
 
     static bool wasMenuPrevOpened = false;
     static bool shouldLogSavedSettingsOnClose = false;

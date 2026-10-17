@@ -62,16 +62,19 @@ static std::optional<std::string> FetchLatestTag() {
     return response.substr(open + 1, close - open - 1);
 }
 
-void UpdateCheck::Start() {
+void UpdateCheck::Start(std::function<void(const std::string&)> onNewerRelease) {
 #if !defined(_DEBUG)
-    std::thread([] {
+    std::thread([onNewerRelease = std::move(onNewerRelease)] {
         const std::optional<std::string> latest = FetchLatestTag();
         if (!latest || ParseVersion(*latest) <= ParseVersion(BETTERVR_VERSION)) {
             return;
         }
         Log::print<INFO>("BetterVR {} is out, this is {}", *latest, BETTERVR_VERSION_STRING);
-        std::scoped_lock lock(s_mutex);
-        s_newerRelease = latest;
+        {
+            std::scoped_lock lock(s_mutex);
+            s_newerRelease = latest;
+        }
+        onNewerRelease(*latest);
     }).detach();
 #endif
 }
