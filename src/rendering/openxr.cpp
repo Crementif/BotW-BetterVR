@@ -55,7 +55,7 @@ static std::string RuntimeFailureHelp(const char* what, XrResult result) {
     std::string help = what;
     switch (result) {
         case XR_ERROR_RUNTIME_UNAVAILABLE:
-            help += " No OpenXR runtime is set up. Pick one in your headset's software (SteamVR, the Meta app, Virtual Desktop's VDXR, or Monado/WiVRn on Linux) and set it as the active OpenXR runtime.";
+            help += " No OpenXR runtime is set up. Pick one in your headset's software (SteamVR, the Meta app, Virtual Desktop's VDXR, or Monado/WiVRn on Linux) and set it as the active OpenXR runtime, as https://academy.vrex.no/knowledge-base/openxr/ shows. Virtual Desktop's VDXR runtime usually performs best.";
             break;
         case XR_ERROR_RUNTIME_FAILURE:
             help += " The active OpenXR runtime failed to start. Restart it or your PC, and check that the right runtime is active.";
