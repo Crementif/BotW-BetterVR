@@ -9,6 +9,7 @@
 #include "game/botw/pack_shared_memory.h"
 #include "utils/eye_resolution.h"
 #include "utils/platform.h"
+#include "utils/update_check.h"
 
 #include <fstream>
 
@@ -185,6 +186,7 @@ public:
             HostModule::ShowErrorDialog("BetterVR is missing its files", "The BetterVR folder that came with BetterVR_Launcher.exe is missing, so it runs without BetterVR and its graphic packs. Keep the BetterVR folder next to BetterVR_Launcher.exe, as it is in the download.");
             return;
         }
+        UpdateCheck::Start();
         HostModule::RegisterBundledGraphicPacks(packs / "graphicPacks");
         try {
             const std::array<XrViewConfigurationView, 2> views = VRManager::instance().XR->GetViewConfigurations();

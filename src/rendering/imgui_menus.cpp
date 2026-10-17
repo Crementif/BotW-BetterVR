@@ -9,6 +9,7 @@
 #include "rendering/openxr.h"
 #include "utils/profiler.h"
 #include "utils/mod_settings.h"
+#include "utils/update_check.h"
 #include "supporters_generated.h"
 
 static constexpr ImVec4 kDescriptionColor = ImVec4(0.63f, 0.71f, 0.78f, 1.0f);
@@ -998,6 +999,10 @@ static void DrawTutorialPromptAndControllerVerification(bool isMenuOpen) {
         }
         else {
             ImGui::Text("%s", GetControllerModMenuPrompt());
+        }
+        if (const std::optional<std::string> newerRelease = UpdateCheck::GetNewerRelease()) {
+            ImGui::Spacing();
+            ImGui::Text("BetterVR %s is out! Get it from github.com/Crementif/BotW-BetterVR/releases", newerRelease->c_str());
         }
     }
     ImGui::End();

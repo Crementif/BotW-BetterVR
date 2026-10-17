@@ -35,6 +35,8 @@ add_library(BetterVR STATIC
     utils/debug_draw.h
     utils/debug_draw.cpp
     utils/eye_resolution.h
+    utils/update_check.h
+    utils/update_check.cpp
 
     cemu/capture.h
     cemu/capture.cpp
@@ -134,7 +136,7 @@ target_include_directories(BetterVR PRIVATE "${BETTERVR_ROOT}/include" "${BETTER
 set_source_files_properties(cemu/host_module.cpp PROPERTIES INCLUDE_DIRECTORIES "${Cemu_SOURCE_DIR}/src")
 
 find_package(glm CONFIG REQUIRED)
-target_link_libraries(BetterVR PRIVATE BetterVR_ImPlot BetterVR_ImGuiVulkan OpenXR::openxr_loader glm::glm fmt::fmt pugixml::pugixml)
+target_link_libraries(BetterVR PRIVATE BetterVR_ImPlot BetterVR_ImGuiVulkan OpenXR::openxr_loader glm::glm fmt::fmt pugixml::pugixml CURL::libcurl)
 
 # the version comes from the workspace's project() line, so a standalone Cemu configure gets it too
 set(BETTERVR_VERSION_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated/version")
