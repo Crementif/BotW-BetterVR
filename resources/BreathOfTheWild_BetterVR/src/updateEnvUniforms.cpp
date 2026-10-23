@@ -13,9 +13,10 @@ struct EnvViewEntry {
     uint32 blockPtr;  // agl::UniformBlock object, *(blockPtr+4) = the buffer the DL binds
     uint32 rowOff;    // byte offset of the inverse-view rows inside that buffer
     float  m[12];
+    uint32 valid;
 };
 
-extern "C" { EnvViewEntry s_envViewBlocks[MAX_ENV_VIEW_BLOCKS]; }
+extern "C" { EnvViewEntry s_envViewBlocks[MAX_ENV_VIEW_BLOCKS]; extern uint32 sModelRenderContextPtr; }
 static volatile uint32 s_envViewCount = 0;
 static uint32 s_envProbeFrame = 0;
 
@@ -36,15 +37,15 @@ static bool isViewToWorld(const float* m) {
     float l0 = m[0] * m[0] + m[1] * m[1] + m[2] * m[2];
     float l1 = m[4] * m[4] + m[5] * m[5] + m[6] * m[6];
     float l2 = m[8] * m[8] + m[9] * m[9] + m[10] * m[10];
-    if (l0 < 0.99f || l0 > 1.01f) return false;
-    if (l1 < 0.99f || l1 > 1.01f) return false;
-    if (l2 < 0.99f || l2 > 1.01f) return false;
+    if (!(l0 >= 0.99f && l0 <= 1.01f)) return false;
+    if (!(l1 >= 0.99f && l1 <= 1.01f)) return false;
+    if (!(l2 >= 0.99f && l2 <= 1.01f)) return false;
     float d01 = m[0] * m[4] + m[1] * m[5] + m[2] * m[6];
     float d02 = m[0] * m[8] + m[1] * m[9] + m[2] * m[10];
     float d12 = m[4] * m[8] + m[5] * m[9] + m[6] * m[10];
-    if (d01 < -0.01f || d01 > 0.01f) return false;
-    if (d02 < -0.01f || d02 > 0.01f) return false;
-    if (d12 < -0.01f || d12 > 0.01f) return false;
+    if (!(d01 >= -0.01f && d01 <= 0.01f)) return false;
+    if (!(d02 >= -0.01f && d02 <= 0.01f)) return false;
+    if (!(d12 >= -0.01f && d12 <= 0.01f)) return false;
     return true;
 }
 
@@ -52,7 +53,7 @@ static bool isTransposeRotation(const float* a, const float* b) {
     for (uint32 r = 0; r < 3; r++) {
         for (uint32 c = 0; c < 3; c++) {
             float d = a[r * 4 + c] - b[c * 4 + r];
-            if (d < -0.002f || d > 0.002f) return false;
+            if (!(d >= -0.002f && d <= 0.002f)) return false;
         }
     }
     return true;
@@ -62,6 +63,20 @@ static bool isTransposeRotation(const float* a, const float* b) {
 extern "C" ATTR_KEEP void hook_captureEnvViewRows(uint32 uniformBlock, uint32 bufferVA, uint32 slot, const float* blob) {
     if (slot != ENV_BLOB_SLOT || uniformBlock == 0 || bufferVA == 0 || blob == 0) return;
 
+    uint32 previousCount = s_envViewCount;
+    for (uint32 i = 0; i < previousCount && i < MAX_ENV_VIEW_BLOCKS; i++) {
+        if (s_envViewBlocks[i].blockPtr == uniformBlock) s_envViewBlocks[i].valid = 0;
+    }
+
+    // other matrices in dungeons can look the same, so also check that it's the camera
+    if (sModelRenderContextPtr == 0) return;
+    uint32 vfc = readU32((void*)sModelRenderContextPtr, 0x0C);
+    if (vfc == 0) return;
+    const float* recordView = (const float*)(vfc + 0x60);
+    if (!isViewToWorld(recordView)) return;
+    float recordInverse[12];
+    gameMTXInverse((float*)recordView, recordInverse);
+
     // the inverse view, followed 0x30 later by the view
     uint32 found = 0xFFFFFFFF;
     for (uint32 off = 0; off + 0x60 <= ENV_BLOB_BYTES; off += 16) {
@@ -69,6 +84,17 @@ extern "C" ATTR_KEEP void hook_captureEnvViewRows(uint32 uniformBlock, uint32 bu
         if (!isViewToWorld(a)) continue;
         const float* b = (const float*)((uint32)blob + off + 0x30);
         if (!isTransposeRotation(a, b)) continue;
+        bool matches = true;
+        for (uint32 k = 0; k < 12; k++) {
+            const float tolerance = (k % 4 == 3) ? 0.05f : 0.002f;
+            const float inverseDifference = a[k] - recordInverse[k];
+            const float viewDifference = b[k] - recordView[k];
+            if (!(inverseDifference >= -tolerance && inverseDifference <= tolerance && viewDifference >= -tolerance && viewDifference <= tolerance)) {
+                matches = false;
+                break;
+            }
+        }
+        if (!matches) continue;
         found = off;
         break;
     }
@@ -91,6 +117,7 @@ extern "C" ATTR_KEEP void hook_captureEnvViewRows(uint32 uniformBlock, uint32 bu
             EnvViewEntry* prev = &s_envViewBlocks[i];
             prev->rowOff = rowOff;
             for (uint32 k = 0; k < 12; k++) prev->m[k] = src[k];
+            prev->valid = 1;
             return;
         }
     }
@@ -101,6 +128,7 @@ extern "C" ATTR_KEEP void hook_captureEnvViewRows(uint32 uniformBlock, uint32 bu
     e->blockPtr = uniformBlock;
     e->rowOff = rowOff;
     for (uint32 k = 0; k < 12; k++) e->m[k] = src[k];
+    e->valid = 1;
 }
 
 extern "C" ATTR_KEEP void envInvalidateBlock(uint32 uniformBlock) {
@@ -134,7 +162,7 @@ extern "C" ATTR_KEEP void recalcEnvViewUniforms(void* modelRenderContext, float 
 
     for (uint32 i = 0; i < count; i++) {
         EnvViewEntry* e = &s_envViewBlocks[i];
-        if (e->blockPtr == 0) continue;
+        if (e->blockPtr == 0 || !e->valid) continue;
         uint32 liveBuf = readU32((void*)e->blockPtr, 4);
         if (liveBuf == 0) continue;
         gpuWriteWordsLE(liveBuf + e->rowOff, invEye, 12);

@@ -739,22 +739,34 @@ _6fe853b8c320bbfb_LCPI4_3:
 	.align 4
 _6fe853b8c320bbfb_ZL13isViewToWorldPKf:
 _6fe853b8c320bbfb_Lfunc_begin4:
-	lfs f1, 4(r3)
 	mr	r4, r3
-	lfs f0, 0(r3)
-	lfs f2, 8(r3)
+	lfs f1, 4(r4)
 	lis r3, _6fe853b8c320bbfb_LCPI4_0@ha
-	lfs f4, _6fe853b8c320bbfb_LCPI4_0@l(r3)
+	lfs f0, 0(r4)
+	lfs f2, 8(r4)
 	fmuls f3, f1, f1
+	lfs f4, _6fe853b8c320bbfb_LCPI4_0@l(r3)
 	fmadds f3, f0, f0, f3
 	fmadds f3, f2, f2, f3
-	fcmpu cr0, f3, f4
+	fcmpu cr7, f3, f4
+	.int 0x7C600026 ; mfcr r3
+	.int 0x7CA00026 ; mfcr r5
+	clrlwi	r3, r3, 31
+	rlwinm r5, r5, 29, 31, 31
+	or r3, r5, r3
+	cmplwi	r3, 0
 	li r3, 0
-	bltlr	cr0
+	bnelr	cr0
 	lis r5, _6fe853b8c320bbfb_LCPI4_1@ha
 	lfs f4, _6fe853b8c320bbfb_LCPI4_1@l(r5)
-	fcmpu cr0, f3, f4
-	bgtlr	cr0
+	fcmpu cr7, f3, f4
+	.int 0x7CA00026 ; mfcr r5
+	.int 0x7CC00026 ; mfcr r6
+	clrlwi	r5, r5, 31
+	rlwinm r6, r6, 30, 31, 31
+	or r5, r6, r5
+	cmplwi	r5, 0
+	bnelr	cr0
 	lfs f5, 20(r4)
 	lis r5, _6fe853b8c320bbfb_LCPI4_0@ha
 	lfs f3, 16(r4)
@@ -763,12 +775,24 @@ _6fe853b8c320bbfb_Lfunc_begin4:
 	lfs f7, _6fe853b8c320bbfb_LCPI4_0@l(r5)
 	fmadds f6, f3, f3, f6
 	fmadds f6, f4, f4, f6
-	fcmpu cr0, f6, f7
-	bltlr	cr0
+	fcmpu cr7, f6, f7
+	.int 0x7CA00026 ; mfcr r5
+	.int 0x7CC00026 ; mfcr r6
+	clrlwi	r5, r5, 31
+	rlwinm r6, r6, 29, 31, 31
+	or r5, r6, r5
+	cmplwi	r5, 0
+	bnelr	cr0
 	lis r5, _6fe853b8c320bbfb_LCPI4_1@ha
 	lfs f7, _6fe853b8c320bbfb_LCPI4_1@l(r5)
-	fcmpu cr0, f6, f7
-	bgtlr	cr0
+	fcmpu cr7, f6, f7
+	.int 0x7CA00026 ; mfcr r5
+	.int 0x7CC00026 ; mfcr r6
+	clrlwi	r5, r5, 31
+	rlwinm r6, r6, 30, 31, 31
+	or r5, r6, r5
+	cmplwi	r5, 0
+	bnelr	cr0
 	lfs f7, 36(r4)
 	lfs f6, 32(r4)
 	lfs f8, 40(r4)
@@ -777,48 +801,92 @@ _6fe853b8c320bbfb_Lfunc_begin4:
 	fmuls f9, f7, f7
 	fmadds f9, f6, f6, f9
 	fmadds f9, f8, f8, f9
-	fcmpu cr0, f9, f10
-	bltlr	cr0
+	fcmpu cr7, f9, f10
+	.int 0x7C800026 ; mfcr r4
+	.int 0x7CA00026 ; mfcr r5
+	clrlwi	r4, r4, 31
+	rlwinm r5, r5, 29, 31, 31
+	or r4, r5, r4
+	cmplwi	r4, 0
+	bnelr	cr0
 	lis r4, _6fe853b8c320bbfb_LCPI4_1@ha
 	lfs f10, _6fe853b8c320bbfb_LCPI4_1@l(r4)
-	fcmpu cr0, f9, f10
-	bgtlr	cr0
+	fcmpu cr7, f9, f10
+	.int 0x7C800026 ; mfcr r4
+	.int 0x7CA00026 ; mfcr r5
+	clrlwi	r4, r4, 31
+	rlwinm r5, r5, 30, 31, 31
+	or r4, r5, r4
+	cmplwi	r4, 0
+	bnelr	cr0
 	lis r4, _6fe853b8c320bbfb_LCPI4_2@ha
 	lfs f10, _6fe853b8c320bbfb_LCPI4_2@l(r4)
 	fmuls f9, f1, f5
 	fmadds f9, f0, f3, f9
 	fmadds f9, f2, f4, f9
-	fcmpu cr0, f9, f10
-	bltlr	cr0
+	fcmpu cr7, f9, f10
+	.int 0x7C800026 ; mfcr r4
+	.int 0x7CA00026 ; mfcr r5
+	clrlwi	r4, r4, 31
+	rlwinm r5, r5, 29, 31, 31
+	or r4, r5, r4
+	cmplwi	r4, 0
+	bnelr	cr0
 	lis r4, _6fe853b8c320bbfb_LCPI4_3@ha
 	lfs f10, _6fe853b8c320bbfb_LCPI4_3@l(r4)
-	fcmpu cr0, f9, f10
-	bgtlr	cr0
+	fcmpu cr7, f9, f10
+	.int 0x7C800026 ; mfcr r4
+	.int 0x7CA00026 ; mfcr r5
+	clrlwi	r4, r4, 31
+	rlwinm r5, r5, 30, 31, 31
+	or r4, r5, r4
+	cmplwi	r4, 0
+	bnelr	cr0
 	lis r4, _6fe853b8c320bbfb_LCPI4_2@ha
 	lfs f9, _6fe853b8c320bbfb_LCPI4_2@l(r4)
 	fmuls f1, f1, f7
 	fmadds f0, f0, f6, f1
 	fmadds f1, f2, f8, f0
-	fcmpu cr0, f1, f9
-	bltlr	cr0
+	fcmpu cr7, f1, f9
+	.int 0x7C800026 ; mfcr r4
+	.int 0x7CA00026 ; mfcr r5
+	clrlwi	r4, r4, 31
+	rlwinm r5, r5, 29, 31, 31
+	or r4, r5, r4
+	cmplwi	r4, 0
+	bnelr	cr0
 	lis r4, _6fe853b8c320bbfb_LCPI4_3@ha
 	lfs f0, _6fe853b8c320bbfb_LCPI4_3@l(r4)
-	fcmpu cr0, f1, f0
-	bgtlr	cr0
+	fcmpu cr7, f1, f0
+	.int 0x7C800026 ; mfcr r4
+	.int 0x7CA00026 ; mfcr r5
+	clrlwi	r4, r4, 31
+	rlwinm r5, r5, 30, 31, 31
+	or r4, r5, r4
+	cmplwi	r4, 0
+	bnelr	cr0
 	lis r3, _6fe853b8c320bbfb_LCPI4_2@ha
 	lfs f1, _6fe853b8c320bbfb_LCPI4_2@l(r3)
 	fmuls f2, f5, f7
 	fmadds f2, f3, f6, f2
 	fmadds f2, f4, f8, f2
 	fcmpu cr7, f2, f1
-	fcmpu cr0, f2, f0
 	.int 0x7C600026 ; mfcr r3
-	.int 0x4F800000 ; mcrf cr7, cr0
 	.int 0x7C800026 ; mfcr r4
-	rlwinm r3, r3, 29, 31, 31
-	rlwinm r4, r4, 30, 31, 31
+	fcmpu cr0, f2, f0
+	clrlwi	r3, r3, 31
+	rlwinm r4, r4, 29, 31, 31
 	xori r3, r3, 1
+	.int 0x4F800000 ; mcrf cr7, cr0
 	xori r4, r4, 1
+	.int 0x7CA00026 ; mfcr r5
+	and r3, r4, r3
+	.int 0x7C800026 ; mfcr r4
+	clrlwi	r5, r5, 31
+	rlwinm r4, r4, 30, 31, 31
+	xori r5, r5, 1
+	xori r4, r4, 1
+	and r4, r4, r5
 	and r3, r3, r4
 	blr
 _6fe853b8c320bbfb_Lfunc_end4:
@@ -843,6 +911,7 @@ _6fe853b8c320bbfb_Lfunc_begin5:
 	addi r9, r3, 4
 	addi r10, r4, 16
 	li r11, 0
+	stw r28, 16(r1)
 	stw r29, 20(r1)
 	stw r30, 24(r1)
 	b _6fe853b8c320bbfb_LBB5_6
@@ -870,10 +939,22 @@ _6fe853b8c320bbfb_LBB5_6:
 	mr	r30, r3
 	lfsux f3, r30, r0
 	fsubs f2, f3, f2
-	fcmpu cr0, f2, f0
-	blt	cr0, _6fe853b8c320bbfb_LBB5_12
-	fcmpu cr0, f2, f1
-	bgt	cr0, _6fe853b8c320bbfb_LBB5_12
+	fcmpu cr7, f2, f0
+	.int 0x7C000026 ; mfcr r0
+	.int 0x7FA00026 ; mfcr r29
+	clrlwi	r0, r0, 31
+	rlwinm r29, r29, 29, 31, 31
+	or r0, r29, r0
+	cmplwi	r0, 0
+	bne	cr0, _6fe853b8c320bbfb_LBB5_12
+	fcmpu cr7, f2, f1
+	.int 0x7C000026 ; mfcr r0
+	.int 0x7FA00026 ; mfcr r29
+	clrlwi	r0, r0, 31
+	rlwinm r29, r29, 30, 31, 31
+	or r0, r29, r0
+	cmplwi	r0, 0
+	bne	cr0, _6fe853b8c320bbfb_LBB5_12
 	li r29, -1
 	mtctr r6
 _6fe853b8c320bbfb_LBB5_9:
@@ -884,162 +965,298 @@ _6fe853b8c320bbfb_LBB5_9:
 	addi r12, r12, 16
 	addi r29, r29, 1
 	fsubs f2, f2, f3
-	fcmpu cr0, f2, f0
-	blt	cr0, _6fe853b8c320bbfb_LBB5_1
-	fcmpu cr0, f2, f1
-	ble cr0, _6fe853b8c320bbfb_LBB5_9
+	fcmpu cr7, f2, f0
+	.int 0x7C000026 ; mfcr r0
+	.int 0x7F800026 ; mfcr r28
+	clrlwi	r0, r0, 31
+	rlwinm r28, r28, 29, 31, 31
+	or r0, r28, r0
+	cmplwi	r0, 0
+	bne	cr0, _6fe853b8c320bbfb_LBB5_1
+	fcmpu cr7, f2, f1
+	.int 0x7C000026 ; mfcr r0
+	.int 0x7F800026 ; mfcr r28
+	clrlwi	r0, r0, 31
+	rlwinm r28, r28, 30, 31, 31
+	xori r0, r0, 1
+	xori r28, r28, 1
+	and r0, r28, r0
+	cmplwi	r0, 0
+	bne	cr0, _6fe853b8c320bbfb_LBB5_9
 	b _6fe853b8c320bbfb_LBB5_1
 _6fe853b8c320bbfb_LBB5_12:
 	clrlwi	r3, r8, 31
 	lwz r30, 24(r1)
 	lwz r29, 20(r1)
+	lwz r28, 16(r1)
 	addi r1, r1, 32
 	blr
 _6fe853b8c320bbfb_Lfunc_end5:
 
 	.align 4
+_6fe853b8c320bbfb_LCPI6_0:
+	.int	0x3b03126f
+	.int	0x3d4ccccd
+	.align 4
 hook_captureEnvViewRows:
 _6fe853b8c320bbfb_Lfunc_begin6:
 	mflr r0
-	stwu r1, -48(r1)
+	stwu r1, -112(r1)
 	cmplwi	r6, 0
-	stw r0, 52(r1)
-	stw r23, 12(r1)
-	stw r24, 16(r1)
-	stw r25, 20(r1)
-	stw r26, 24(r1)
-	stw r27, 28(r1)
-	stw r28, 32(r1)
-	stw r29, 36(r1)
-	stw r30, 40(r1)
-	beq	cr0, _6fe853b8c320bbfb_LBB6_27
+	stw r0, 116(r1)
+	stw r20, 64(r1)
+	stw r21, 68(r1)
+	stw r22, 72(r1)
+	stw r23, 76(r1)
+	stw r24, 80(r1)
+	stw r25, 84(r1)
+	stw r26, 88(r1)
+	stw r27, 92(r1)
+	stw r28, 96(r1)
+	stw r29, 100(r1)
+	stw r30, 104(r1)
+	beq	cr0, _6fe853b8c320bbfb_LBB6_41
 	cmplwi	r4, 0
-	beq	cr0, _6fe853b8c320bbfb_LBB6_27
+	beq	cr0, _6fe853b8c320bbfb_LBB6_41
 	mr	r30, r3
 	cmplwi	r3, 0
-	beq	cr0, _6fe853b8c320bbfb_LBB6_27
+	beq	cr0, _6fe853b8c320bbfb_LBB6_41
 	cmplwi	r5, 34
-	bne	cr0, _6fe853b8c320bbfb_LBB6_27
+	bne	cr0, _6fe853b8c320bbfb_LBB6_41
+	lis r3, _6fe853b8c320bbfb_ZL14s_envViewCount@ha
+	lwz r3, _6fe853b8c320bbfb_ZL14s_envViewCount@l(r3)
 	mr	r29, r6
-	addi r26, r6, 48
-	li r24, 0
-	li r27, -1
-	li r25, 4
-	li r23, 2
-_6fe853b8c320bbfb_LBB6_5:
-	add r28, r29, r24
+	cmplwi	r3, 0
+	beq	cr0, _6fe853b8c320bbfb_LBB6_11
+	cmplwi	r3, 8
+	li r4, 8
+	bc 12, lt, _6fe853b8c320bbfb_LBB6_7
+	ori r3, r4, 0
+	b _6fe853b8c320bbfb_LBB6_7
+_6fe853b8c320bbfb_LBB6_7:
+	lis r4, s_envViewBlocks@ha
+	addi r4, r4, s_envViewBlocks@l
+	mtctr r3
+	addi r3, r4, -60
+	li r4, 0
+	b _6fe853b8c320bbfb_LBB6_9
+_6fe853b8c320bbfb_LBB6_8:
+	bdz _6fe853b8c320bbfb_LBB6_11
+_6fe853b8c320bbfb_LBB6_9:
+	lwzu r5, 60(r3)
+	cmplw	r5, r30
+	bne	cr0, _6fe853b8c320bbfb_LBB6_8
+	stw r4, 56(r3)
+	b _6fe853b8c320bbfb_LBB6_8
+_6fe853b8c320bbfb_LBB6_11:
+	lis r3, sModelRenderContextPtr@ha
+	lwz r3, sModelRenderContextPtr@l(r3)
+	cmplwi	r3, 0
+	beq	cr0, _6fe853b8c320bbfb_LBB6_41
+	li r4, 12
+	bl _6fe853b8c320bbfb_ZL7readU32Pvj
+	cmplwi	r3, 0
+	beq	cr0, _6fe853b8c320bbfb_LBB6_41
+	addi r28, r3, 96
 	mr	r3, r28
 	bl _6fe853b8c320bbfb_ZL13isViewToWorldPKf
 	cmplwi	r3, 0
-	beq	cr0, _6fe853b8c320bbfb_LBB6_10
-	add r4, r26, r24
+	beq	cr0, _6fe853b8c320bbfb_LBB6_41
+	lis r3, gameMTXInverse@ha
+	lwz r3, gameMTXInverse@l(r3)
+	addi r4, r1, 16
+	mtctr r3
 	mr	r3, r28
+	bctrl
+	li r3, _6fe853b8c320bbfb_LCPI6_0@l
+	li r23, 0
+	li r25, -1
+	addi r24, r1, 12
+	li r22, 7
+	addis r21, r3, _6fe853b8c320bbfb_LCPI6_0@ha
+	li r20, 5
+	b _6fe853b8c320bbfb_LBB6_17
+_6fe853b8c320bbfb_LBB6_15:
+	li r3, 7
+	cmplwi	r3, 7
+	bne	cr0, _6fe853b8c320bbfb_LBB6_26
+_6fe853b8c320bbfb_LBB6_16:
+	cmplwi	r23, 3985
+	addi r23, r23, 16
+	bge cr0, _6fe853b8c320bbfb_LBB6_26
+_6fe853b8c320bbfb_LBB6_17:
+	add r27, r23, r29
+	mr	r3, r27
+	bl _6fe853b8c320bbfb_ZL13isViewToWorldPKf
+	cmplwi	r3, 0
+	beq	cr0, _6fe853b8c320bbfb_LBB6_15
+	addi r26, r27, 48
+	mr	r3, r27
+	mr	r4, r26
 	bl _6fe853b8c320bbfb_ZL19isTransposeRotationPKfS0_
 	cmplwi	r3, 0
-	bc 12, eq, _6fe853b8c320bbfb_LBB6_8
-	ori r3, r23, 0
-	ori r27, r24, 0
-	b _6fe853b8c320bbfb_LBB6_9
-_6fe853b8c320bbfb_LBB6_8:
-	addi r3, r25, 0
-_6fe853b8c320bbfb_LBB6_9:
-	cmplwi	r3, 4
-	beq	cr0, _6fe853b8c320bbfb_LBB6_11
-	b _6fe853b8c320bbfb_LBB6_12
-_6fe853b8c320bbfb_LBB6_10:
-	li r3, 4
-	cmplwi	r3, 4
-	bne	cr0, _6fe853b8c320bbfb_LBB6_12
-_6fe853b8c320bbfb_LBB6_11:
-	cmplwi	r24, 3985
-	addi r24, r24, 16
-	blt	cr0, _6fe853b8c320bbfb_LBB6_5
-_6fe853b8c320bbfb_LBB6_12:
-	cmpwi	r27, -1
-	beq	cr0, _6fe853b8c320bbfb_LBB6_27
+	beq	cr0, _6fe853b8c320bbfb_LBB6_15
+	li r3, 1
+	li r4, 0
+	li r5, 0
+	mr	r6, r24
+_6fe853b8c320bbfb_LBB6_20:
+	not	r7, r5
+	clrlwi	r7, r7, 30
+	cntlzw	r7, r7
+	rlwinm r7, r7, 29, 29, 29
+	lfsu f0, 4(r6)
+	lfsx f1, r27, r4
+	lfsx f2, r21, r7
+	lfsx f3, r26, r4
+	fsubs f0, f1, f0
+	lfsx f4, r28, r4
+	fneg f1, f2
+	fcmpu cr7, f0, f1
+	fcmpu cr1, f0, f2
+	.int 0x7CE00026 ; mfcr r7
+	.int 0x7D000026 ; mfcr r8
+	.int 0x4F840000 ; mcrf cr7, cr1
+	fsubs f0, f3, f4
+	.int 0x7D200026 ; mfcr r9
+	fcmpu cr0, f0, f1
+	.int 0x7D400026 ; mfcr r10
+	clrlwi	r7, r7, 31
+	rlwinm r8, r8, 29, 31, 31
+	.int 0x4F800000 ; mcrf cr7, cr0
+	clrlwi	r9, r9, 31
+	rlwinm r10, r10, 30, 31, 31
+	or r7, r8, r7
+	.int 0x7D000026 ; mfcr r8
+	or r9, r10, r9
+	.int 0x7D400026 ; mfcr r10
+	fcmpu cr1, f0, f2
+	clrlwi	r8, r8, 31
+	rlwinm r10, r10, 29, 31, 31
+	.int 0x4F840000 ; mcrf cr7, cr1
+	or r8, r10, r8
+	.int 0x7D400026 ; mfcr r10
+	or r7, r7, r8
+	.int 0x7D000026 ; mfcr r8
+	clrlwi	r10, r10, 31
+	rlwinm r8, r8, 30, 31, 31
+	or r7, r7, r9
+	or r8, r8, r10
+	or r7, r7, r8
+	xori r8, r7, 1
+	cmplwi	r5, 10
+	and r3, r8, r3
+	bgt	cr0, _6fe853b8c320bbfb_LBB6_22
+	cmplwi	r7, 0
+	addi r5, r5, 1
+	addi r4, r4, 4
+	beq	cr0, _6fe853b8c320bbfb_LBB6_20
+_6fe853b8c320bbfb_LBB6_22:
+	clrlwi	r3, r3, 31
+	cmplwi	r3, 0
+	bc 12, eq, _6fe853b8c320bbfb_LBB6_24
+	ori r25, r23, 0
+	ori r3, r20, 0
+	b _6fe853b8c320bbfb_LBB6_25
+_6fe853b8c320bbfb_LBB6_24:
+	addi r3, r22, 0
+_6fe853b8c320bbfb_LBB6_25:
+	cmplwi	r3, 7
+	beq	cr0, _6fe853b8c320bbfb_LBB6_16
+_6fe853b8c320bbfb_LBB6_26:
+	cmpwi	r25, -1
+	beq	cr0, _6fe853b8c320bbfb_LBB6_41
 	mr	r3, r30
 	li r4, 0
 	bl _6fe853b8c320bbfb_ZL7readU32Pvj
 	cmplwi	r3, 0
-	beq	cr0, _6fe853b8c320bbfb_LBB6_27
+	beq	cr0, _6fe853b8c320bbfb_LBB6_41
 	li r4, 0
 	bl _6fe853b8c320bbfb_ZL7readU32Pvj
 	cmplwi	r3, 0
-	beq	cr0, _6fe853b8c320bbfb_LBB6_27
+	beq	cr0, _6fe853b8c320bbfb_LBB6_41
 	addi r3, r3, 408
-	add r29, r27, r29
+	add r29, r25, r29
 	bl _6fe853b8c320bbfb_ZL7readU16Pvj
 	lis r4, _6fe853b8c320bbfb_ZL14s_envViewCount@ha
 	lwz r4, _6fe853b8c320bbfb_ZL14s_envViewCount@l(r4)
-	add r28, r27, r3
+	add r28, r25, r3
 	cmplwi	r4, 0
-	beq	cr0, _6fe853b8c320bbfb_LBB6_22
+	beq	cr0, _6fe853b8c320bbfb_LBB6_35
 	addi r3, r4, -1
 	li r4, 7
-	lis r5, s_envViewBlocks@ha
 	cmplwi	r3, 7
-	addi r5, r5, s_envViewBlocks@l
-	bc 12, lt, _6fe853b8c320bbfb_LBB6_18
-	ori r6, r4, 0
-	b _6fe853b8c320bbfb_LBB6_19
-_6fe853b8c320bbfb_LBB6_18:
-	addi r6, r3, 0
-_6fe853b8c320bbfb_LBB6_19:
-	addi r4, r5, -56
-	addi r3, r5, 8
-	addi r5, r6, 1
-	mtctr r5
-	li r5, 0
-_6fe853b8c320bbfb_LBB6_20:
-	lwzu r6, 56(r4)
+	lis r5, s_envViewBlocks@ha
+	bc 12, lt, _6fe853b8c320bbfb_LBB6_32
+	ori r3, r4, 0
+	b _6fe853b8c320bbfb_LBB6_32
+_6fe853b8c320bbfb_LBB6_32:
+	addi r6, r5, s_envViewBlocks@l
+	addi r3, r3, 1
+	addi r5, r6, -60
+	addi r4, r6, 8
+	mtctr r3
+	li r3, 0
+_6fe853b8c320bbfb_LBB6_33:
+	lwzu r6, 60(r5)
 	cmplw	r6, r30
-	beq	cr0, _6fe853b8c320bbfb_LBB6_25
-	addi r5, r5, 1
-	addi r3, r3, 56
-	bdnz _6fe853b8c320bbfb_LBB6_20
-_6fe853b8c320bbfb_LBB6_22:
+	beq	cr0, _6fe853b8c320bbfb_LBB6_38
+	addi r3, r3, 1
+	addi r4, r4, 60
+	bdnz _6fe853b8c320bbfb_LBB6_33
+_6fe853b8c320bbfb_LBB6_35:
 	bl _6fe853b8c320bbfb_ZL17atomicFetchAddEnvPVjj
 	cmplwi	r3, 7
-	bgt	cr0, _6fe853b8c320bbfb_LBB6_27
-	mulli r4, r3, 56
-	lis r3, s_envViewBlocks@ha
-	addi r3, r3, s_envViewBlocks@l
-	stwux r30, r3, r4
-	li r4, 12
-	stwu r28, 4(r3)
-	mtctr r4
-	li r4, 0
-_6fe853b8c320bbfb_LBB6_24:
-	lwzx r5, r29, r4
-	addi r4, r4, 4
-	stwu r5, 4(r3)
-	bdnz _6fe853b8c320bbfb_LBB6_24
-	b _6fe853b8c320bbfb_LBB6_27
-_6fe853b8c320bbfb_LBB6_25:
-	mulli r4, r5, 56
-	lis r5, s_envViewBlocks@ha
-	addi r5, r5, s_envViewBlocks@l
-	add r4, r4, r5
-	stw r28, -4(r3)
-	addi r3, r29, -4
+	bgt	cr0, _6fe853b8c320bbfb_LBB6_41
+	lis r4, s_envViewBlocks@ha
+	mulli r5, r3, 60
+	addi r4, r4, s_envViewBlocks@l
+	stwux r30, r4, r5
+	li r5, 12
+	stwu r28, 4(r4)
+	mtctr r5
+	li r5, 0
+_6fe853b8c320bbfb_LBB6_37:
+	lwzx r6, r29, r5
+	addi r5, r5, 4
+	stwu r6, 4(r4)
+	bdnz _6fe853b8c320bbfb_LBB6_37
+	b _6fe853b8c320bbfb_LBB6_40
+_6fe853b8c320bbfb_LBB6_38:
+	lis r6, s_envViewBlocks@ha
+	mulli r5, r3, 60
+	addi r6, r6, s_envViewBlocks@l
+	add r5, r5, r6
+	stw r28, -4(r4)
+	addi r4, r29, -4
 	li r6, 12
-	addi r4, r4, 4
+	addi r5, r5, 4
 	mtctr r6
-_6fe853b8c320bbfb_LBB6_26:
-	lwzu r5, 4(r3)
-	stwu r5, 4(r4)
-	bdnz _6fe853b8c320bbfb_LBB6_26
-_6fe853b8c320bbfb_LBB6_27:
-	lwz r30, 40(r1)
-	lwz r29, 36(r1)
-	lwz r28, 32(r1)
-	lwz r27, 28(r1)
-	lwz r26, 24(r1)
-	lwz r25, 20(r1)
-	lwz r24, 16(r1)
-	lwz r23, 12(r1)
-	lwz r0, 52(r1)
-	addi r1, r1, 48
+_6fe853b8c320bbfb_LBB6_39:
+	lwzu r6, 4(r4)
+	stwu r6, 4(r5)
+	bdnz _6fe853b8c320bbfb_LBB6_39
+_6fe853b8c320bbfb_LBB6_40:
+	lis r4, s_envViewBlocks@ha
+	mulli r3, r3, 60
+	addi r4, r4, s_envViewBlocks@l
+	add r3, r4, r3
+	li r4, 1
+	stw r4, 56(r3)
+_6fe853b8c320bbfb_LBB6_41:
+	lwz r30, 104(r1)
+	lwz r29, 100(r1)
+	lwz r28, 96(r1)
+	lwz r27, 92(r1)
+	lwz r26, 88(r1)
+	lwz r25, 84(r1)
+	lwz r24, 80(r1)
+	lwz r23, 76(r1)
+	lwz r22, 72(r1)
+	lwz r21, 68(r1)
+	lwz r20, 64(r1)
+	lwz r0, 116(r1)
+	addi r1, r1, 112
 	mtlr r0
 	blr
 _6fe853b8c320bbfb_Lfunc_end6:
@@ -1060,13 +1277,13 @@ _6fe853b8c320bbfb_LBB7_3:
 	lis r5, s_envViewBlocks@ha
 	addi r5, r5, s_envViewBlocks@l
 	mtctr r4
-	addi r4, r5, -56
+	addi r4, r5, -60
 	li r5, 0
 	b _6fe853b8c320bbfb_LBB7_5
 _6fe853b8c320bbfb_LBB7_4:
 	bdz _6fe853b8c320bbfb_LBB7_7
 _6fe853b8c320bbfb_LBB7_5:
-	lwzu r6, 56(r4)
+	lwzu r6, 60(r4)
 	cmplw	r6, r3
 	bne	cr0, _6fe853b8c320bbfb_LBB7_4
 	stw r5, 0(r4)
@@ -1105,9 +1322,9 @@ _6fe853b8c320bbfb_Lfunc_begin9:
 	stw r30, 136(r1)
 	stw r12, 124(r1)
 	lwz r5, _6fe853b8c320bbfb_ZL14s_envViewCount@l(r3)
-	beq	cr0, _6fe853b8c320bbfb_LBB9_16
+	beq	cr0, _6fe853b8c320bbfb_LBB9_17
 	cmplwi cr2, r5, 0
-	beq	cr2, _6fe853b8c320bbfb_LBB9_16
+	beq	cr2, _6fe853b8c320bbfb_LBB9_17
 	cmplwi	r5, 8
 	li r6, 8
 	addi r3, r4, -4
@@ -1135,7 +1352,7 @@ _6fe853b8c320bbfb_LBB9_6:
 	lfs f0, 116(r1)
 	lfs f1, _6fe853b8c320bbfb_LCPI9_0@l(r3)
 	fcmpu cr0, f0, f1
-	beq	cr0, _6fe853b8c320bbfb_LBB9_16
+	beq	cr0, _6fe853b8c320bbfb_LBB9_17
 _6fe853b8c320bbfb_LBB9_10:
 	lis r3, gameMTXInverse@ha
 	lwz r5, gameMTXInverse@l(r3)
@@ -1143,19 +1360,22 @@ _6fe853b8c320bbfb_LBB9_10:
 	addi r4, r1, 28
 	mtctr r5
 	bctrl
-	beq	cr2, _6fe853b8c320bbfb_LBB9_16
+	beq	cr2, _6fe853b8c320bbfb_LBB9_17
 	lis r3, s_envViewBlocks@ha
 	addi r3, r3, s_envViewBlocks@l
-	addi r28, r3, -56
+	addi r28, r3, -60
 	addi r30, r1, 28
 	b _6fe853b8c320bbfb_LBB9_13
 _6fe853b8c320bbfb_LBB9_12:
 	addi r29, r29, -1
 	cmplwi	r29, 0
-	bc 4, gt, _6fe853b8c320bbfb_LBB9_16
+	bc 4, gt, _6fe853b8c320bbfb_LBB9_17
 _6fe853b8c320bbfb_LBB9_13:
-	lwzu r3, 56(r28)
+	lwzu r3, 60(r28)
 	cmplwi	r3, 0
+	beq	cr0, _6fe853b8c320bbfb_LBB9_12
+	lwz r4, 56(r28)
+	cmplwi	r4, 0
 	beq	cr0, _6fe853b8c320bbfb_LBB9_12
 	li r4, 4
 	bl _6fe853b8c320bbfb_ZL7readU32Pvj
@@ -1167,7 +1387,7 @@ _6fe853b8c320bbfb_LBB9_13:
 	mr	r4, r30
 	bl gpuWriteWordsLE
 	b _6fe853b8c320bbfb_LBB9_12
-_6fe853b8c320bbfb_LBB9_16:
+_6fe853b8c320bbfb_LBB9_17:
 	lwz r12, 124(r1)
 	lwz r30, 136(r1)
 	.int 0x7D820120 ; mtcrf 32, r12
@@ -1181,7 +1401,7 @@ _6fe853b8c320bbfb_Lfunc_end9:
 
 	.align 4
 s_envViewBlocks:
-	.int 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+	.int 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 
 	.align 4
 _6fe853b8c320bbfb_ZL14s_envViewCount:
