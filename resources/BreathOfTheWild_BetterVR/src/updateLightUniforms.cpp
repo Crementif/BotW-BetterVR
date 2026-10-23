@@ -484,13 +484,8 @@ extern "C" ATTR_KEEP void hook_recalcPointLightUniforms(float eyeOffset) {
     RecalcGrudgeUniforms(eyeOffset);
     RecalcSpotLightUniforms(eyeOffset);
     uint32 count = s_lightBlockCount;
-    uint32 bindCount = s_stampBindCount;
-    if (count == 0 && bindCount == 0) return;
+    if (count == 0 && s_capsuleBlockCount == 0) return;
     if (count > MAX_LIGHT_BLOCKS) count = MAX_LIGHT_BLOCKS;
-    if (bindCount > MAX_STAMP_BINDS) bindCount = MAX_STAMP_BINDS;
-
-    float d = getEyeViewOffsetX(eyeOffset);
-    if (d == 0.0f) return;
 
     float monoView[12];
     if (!getRecordCameraView(monoView)) return;

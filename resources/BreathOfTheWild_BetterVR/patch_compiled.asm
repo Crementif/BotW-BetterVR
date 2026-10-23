@@ -1478,45 +1478,15 @@ _e328e890d4b4945c_Lfunc_begin4:
 _e328e890d4b4945c_Lfunc_end4:
 
 	.align 4
-_e328e890d4b4945c_LCPI5_0:
-	.int	0x00000000
-_e328e890d4b4945c_LCPI5_1:
-	.int	0x3f000000
-	.align 4
-_e328e890d4b4945c_ZL17getEyeViewOffsetXf:
+_e328e890d4b4945c_ZL21writeWordByteReversedPjj:
 _e328e890d4b4945c_Lfunc_begin5:
-	lis r3, gVRSharedMemory@ha
-	lwz r4, gVRSharedMemory@l(r3)
-	cmplwi	r4, 1
-	lis r4, _e328e890d4b4945c_LCPI5_0@ha
-	bne	cr0, _e328e890d4b4945c_LBB5_3
-	addi r3, r3, gVRSharedMemory@l
-	lfs f0, _e328e890d4b4945c_LCPI5_0@l(r4)
-	lfs f2, 16(r3)
-	lfs f3, 128(r3)
-	lis r3, _e328e890d4b4945c_LCPI5_1@ha
-	lfs f4, _e328e890d4b4945c_LCPI5_1@l(r3)
-	fcmpu cr0, f1, f0
-	fsubs f0, f2, f3
-	fmuls f1, f0, f4
-	bltlr	cr0
-	fneg f1, f1
-	blr
-_e328e890d4b4945c_LBB5_3:
-	lfs f1, _e328e890d4b4945c_LCPI5_0@l(r4)
+	stwbrx r4, 0, r3
 	blr
 _e328e890d4b4945c_Lfunc_end5:
 
 	.align 4
-_e328e890d4b4945c_ZL21writeWordByteReversedPjj:
-_e328e890d4b4945c_Lfunc_begin6:
-	stwbrx r4, 0, r3
-	blr
-_e328e890d4b4945c_Lfunc_end6:
-
-	.align 4
 _e328e890d4b4945c_ZL11resolveSlotjjPjS_:
-_e328e890d4b4945c_Lfunc_begin7:
+_e328e890d4b4945c_Lfunc_begin6:
 	mflr r0
 	stwu r1, -32(r1)
 	stw r0, 36(r1)
@@ -1561,11 +1531,11 @@ _e328e890d4b4945c_Lfunc_begin7:
 	addi r1, r1, 32
 	mtlr r0
 	blr
-_e328e890d4b4945c_Lfunc_end7:
+_e328e890d4b4945c_Lfunc_end6:
 
 	.align 4
 _e328e890d4b4945c_ZL14getStrideBytesjj:
-_e328e890d4b4945c_Lfunc_begin8:
+_e328e890d4b4945c_Lfunc_begin7:
 	mflr r0
 	stwu r1, -32(r1)
 	stw r0, 36(r1)
@@ -1588,11 +1558,11 @@ _e328e890d4b4945c_Lfunc_begin8:
 	addi r1, r1, 32
 	mtlr r0
 	blr
-_e328e890d4b4945c_Lfunc_end8:
+_e328e890d4b4945c_Lfunc_end7:
 
 	.align 4
 _e328e890d4b4945c_ZL12gpuWriteRowsjjPKfj:
-_e328e890d4b4945c_Lfunc_begin9:
+_e328e890d4b4945c_Lfunc_begin8:
 	mflr r0
 	stwu r1, -32(r1)
 	stw r0, 36(r1)
@@ -1604,17 +1574,17 @@ _e328e890d4b4945c_Lfunc_begin9:
 	stw r30, 24(r1)
 	mr	r30, r5
 	stw r27, 12(r1)
-	bne	cr0, _e328e890d4b4945c_LBB9_2
+	bne	cr0, _e328e890d4b4945c_LBB8_2
 	slwi r5, r29, 2
 	mr	r3, r28
 	mr	r4, r30
 	bl gpuWriteWordsLE
-	b _e328e890d4b4945c_LBB9_5
-_e328e890d4b4945c_LBB9_2:
+	b _e328e890d4b4945c_LBB8_5
+_e328e890d4b4945c_LBB8_2:
 	cmplwi	r29, 0
-	beq	cr0, _e328e890d4b4945c_LBB9_5
+	beq	cr0, _e328e890d4b4945c_LBB8_5
 	mr	r27, r4
-_e328e890d4b4945c_LBB9_4:
+_e328e890d4b4945c_LBB8_4:
 	mr	r3, r28
 	mr	r4, r30
 	li r5, 4
@@ -1623,8 +1593,8 @@ _e328e890d4b4945c_LBB9_4:
 	cmplwi	r29, 0
 	add r28, r28, r27
 	addi r30, r30, 16
-	bc 12, gt, _e328e890d4b4945c_LBB9_4
-_e328e890d4b4945c_LBB9_5:
+	bc 12, gt, _e328e890d4b4945c_LBB8_4
+_e328e890d4b4945c_LBB8_5:
 	lwz r30, 24(r1)
 	lwz r29, 20(r1)
 	lwz r28, 16(r1)
@@ -1633,11 +1603,11 @@ _e328e890d4b4945c_LBB9_5:
 	addi r1, r1, 32
 	mtlr r0
 	blr
-_e328e890d4b4945c_Lfunc_end9:
+_e328e890d4b4945c_Lfunc_end8:
 
 	.align 4
 _e328e890d4b4945c_ZL16writeUniformSlotjjPKfj:
-_e328e890d4b4945c_Lfunc_begin10:
+_e328e890d4b4945c_Lfunc_begin9:
 	mflr r0
 	stwu r1, -48(r1)
 	stw r0, 52(r1)
@@ -1666,11 +1636,11 @@ _e328e890d4b4945c_Lfunc_begin10:
 	bl _e328e890d4b4945c_ZL14getStrideBytesjj
 	li r4, 16
 	cmplwi	r3, 16
-	bc 12, gt, _e328e890d4b4945c_LBB10_1
-	b _e328e890d4b4945c_LBB10_2
-_e328e890d4b4945c_LBB10_1:
+	bc 12, gt, _e328e890d4b4945c_LBB9_1
+	b _e328e890d4b4945c_LBB9_2
+_e328e890d4b4945c_LBB9_1:
 	addi r4, r3, 0
-_e328e890d4b4945c_LBB10_2:
+_e328e890d4b4945c_LBB9_2:
 	lwz r3, 24(r1)
 	mr	r5, r29
 	mr	r6, r30
@@ -1683,16 +1653,16 @@ _e328e890d4b4945c_LBB10_2:
 	addi r1, r1, 48
 	mtlr r0
 	blr
-_e328e890d4b4945c_Lfunc_end10:
+_e328e890d4b4945c_Lfunc_end9:
 
 	.align 4
 _e328e890d4b4945c_ZL11mulProjViewPKfS0_Pf:
-_e328e890d4b4945c_Lfunc_begin11:
+_e328e890d4b4945c_Lfunc_begin10:
 	li r6, 4
 	addi r3, r3, -16
 	addi r5, r5, -16
 	mtctr r6
-_e328e890d4b4945c_LBB11_1:
+_e328e890d4b4945c_LBB10_1:
 	lfsu f0, 16(r3)
 	lfs f2, 16(r4)
 	lfs f4, 4(r3)
@@ -1726,18 +1696,18 @@ _e328e890d4b4945c_LBB11_1:
 	fmadds f0, f5, f3, f0
 	fadds f0, f6, f0
 	stfs f0, 12(r5)
-	bdnz _e328e890d4b4945c_LBB11_1
+	bdnz _e328e890d4b4945c_LBB10_1
 	blr
-_e328e890d4b4945c_Lfunc_end11:
+_e328e890d4b4945c_Lfunc_end10:
 
 	.align 4
-_e328e890d4b4945c_LCPI12_0:
+_e328e890d4b4945c_LCPI11_0:
 	.int	0x00000000
-_e328e890d4b4945c_LCPI12_1:
+_e328e890d4b4945c_LCPI11_1:
 	.int	0x3f800000
 	.align 4
 hook_recalcLightUniforms:
-_e328e890d4b4945c_Lfunc_begin12:
+_e328e890d4b4945c_Lfunc_begin11:
 	mflr r0
 	stwu r1, -224(r1)
 	.int 0x7D800026 ; mfcr r12
@@ -1755,68 +1725,68 @@ _e328e890d4b4945c_Lfunc_begin12:
 	stfd f29, 200(r1)
 	stfd f30, 208(r1)
 	stfd f31, 216(r1)
-	beq	cr0, _e328e890d4b4945c_LBB12_20
+	beq	cr0, _e328e890d4b4945c_LBB11_20
 	lis r3, gVRSharedMemory@ha
 	lwz r3, gVRSharedMemory@l(r3)
 	cmplwi	r3, 1
-	bne	cr0, _e328e890d4b4945c_LBB12_20
-	lis r3, _e328e890d4b4945c_LCPI12_0@ha
-	lfs f3, _e328e890d4b4945c_LCPI12_0@l(r3)
+	bne	cr0, _e328e890d4b4945c_LBB11_20
+	lis r3, _e328e890d4b4945c_LCPI11_0@ha
+	lfs f3, _e328e890d4b4945c_LCPI11_0@l(r3)
 	li r3, 164
 	li r4, 52
 	fcmpu cr0, f1, f3
-	bc 12, lt, _e328e890d4b4945c_LBB12_4
+	bc 12, lt, _e328e890d4b4945c_LBB11_4
 	ori r4, r3, 0
-	b _e328e890d4b4945c_LBB12_4
-_e328e890d4b4945c_LBB12_4:
+	b _e328e890d4b4945c_LBB11_4
+_e328e890d4b4945c_LBB11_4:
 	lis r3, gVRSharedMemory@ha
 	addi r3, r3, gVRSharedMemory@l
 	lfsx f2, r3, r4
 	fcmpu cr1, f2, f3
-	beq	cr1, _e328e890d4b4945c_LBB12_20
+	beq	cr1, _e328e890d4b4945c_LBB11_20
 	addi r4, r3, 72
 	addi r5, r3, 184
-	bc 12, lt, _e328e890d4b4945c_LBB12_7
+	bc 12, lt, _e328e890d4b4945c_LBB11_7
 	ori r4, r5, 0
-	b _e328e890d4b4945c_LBB12_7
-_e328e890d4b4945c_LBB12_7:
+	b _e328e890d4b4945c_LBB11_7
+_e328e890d4b4945c_LBB11_7:
 	lfs f0, 0(r4)
 	fcmpu cr1, f0, f3
-	beq	cr1, _e328e890d4b4945c_LBB12_20
-	lis r4, _e328e890d4b4945c_LCPI12_1@ha
-	lfs f3, _e328e890d4b4945c_LCPI12_1@l(r4)
-	lis r6, _e328e890d4b4945c_LCPI12_0@ha
+	beq	cr1, _e328e890d4b4945c_LBB11_20
+	lis r4, _e328e890d4b4945c_LCPI11_1@ha
+	lfs f3, _e328e890d4b4945c_LCPI11_1@l(r4)
+	lis r6, _e328e890d4b4945c_LCPI11_0@ha
 	lis r5, gVRSharedMemory@ha
 	addi r27, r5, gVRSharedMemory@l
 	fdivs f31, f3, f2
-	lfs f2, _e328e890d4b4945c_LCPI12_0@l(r6)
+	lfs f2, _e328e890d4b4945c_LCPI11_0@l(r6)
 	addi r5, r27, 228
 	addi r6, r27, 248
 	addi r4, r3, 164
 	addi r3, r3, 52
 	addi r7, r27, 116
 	addi r8, r27, 4
-	bc 12, lt, _e328e890d4b4945c_LBB12_10
+	bc 12, lt, _e328e890d4b4945c_LBB11_10
 	ori r3, r4, 0
-	b _e328e890d4b4945c_LBB12_10
-_e328e890d4b4945c_LBB12_10:
+	b _e328e890d4b4945c_LBB11_10
+_e328e890d4b4945c_LBB11_10:
 	addi r28, r1, 100
 	fcmpu cr2, f1, f2
-	bc 12, 4*cr2+lt, _e328e890d4b4945c_LBB12_12
+	bc 12, 4*cr2+lt, _e328e890d4b4945c_LBB11_12
 	ori r5, r6, 0
-	b _e328e890d4b4945c_LBB12_12
-_e328e890d4b4945c_LBB12_12:
+	b _e328e890d4b4945c_LBB11_12
+_e328e890d4b4945c_LBB11_12:
 	addi r6, r27, 232
 	lfs f29, 0(r5)
 	addi r5, r27, 252
-	bc 12, 4*cr2+lt, _e328e890d4b4945c_LBB12_14
+	bc 12, 4*cr2+lt, _e328e890d4b4945c_LBB11_14
 	ori r29, r7, 0
 	ori r4, r5, 0
-	b _e328e890d4b4945c_LBB12_15
-_e328e890d4b4945c_LBB12_14:
+	b _e328e890d4b4945c_LBB11_15
+_e328e890d4b4945c_LBB11_14:
 	addi r29, r8, 0
 	addi r4, r6, 0
-_e328e890d4b4945c_LBB12_15:
+_e328e890d4b4945c_LBB11_15:
 	mr	r5, r28
 	lfs f28, 0(r4)
 	mr	r4, r29
@@ -1851,10 +1821,10 @@ _e328e890d4b4945c_LBB12_15:
 	addi r3, r27, 60
 	addi r4, r27, 172
 	stfs f29, 20(r1)
-	bc 12, 4*cr2+lt, _e328e890d4b4945c_LBB12_17
+	bc 12, 4*cr2+lt, _e328e890d4b4945c_LBB11_17
 	ori r3, r4, 0
-	b _e328e890d4b4945c_LBB12_17
-_e328e890d4b4945c_LBB12_17:
+	b _e328e890d4b4945c_LBB11_17
+_e328e890d4b4945c_LBB11_17:
 	addi r4, r27, 188
 	stw r28, 28(r1)
 	addi r5, r1, 20
@@ -1865,10 +1835,10 @@ _e328e890d4b4945c_LBB12_17:
 	stfs f1, 40(r1)
 	lfs f0, 0(r3)
 	addi r3, r27, 76
-	bc 12, 4*cr2+lt, _e328e890d4b4945c_LBB12_19
+	bc 12, 4*cr2+lt, _e328e890d4b4945c_LBB11_19
 	ori r3, r4, 0
-	b _e328e890d4b4945c_LBB12_19
-_e328e890d4b4945c_LBB12_19:
+	b _e328e890d4b4945c_LBB11_19
+_e328e890d4b4945c_LBB11_19:
 	li r4, 4
 	fmuls f0, f31, f0
 	stfs f0, 44(r1)
@@ -1877,7 +1847,7 @@ _e328e890d4b4945c_LBB12_19:
 	fmuls f0, f30, f0
 	stfs f0, 48(r1)
 	bl _e328e890d4b4945c_ZL16writeUniformSlotjjPKfj
-_e328e890d4b4945c_LBB12_20:
+_e328e890d4b4945c_LBB11_20:
 	lfd f31, 216(r1)
 	lfd f30, 208(r1)
 	lfd f29, 200(r1)
@@ -1893,11 +1863,11 @@ _e328e890d4b4945c_LBB12_20:
 	addi r1, r1, 224
 	mtlr r0
 	blr
-_e328e890d4b4945c_Lfunc_end12:
+_e328e890d4b4945c_Lfunc_end11:
 
 	.align 4
 _e328e890d4b4945c_ZL9readF32LEj:
-_e328e890d4b4945c_Lfunc_begin13:
+_e328e890d4b4945c_Lfunc_begin12:
 	mflr r0
 	stwu r1, -16(r1)
 	li r4, 0
@@ -1911,11 +1881,11 @@ _e328e890d4b4945c_Lfunc_begin13:
 	addi r1, r1, 16
 	mtlr r0
 	blr
-_e328e890d4b4945c_Lfunc_end13:
+_e328e890d4b4945c_Lfunc_end12:
 
 	.align 4
 _e328e890d4b4945c_ZL19getRecordCameraViewPf:
-_e328e890d4b4945c_Lfunc_begin14:
+_e328e890d4b4945c_Lfunc_begin13:
 	mflr r0
 	stwu r1, -32(r1)
 	stw r0, 36(r1)
@@ -1926,11 +1896,11 @@ _e328e890d4b4945c_Lfunc_begin14:
 	stw r30, 24(r1)
 	li r30, 0
 	cmplwi	r3, 0
-	beq	cr0, _e328e890d4b4945c_LBB14_5
+	beq	cr0, _e328e890d4b4945c_LBB13_5
 	li r4, 520
 	bl _e328e890d4b4945c_ZL7readU32Pvj
 	cmplwi	r3, 0
-	beq	cr0, _e328e890d4b4945c_LBB14_5
+	beq	cr0, _e328e890d4b4945c_LBB13_5
 	lis r4, gameGetRenderCamera@ha
 	lwz r4, gameGetRenderCamera@l(r4)
 	mtctr r4
@@ -1938,16 +1908,16 @@ _e328e890d4b4945c_Lfunc_begin14:
 	addic r4, r3, -1
 	cmplwi	r3, 0
 	subfe r30, r4, r3
-	beq	cr0, _e328e890d4b4945c_LBB14_5
+	beq	cr0, _e328e890d4b4945c_LBB13_5
 	addi r3, r3, -4
 	addi r4, r29, -4
 	li r5, 12
 	mtctr r5
-_e328e890d4b4945c_LBB14_4:
+_e328e890d4b4945c_LBB13_4:
 	lwzu r5, 4(r3)
 	stwu r5, 4(r4)
-	bdnz _e328e890d4b4945c_LBB14_4
-_e328e890d4b4945c_LBB14_5:
+	bdnz _e328e890d4b4945c_LBB13_4
+_e328e890d4b4945c_LBB13_5:
 	mr	r3, r30
 	lwz r30, 24(r1)
 	lwz r29, 20(r1)
@@ -1955,15 +1925,15 @@ _e328e890d4b4945c_LBB14_5:
 	addi r1, r1, 32
 	mtlr r0
 	blr
-_e328e890d4b4945c_Lfunc_end14:
+_e328e890d4b4945c_Lfunc_end13:
 
 	.align 4
 _e328e890d4b4945c_ZL15stampBufMatchesPK13ProxyMVPEntryj:
-_e328e890d4b4945c_Lfunc_begin15:
+_e328e890d4b4945c_Lfunc_begin14:
 	lwz r5, 4(r3)
 	cmplw	r5, r4
 	li r5, 1
-	beq	cr0, _e328e890d4b4945c_LBB15_2
+	beq	cr0, _e328e890d4b4945c_LBB14_2
 	lwz r3, 8(r3)
 	xor r4, r3, r4
 	addic r5, r3, -1
@@ -1971,14 +1941,14 @@ _e328e890d4b4945c_Lfunc_begin15:
 	subfe r3, r5, r3
 	srwi r4, r4, 5
 	and r5, r3, r4
-_e328e890d4b4945c_LBB15_2:
+_e328e890d4b4945c_LBB14_2:
 	mr	r3, r5
 	blr
-_e328e890d4b4945c_Lfunc_end15:
+_e328e890d4b4945c_Lfunc_end14:
 
 	.align 4
 _e328e890d4b4945c_ZL11mtx34MulVecPKffffPf:
-_e328e890d4b4945c_Lfunc_begin16:
+_e328e890d4b4945c_Lfunc_begin15:
 	lfs f4, 4(r3)
 	lfs f0, 0(r3)
 	lfs f5, 8(r3)
@@ -2007,11 +1977,11 @@ _e328e890d4b4945c_Lfunc_begin16:
 	fadds f0, f6, f0
 	stfs f0, 8(r4)
 	blr
-_e328e890d4b4945c_Lfunc_end16:
+_e328e890d4b4945c_Lfunc_end15:
 
 	.align 4
 _e328e890d4b4945c_ZL19atomicFetchAddLightPVjj:
-_e328e890d4b4945c_Lfunc_begin17:
+_e328e890d4b4945c_Lfunc_begin16:
 	li r5, 1
 _e328e890d4b4945c_Ltmp0:
 	lwarx r4, 0, r3
@@ -2021,11 +1991,11 @@ _e328e890d4b4945c_Ltmp0:
 
 	mr	r3, r4
 	blr
-_e328e890d4b4945c_Lfunc_end17:
+_e328e890d4b4945c_Lfunc_end16:
 
 	.align 4
 _e328e890d4b4945c_ZL22atomicCompareSwapLightPVjjj:
-_e328e890d4b4945c_Lfunc_begin18:
+_e328e890d4b4945c_Lfunc_begin17:
 	li r5, 0
 	li r6, -1
 _e328e890d4b4945c_Ltmp1:
@@ -2038,11 +2008,11 @@ _e328e890d4b4945c_Ltmp2:
 
 	mr	r3, r4
 	blr
-_e328e890d4b4945c_Lfunc_end18:
+_e328e890d4b4945c_Lfunc_end17:
 
 	.align 4
 hook_capturePointLightUBO:
-_e328e890d4b4945c_Lfunc_begin19:
+_e328e890d4b4945c_Lfunc_begin18:
 	mflr r0
 	stwu r1, -32(r1)
 	cmplwi	r3, 0
@@ -2051,12 +2021,12 @@ _e328e890d4b4945c_Lfunc_begin19:
 	stw r28, 16(r1)
 	stw r29, 20(r1)
 	stw r30, 24(r1)
-	beq	cr0, _e328e890d4b4945c_LBB19_5
+	beq	cr0, _e328e890d4b4945c_LBB18_5
 	mr	r30, r4
 	cmplwi	r4, 0
-	beq	cr0, _e328e890d4b4945c_LBB19_5
+	beq	cr0, _e328e890d4b4945c_LBB18_5
 	cmplwi	r5, 0
-	beq	cr0, _e328e890d4b4945c_LBB19_5
+	beq	cr0, _e328e890d4b4945c_LBB18_5
 	li r4, 0
 	mr	r29, r3
 	bl _e328e890d4b4945c_ZL7readU32Pvj
@@ -2069,7 +2039,7 @@ _e328e890d4b4945c_Lfunc_begin19:
 	addi r3, r3, _e328e890d4b4945c_ZL17s_lightBlockCount@l
 	bl _e328e890d4b4945c_ZL19atomicFetchAddLightPVjj
 	cmplwi	r3, 47
-	bgt	cr0, _e328e890d4b4945c_LBB19_5
+	bgt	cr0, _e328e890d4b4945c_LBB18_5
 	lis r4, s_lightBlocks@ha
 	slwi r3, r3, 5
 	addi r27, r4, s_lightBlocks@l
@@ -2099,7 +2069,7 @@ _e328e890d4b4945c_Lfunc_begin19:
 	stfs f1, 24(r27)
 	bl _e328e890d4b4945c_ZL7readF32Pvj
 	stfs f1, 28(r27)
-_e328e890d4b4945c_LBB19_5:
+_e328e890d4b4945c_LBB18_5:
 	lwz r30, 24(r1)
 	lwz r29, 20(r1)
 	lwz r28, 16(r1)
@@ -2108,11 +2078,11 @@ _e328e890d4b4945c_LBB19_5:
 	addi r1, r1, 32
 	mtlr r0
 	blr
-_e328e890d4b4945c_Lfunc_end19:
+_e328e890d4b4945c_Lfunc_end18:
 
 	.align 4
 hook_captureCapsuleLightUBO:
-_e328e890d4b4945c_Lfunc_begin20:
+_e328e890d4b4945c_Lfunc_begin19:
 	mflr r0
 	stwu r1, -32(r1)
 	cmplwi	r3, 0
@@ -2121,18 +2091,18 @@ _e328e890d4b4945c_Lfunc_begin20:
 	stw r28, 16(r1)
 	stw r29, 20(r1)
 	stw r30, 24(r1)
-	beq	cr0, _e328e890d4b4945c_LBB20_5
+	beq	cr0, _e328e890d4b4945c_LBB19_5
 	cmplwi	r4, 0
-	beq	cr0, _e328e890d4b4945c_LBB20_5
+	beq	cr0, _e328e890d4b4945c_LBB19_5
 	mr	r30, r5
 	cmplwi	r5, 0
-	beq	cr0, _e328e890d4b4945c_LBB20_5
+	beq	cr0, _e328e890d4b4945c_LBB19_5
 	mr	r29, r3
 	lis r3, _e328e890d4b4945c_ZL19s_capsuleBlockCount@ha
 	addi r3, r3, _e328e890d4b4945c_ZL19s_capsuleBlockCount@l
 	bl _e328e890d4b4945c_ZL19atomicFetchAddLightPVjj
 	cmplwi	r3, 15
-	bgt	cr0, _e328e890d4b4945c_LBB20_5
+	bgt	cr0, _e328e890d4b4945c_LBB19_5
 	lis r4, s_capsuleBlocks@ha
 	addi r28, r29, -80
 	mulli r3, r3, 28
@@ -2159,7 +2129,7 @@ _e328e890d4b4945c_Lfunc_begin20:
 	stfs f1, 20(r27)
 	bl _e328e890d4b4945c_ZL9readF32LEj
 	stfs f1, 24(r27)
-_e328e890d4b4945c_LBB20_5:
+_e328e890d4b4945c_LBB19_5:
 	lwz r30, 24(r1)
 	lwz r29, 20(r1)
 	lwz r28, 16(r1)
@@ -2168,11 +2138,11 @@ _e328e890d4b4945c_LBB20_5:
 	addi r1, r1, 32
 	mtlr r0
 	blr
-_e328e890d4b4945c_Lfunc_end20:
+_e328e890d4b4945c_Lfunc_end19:
 
 	.align 4
 _e328e890d4b4945c_ZL15getMemberOffsetjjjPj:
-_e328e890d4b4945c_Lfunc_begin21:
+_e328e890d4b4945c_Lfunc_begin20:
 	mflr r0
 	stwu r1, -32(r1)
 	stw r0, 36(r1)
@@ -2198,9 +2168,9 @@ _e328e890d4b4945c_Lfunc_begin21:
 	bl _e328e890d4b4945c_ZL14getStrideBytesjj
 	cmplwi	r29, 0
 	mr	r27, r3
-	beq	cr0, _e328e890d4b4945c_LBB21_2
+	beq	cr0, _e328e890d4b4945c_LBB20_2
 	stw r27, 0(r29)
-_e328e890d4b4945c_LBB21_2:
+_e328e890d4b4945c_LBB20_2:
 	mr	r3, r28
 	li r4, 4
 	bl _e328e890d4b4945c_ZL7readU16Pvj
@@ -2214,16 +2184,16 @@ _e328e890d4b4945c_LBB21_2:
 	addi r1, r1, 32
 	mtlr r0
 	blr
-_e328e890d4b4945c_Lfunc_end21:
+_e328e890d4b4945c_Lfunc_end20:
 
 	.align 4
-_e328e890d4b4945c_LCPI22_0:
+_e328e890d4b4945c_LCPI21_0:
 	.int	0x00000000
-_e328e890d4b4945c_LCPI22_1:
+_e328e890d4b4945c_LCPI21_1:
 	.int	0x3c23d70a
 	.align 4
 hook_captureSpotLightUBO:
-_e328e890d4b4945c_Lfunc_begin22:
+_e328e890d4b4945c_Lfunc_begin21:
 	mflr r0
 	stwu r1, -96(r1)
 	cmplwi	r3, 0
@@ -2234,21 +2204,21 @@ _e328e890d4b4945c_Lfunc_begin22:
 	stw r28, 80(r1)
 	stw r29, 84(r1)
 	stw r30, 88(r1)
-	beq	cr0, _e328e890d4b4945c_LBB22_15
+	beq	cr0, _e328e890d4b4945c_LBB21_15
 	mr	r27, r4
 	cmplwi	r4, 0
-	beq	cr0, _e328e890d4b4945c_LBB22_15
+	beq	cr0, _e328e890d4b4945c_LBB21_15
 	mr	r29, r5
 	cmplwi	r5, 0
-	beq	cr0, _e328e890d4b4945c_LBB22_15
+	beq	cr0, _e328e890d4b4945c_LBB21_15
 	mr	r30, r6
 	cmplwi	r6, 0
-	beq	cr0, _e328e890d4b4945c_LBB22_15
+	beq	cr0, _e328e890d4b4945c_LBB21_15
 	mr	r28, r3
 	addi r3, r1, 20
 	bl _e328e890d4b4945c_ZL19getRecordCameraViewPf
 	cmplwi	r3, 0
-	beq	cr0, _e328e890d4b4945c_LBB22_15
+	beq	cr0, _e328e890d4b4945c_LBB21_15
 	lfsu f1, 12(r29)
 	addi r3, r1, 20
 	addi r4, r1, 8
@@ -2256,36 +2226,36 @@ _e328e890d4b4945c_Lfunc_begin22:
 	lfs f2, 4(r29)
 	lfs f3, 8(r29)
 	bl _e328e890d4b4945c_ZL11mtx34MulVecPKffffPf
-	lis r3, _e328e890d4b4945c_LCPI22_0@ha
-	lfs f0, _e328e890d4b4945c_LCPI22_0@l(r3)
+	lis r3, _e328e890d4b4945c_LCPI21_0@ha
+	lfs f0, _e328e890d4b4945c_LCPI21_0@l(r3)
 	li r4, 3
 	addi r3, r1, 4
 	mtctr r4
 	li r4, 0
 	fmr f1, f0
-	b _e328e890d4b4945c_LBB22_7
-_e328e890d4b4945c_LBB22_6:
+	b _e328e890d4b4945c_LBB21_7
+_e328e890d4b4945c_LBB21_6:
 	fadds f1, f1, f2
 	addi r4, r4, 4
-	bdz _e328e890d4b4945c_LBB22_9
-_e328e890d4b4945c_LBB22_7:
+	bdz _e328e890d4b4945c_LBB21_9
+_e328e890d4b4945c_LBB21_7:
 	lfsu f2, 4(r3)
 	lfsx f3, r26, r4
 	fsubs f2, f2, f3
 	fcmpu cr0, f2, f0
-	bge cr0, _e328e890d4b4945c_LBB22_6
+	bge cr0, _e328e890d4b4945c_LBB21_6
 	fneg f2, f2
-	b _e328e890d4b4945c_LBB22_6
-_e328e890d4b4945c_LBB22_9:
-	lis r3, _e328e890d4b4945c_LCPI22_1@ha
-	lfs f0, _e328e890d4b4945c_LCPI22_1@l(r3)
+	b _e328e890d4b4945c_LBB21_6
+_e328e890d4b4945c_LBB21_9:
+	lis r3, _e328e890d4b4945c_LCPI21_1@ha
+	lfs f0, _e328e890d4b4945c_LCPI21_1@l(r3)
 	fcmpu cr0, f1, f0
-	bgt	cr0, _e328e890d4b4945c_LBB22_15
+	bgt	cr0, _e328e890d4b4945c_LBB21_15
 	lis r3, _e328e890d4b4945c_ZL21s_spotLightBlockCount@ha
 	addi r3, r3, _e328e890d4b4945c_ZL21s_spotLightBlockCount@l
 	bl _e328e890d4b4945c_ZL19atomicFetchAddLightPVjj
 	cmplwi	r3, 7
-	bgt	cr0, _e328e890d4b4945c_LBB22_15
+	bgt	cr0, _e328e890d4b4945c_LBB21_15
 	mulli r26, r3, 168
 	lis r3, s_spotLightBlocks@ha
 	addi r25, r3, s_spotLightBlocks@l
@@ -2314,11 +2284,11 @@ _e328e890d4b4945c_LBB22_9:
 	stw r3, -8(r25)
 	li r3, 12
 	mtctr r3
-_e328e890d4b4945c_LBB22_12:
+_e328e890d4b4945c_LBB21_12:
 	lwzx r3, r4, r27
 	addi r27, r27, 4
 	stwu r3, 4(r25)
-	bdnz _e328e890d4b4945c_LBB22_12
+	bdnz _e328e890d4b4945c_LBB21_12
 	lis r5, s_spotLightBlocks@ha
 	addi r5, r5, s_spotLightBlocks@l
 	add r5, r26, r5
@@ -2327,7 +2297,7 @@ _e328e890d4b4945c_LBB22_12:
 	li r6, 3
 	addi r5, r5, 76
 	mtctr r6
-_e328e890d4b4945c_LBB22_14:
+_e328e890d4b4945c_LBB21_14:
 	lwzu r6, 4(r3)
 	lfsu f0, 4(r4)
 	stwu r6, 4(r5)
@@ -2340,8 +2310,8 @@ _e328e890d4b4945c_LBB22_14:
 	fmadds f0, f0, f2, f1
 	fmadds f0, f4, f5, f0
 	stfs f0, 12(r5)
-	bdnz _e328e890d4b4945c_LBB22_14
-_e328e890d4b4945c_LBB22_15:
+	bdnz _e328e890d4b4945c_LBB21_14
+_e328e890d4b4945c_LBB21_15:
 	lwz r30, 88(r1)
 	lwz r29, 84(r1)
 	lwz r28, 80(r1)
@@ -2352,11 +2322,11 @@ _e328e890d4b4945c_LBB22_15:
 	addi r1, r1, 96
 	mtlr r0
 	blr
-_e328e890d4b4945c_Lfunc_end22:
+_e328e890d4b4945c_Lfunc_end21:
 
 	.align 4
 hook_captureSpotLightTex:
-_e328e890d4b4945c_Lfunc_begin23:
+_e328e890d4b4945c_Lfunc_begin22:
 	mflr r0
 	stwu r1, -80(r1)
 	cmplwi	r3, 0
@@ -2364,45 +2334,45 @@ _e328e890d4b4945c_Lfunc_begin23:
 	stw r28, 64(r1)
 	stw r29, 68(r1)
 	stw r30, 72(r1)
-	beq	cr0, _e328e890d4b4945c_LBB23_16
+	beq	cr0, _e328e890d4b4945c_LBB22_16
 	cmplwi	r4, 0
-	beq	cr0, _e328e890d4b4945c_LBB23_16
+	beq	cr0, _e328e890d4b4945c_LBB22_16
 	lis r5, _e328e890d4b4945c_ZL21s_spotLightBlockCount@ha
 	lwz r5, _e328e890d4b4945c_ZL21s_spotLightBlockCount@l(r5)
 	li r6, 8
 	lis r7, s_spotLightBlocks@ha
 	addi r7, r7, s_spotLightBlocks@l
 	cmplwi	r5, 8
-	bc 12, lt, _e328e890d4b4945c_LBB23_4
+	bc 12, lt, _e328e890d4b4945c_LBB22_4
 	ori r5, r6, 0
-	b _e328e890d4b4945c_LBB23_4
-_e328e890d4b4945c_LBB23_4:
+	b _e328e890d4b4945c_LBB22_4
+_e328e890d4b4945c_LBB22_4:
 	mulli r6, r5, 168
 	add r30, r7, r6
 	addi r5, r5, 1
 	mtctr r5
 	mr	r5, r30
-_e328e890d4b4945c_LBB23_5:
-	bdz _e328e890d4b4945c_LBB23_8
+_e328e890d4b4945c_LBB22_5:
+	bdz _e328e890d4b4945c_LBB22_8
 	lwz r6, -168(r5)
 	addi r5, r5, -168
 	addi r30, r30, -168
 	cmplw	r6, r3
-	bne	cr0, _e328e890d4b4945c_LBB23_5
+	bne	cr0, _e328e890d4b4945c_LBB22_5
 	cmplwi	r30, 0
-	bne	cr0, _e328e890d4b4945c_LBB23_9
-	b _e328e890d4b4945c_LBB23_16
-_e328e890d4b4945c_LBB23_8:
+	bne	cr0, _e328e890d4b4945c_LBB22_9
+	b _e328e890d4b4945c_LBB22_16
+_e328e890d4b4945c_LBB22_8:
 	li r30, 0
 	cmplwi	r30, 0
-	beq	cr0, _e328e890d4b4945c_LBB23_16
-_e328e890d4b4945c_LBB23_9:
+	beq	cr0, _e328e890d4b4945c_LBB22_16
+_e328e890d4b4945c_LBB22_9:
 	mr	r28, r3
 	addi r3, r1, 16
 	mr	r29, r4
 	bl _e328e890d4b4945c_ZL19getRecordCameraViewPf
 	cmplwi	r3, 0
-	beq	cr0, _e328e890d4b4945c_LBB23_16
+	beq	cr0, _e328e890d4b4945c_LBB22_16
 	addi r4, r30, 104
 	li r5, 0
 	addi r6, r1, 12
@@ -2410,14 +2380,14 @@ _e328e890d4b4945c_LBB23_9:
 	li r8, 12
 	mr	r3, r28
 	mr	r9, r29
-_e328e890d4b4945c_LBB23_11:
+_e328e890d4b4945c_LBB22_11:
 	slwi r10, r5, 4
 	add r12, r10, r30
 	add r11, r9, r10
 	addi r12, r12, 100
 	mr	r29, r6
 	mtctr r7
-_e328e890d4b4945c_LBB23_12:
+_e328e890d4b4945c_LBB22_12:
 	lfsu f1, 4(r29)
 	lfs f2, 4(r11)
 	lfs f3, 16(r29)
@@ -2428,7 +2398,7 @@ _e328e890d4b4945c_LBB23_12:
 	fmadds f0, f0, f1, f2
 	fmadds f0, f4, f5, f0
 	stfsu f0, 4(r12)
-	bdnz _e328e890d4b4945c_LBB23_12
+	bdnz _e328e890d4b4945c_LBB22_12
 	rlwimi r10, r8, 0, 28, 29
 	lfsx f0, r9, r10
 	add r10, r30, r10
@@ -2438,7 +2408,7 @@ _e328e890d4b4945c_LBB23_12:
 	addi r4, r4, 16
 	fadds f0, f0, f1
 	stfs f0, 104(r10)
-	bne	cr0, _e328e890d4b4945c_LBB23_11
+	bne	cr0, _e328e890d4b4945c_LBB22_11
 	addi r6, r30, 28
 	li r4, 1
 	li r5, 0
@@ -2446,10 +2416,10 @@ _e328e890d4b4945c_LBB23_12:
 	lwz r4, 28(r30)
 	stw r3, 24(r30)
 	cmplwi	r4, 16
-	bge cr0, _e328e890d4b4945c_LBB23_16
+	bge cr0, _e328e890d4b4945c_LBB22_16
 	li r3, 16
 	stw r3, 28(r30)
-_e328e890d4b4945c_LBB23_16:
+_e328e890d4b4945c_LBB22_16:
 	lwz r30, 72(r1)
 	lwz r29, 68(r1)
 	lwz r28, 64(r1)
@@ -2457,11 +2427,11 @@ _e328e890d4b4945c_LBB23_16:
 	addi r1, r1, 80
 	mtlr r0
 	blr
-_e328e890d4b4945c_Lfunc_end23:
+_e328e890d4b4945c_Lfunc_end22:
 
 	.align 4
 hook_captureLightProxyMVP:
-_e328e890d4b4945c_Lfunc_begin24:
+_e328e890d4b4945c_Lfunc_begin23:
 	mflr r0
 	stwu r1, -64(r1)
 	cmplwi	r3, 0
@@ -2476,16 +2446,16 @@ _e328e890d4b4945c_Lfunc_begin24:
 	stw r28, 48(r1)
 	stw r29, 52(r1)
 	stw r30, 56(r1)
-	beq	cr0, _e328e890d4b4945c_LBB24_45
+	beq	cr0, _e328e890d4b4945c_LBB23_45
 	mr	r28, r4
 	cmplwi	r4, 0
-	beq	cr0, _e328e890d4b4945c_LBB24_45
+	beq	cr0, _e328e890d4b4945c_LBB23_45
 	mr	r27, r5
 	cmplwi	r5, 0
-	beq	cr0, _e328e890d4b4945c_LBB24_45
+	beq	cr0, _e328e890d4b4945c_LBB23_45
 	mr	r30, r6
 	cmplwi	r6, 0
-	beq	cr0, _e328e890d4b4945c_LBB24_45
+	beq	cr0, _e328e890d4b4945c_LBB23_45
 	li r4, 0
 	mr	r29, r3
 	li r24, 0
@@ -2497,19 +2467,19 @@ _e328e890d4b4945c_Lfunc_begin24:
 	bl _e328e890d4b4945c_ZL7readU16Pvj
 	cmplwi	r3, 0
 	li r25, 0
-	bne	cr0, _e328e890d4b4945c_LBB24_9
+	bne	cr0, _e328e890d4b4945c_LBB23_9
 	mr	r3, r26
 	li r4, 16
 	bl _e328e890d4b4945c_ZL7readU16Pvj
 	cmplwi	r3, 64
 	li r25, 0
-	bne	cr0, _e328e890d4b4945c_LBB24_9
+	bne	cr0, _e328e890d4b4945c_LBB23_9
 	mr	r3, r29
 	li r4, 8
 	bl _e328e890d4b4945c_ZL7readU32Pvj
 	cmplwi	r3, 112
 	li r25, 0
-	blt	cr0, _e328e890d4b4945c_LBB24_9
+	blt	cr0, _e328e890d4b4945c_LBB23_9
 	mr	r3, r26
 	li r4, 8
 	bl _e328e890d4b4945c_ZL6readU8Pvj
@@ -2518,7 +2488,7 @@ _e328e890d4b4945c_Lfunc_begin24:
 	bl _e328e890d4b4945c_ZL14getStrideBytesjj
 	cmplwi	r3, 16
 	li r25, 0
-	bne	cr0, _e328e890d4b4945c_LBB24_9
+	bne	cr0, _e328e890d4b4945c_LBB23_9
 	mr	r3, r26
 	li r4, 20
 	bl _e328e890d4b4945c_ZL6readU8Pvj
@@ -2528,18 +2498,18 @@ _e328e890d4b4945c_Lfunc_begin24:
 	xori r3, r3, 16
 	cntlzw	r3, r3
 	srwi r25, r3, 5
-_e328e890d4b4945c_LBB24_9:
+_e328e890d4b4945c_LBB23_9:
 	li r3, 128
 	mtctr r3
 	lis r3, s_proxyBlocks@ha
 	addi r3, r3, s_proxyBlocks@l
 	addi r3, r3, -180
-_e328e890d4b4945c_LBB24_10:
+_e328e890d4b4945c_LBB23_10:
 	lwzu r4, 180(r3)
 	cmplw	r4, r29
-	beq	cr0, _e328e890d4b4945c_LBB24_28
+	beq	cr0, _e328e890d4b4945c_LBB23_28
 	addi r24, r24, 1
-	bdnz _e328e890d4b4945c_LBB24_10
+	bdnz _e328e890d4b4945c_LBB23_10
 	lis r3, s_proxyBlocks@ha
 	addi r3, r3, s_proxyBlocks@l
 	li r23, 128
@@ -2547,74 +2517,74 @@ _e328e890d4b4945c_LBB24_10:
 	li r21, 11
 	addi r26, r3, -180
 	li r24, 0
-	b _e328e890d4b4945c_LBB24_14
-_e328e890d4b4945c_LBB24_13:
+	b _e328e890d4b4945c_LBB23_14
+_e328e890d4b4945c_LBB23_13:
 	addi r23, r23, -1
 	cmplwi	r23, 0
-	bc 4, gt, _e328e890d4b4945c_LBB24_21
-_e328e890d4b4945c_LBB24_14:
+	bc 4, gt, _e328e890d4b4945c_LBB23_21
+_e328e890d4b4945c_LBB23_14:
 	lwzu r3, 180(r26)
 	cmplwi	r3, 0
 	li r3, 13
-	beq	cr0, _e328e890d4b4945c_LBB24_16
+	beq	cr0, _e328e890d4b4945c_LBB23_16
 	cmplwi	r3, 13
-	bne	cr0, _e328e890d4b4945c_LBB24_20
-	b _e328e890d4b4945c_LBB24_13
-_e328e890d4b4945c_LBB24_16:
+	bne	cr0, _e328e890d4b4945c_LBB23_20
+	b _e328e890d4b4945c_LBB23_13
+_e328e890d4b4945c_LBB23_16:
 	mr	r3, r26
 	bl _e328e890d4b4945c_ZL22atomicCompareSwapLightPVjjj
 	cmplwi	r3, 0
-	bc 12, eq, _e328e890d4b4945c_LBB24_18
+	bc 12, eq, _e328e890d4b4945c_LBB23_18
 	ori r3, r22, 0
-	b _e328e890d4b4945c_LBB24_19
-_e328e890d4b4945c_LBB24_18:
+	b _e328e890d4b4945c_LBB23_19
+_e328e890d4b4945c_LBB23_18:
 	addi r3, r21, 0
 	addi r24, r26, 0
-_e328e890d4b4945c_LBB24_19:
+_e328e890d4b4945c_LBB23_19:
 	cmplwi	r3, 13
-	beq	cr0, _e328e890d4b4945c_LBB24_13
-_e328e890d4b4945c_LBB24_20:
+	beq	cr0, _e328e890d4b4945c_LBB23_13
+_e328e890d4b4945c_LBB23_20:
 	cmplwi	r3, 0
-	beq	cr0, _e328e890d4b4945c_LBB24_13
-_e328e890d4b4945c_LBB24_21:
+	beq	cr0, _e328e890d4b4945c_LBB23_13
+_e328e890d4b4945c_LBB23_21:
 	cmplwi	r24, 0
-	bne	cr0, _e328e890d4b4945c_LBB24_40
+	bne	cr0, _e328e890d4b4945c_LBB23_40
 	li r3, 128
 	lis r4, s_proxyBlocks@ha
 	mtctr r3
 	addi r3, r4, s_proxyBlocks@l
 	addi r3, r3, -180
 	li r24, 0
-	b _e328e890d4b4945c_LBB24_25
-_e328e890d4b4945c_LBB24_23:
+	b _e328e890d4b4945c_LBB23_25
+_e328e890d4b4945c_LBB23_23:
 	mr	r24, r3
-_e328e890d4b4945c_LBB24_24:
-	bdz _e328e890d4b4945c_LBB24_38
-_e328e890d4b4945c_LBB24_25:
+_e328e890d4b4945c_LBB23_24:
+	bdz _e328e890d4b4945c_LBB23_38
+_e328e890d4b4945c_LBB23_25:
 	lwzu r4, 180(r3)
 	cmpwi	r4, -1
-	beq	cr0, _e328e890d4b4945c_LBB24_24
+	beq	cr0, _e328e890d4b4945c_LBB23_24
 	cmplwi	r24, 0
-	beq	cr0, _e328e890d4b4945c_LBB24_23
+	beq	cr0, _e328e890d4b4945c_LBB23_23
 	lwz r4, 176(r3)
 	lwz r5, 176(r24)
 	cmplw	r4, r5
-	blt	cr0, _e328e890d4b4945c_LBB24_23
-	b _e328e890d4b4945c_LBB24_24
-_e328e890d4b4945c_LBB24_28:
+	blt	cr0, _e328e890d4b4945c_LBB23_23
+	b _e328e890d4b4945c_LBB23_24
+_e328e890d4b4945c_LBB23_28:
 	lwz r4, 4(r3)
 	cmplw	r4, r27
-	beq	cr0, _e328e890d4b4945c_LBB24_33
+	beq	cr0, _e328e890d4b4945c_LBB23_33
 	lwz r4, 8(r3)
 	cmplw	r4, r27
-	beq	cr0, _e328e890d4b4945c_LBB24_33
+	beq	cr0, _e328e890d4b4945c_LBB23_33
 	cmplwi	r4, 0
-	beq	cr0, _e328e890d4b4945c_LBB24_32
+	beq	cr0, _e328e890d4b4945c_LBB23_32
 	stw r27, 4(r3)
 	li r27, 0
-_e328e890d4b4945c_LBB24_32:
+_e328e890d4b4945c_LBB23_32:
 	stw r27, 8(r3)
-_e328e890d4b4945c_LBB24_33:
+_e328e890d4b4945c_LBB23_33:
 	lis r6, s_proxyBlocks@ha
 	mulli r5, r24, 180
 	addi r6, r6, s_proxyBlocks@l
@@ -2623,10 +2593,10 @@ _e328e890d4b4945c_LBB24_33:
 	li r6, 16
 	addi r5, r5, 8
 	mtctr r6
-_e328e890d4b4945c_LBB24_34:
+_e328e890d4b4945c_LBB23_34:
 	lwzu r6, 4(r4)
 	stwu r6, 4(r5)
-	bdnz _e328e890d4b4945c_LBB24_34
+	bdnz _e328e890d4b4945c_LBB23_34
 	li r6, 12
 	mtctr r6
 	lis r6, s_proxyBlocks@ha
@@ -2636,53 +2606,53 @@ _e328e890d4b4945c_LBB24_34:
 	addi r4, r29, 88
 	addi r5, r5, 72
 	li r6, 0
-_e328e890d4b4945c_LBB24_36:
+_e328e890d4b4945c_LBB23_36:
 	lwzx r7, r30, r6
 	stwu r7, 4(r5)
 	lwzx r7, r4, r6
 	addi r6, r6, 4
 	stw r7, 48(r5)
-	bdnz _e328e890d4b4945c_LBB24_36
+	bdnz _e328e890d4b4945c_LBB23_36
 	lis r4, sFrameCounter@ha
 	lwz r4, sFrameCounter@l(r4)
 	stw r25, 172(r3)
 	stw r4, 176(r3)
-	b _e328e890d4b4945c_LBB24_45
-_e328e890d4b4945c_LBB24_38:
+	b _e328e890d4b4945c_LBB23_45
+_e328e890d4b4945c_LBB23_38:
 	cmplwi	r24, 0
-	beq	cr0, _e328e890d4b4945c_LBB24_45
+	beq	cr0, _e328e890d4b4945c_LBB23_45
 	li r3, -1
 	stw r3, 0(r24)
-_e328e890d4b4945c_LBB24_40:
+_e328e890d4b4945c_LBB23_40:
 	li r3, 0
 	mr	r4, r24
 	stwu r3, 8(r4)
 	li r5, 16
 	stw r27, -4(r4)
 	mtctr r5
-_e328e890d4b4945c_LBB24_41:
+_e328e890d4b4945c_LBB23_41:
 	lwzx r5, r28, r3
 	addi r3, r3, 4
 	stwu r5, 4(r4)
-	bdnz _e328e890d4b4945c_LBB24_41
+	bdnz _e328e890d4b4945c_LBB23_41
 	li r5, 12
 	addi r3, r29, 88
 	addi r4, r24, 72
 	mtctr r5
 	li r5, 0
-_e328e890d4b4945c_LBB24_43:
+_e328e890d4b4945c_LBB23_43:
 	lwzx r6, r30, r5
 	stwu r6, 4(r4)
 	lwzx r6, r3, r5
 	addi r5, r5, 4
 	stw r6, 48(r4)
-	bdnz _e328e890d4b4945c_LBB24_43
+	bdnz _e328e890d4b4945c_LBB23_43
 	lis r3, sFrameCounter@ha
 	lwz r3, sFrameCounter@l(r3)
 	stw r25, 172(r24)
 	stw r3, 176(r24)
 	stw r29, 0(r24)
-_e328e890d4b4945c_LBB24_45:
+_e328e890d4b4945c_LBB23_45:
 	lwz r30, 56(r1)
 	lwz r29, 52(r1)
 	lwz r28, 48(r1)
@@ -2697,96 +2667,96 @@ _e328e890d4b4945c_LBB24_45:
 	addi r1, r1, 64
 	mtlr r0
 	blr
-_e328e890d4b4945c_Lfunc_end24:
+_e328e890d4b4945c_Lfunc_end23:
 
 	.align 4
 hook_captureStampBind:
-_e328e890d4b4945c_Lfunc_begin25:
+_e328e890d4b4945c_Lfunc_begin24:
 	mflr r0
 	stwu r1, -16(r1)
 	cmplwi	r3, 0
 	stw r0, 20(r1)
 	stw r30, 8(r1)
-	beq	cr0, _e328e890d4b4945c_LBB25_9
+	beq	cr0, _e328e890d4b4945c_LBB24_9
 	mr	r30, r3
 	lis r3, _e328e890d4b4945c_ZL16s_stampBindCount@ha
 	lwz r4, _e328e890d4b4945c_ZL16s_stampBindCount@l(r3)
 	cmplwi	r4, 0
-	beq	cr0, _e328e890d4b4945c_LBB25_7
+	beq	cr0, _e328e890d4b4945c_LBB24_7
 	cmplwi	r4, 128
 	li r5, 128
-	bc 12, lt, _e328e890d4b4945c_LBB25_4
+	bc 12, lt, _e328e890d4b4945c_LBB24_4
 	ori r4, r5, 0
-	b _e328e890d4b4945c_LBB25_4
-_e328e890d4b4945c_LBB25_4:
+	b _e328e890d4b4945c_LBB24_4
+_e328e890d4b4945c_LBB24_4:
 	lis r5, s_stampBinds@ha
 	addi r5, r5, s_stampBinds@l
 	mtctr r4
 	addi r4, r5, -8
-_e328e890d4b4945c_LBB25_5:
+_e328e890d4b4945c_LBB24_5:
 	lwzu r5, 8(r4)
 	cmplw	r5, r30
-	beq	cr0, _e328e890d4b4945c_LBB25_9
-	bdnz _e328e890d4b4945c_LBB25_5
-_e328e890d4b4945c_LBB25_7:
+	beq	cr0, _e328e890d4b4945c_LBB24_9
+	bdnz _e328e890d4b4945c_LBB24_5
+_e328e890d4b4945c_LBB24_7:
 	addi r3, r3, _e328e890d4b4945c_ZL16s_stampBindCount@l
 	bl _e328e890d4b4945c_ZL19atomicFetchAddLightPVjj
 	cmplwi	r3, 127
-	bgt	cr0, _e328e890d4b4945c_LBB25_9
+	bgt	cr0, _e328e890d4b4945c_LBB24_9
 	lis r4, s_stampBinds@ha
 	slwi r3, r3, 3
 	addi r4, r4, s_stampBinds@l
 	stwux r30, r4, r3
 	li r3, 0
 	stw r3, 4(r4)
-_e328e890d4b4945c_LBB25_9:
+_e328e890d4b4945c_LBB24_9:
 	lwz r30, 8(r1)
 	lwz r0, 20(r1)
 	addi r1, r1, 16
 	mtlr r0
 	blr
-_e328e890d4b4945c_Lfunc_end25:
+_e328e890d4b4945c_Lfunc_end24:
 
 	.align 4
-_e328e890d4b4945c_LCPI26_0:
+_e328e890d4b4945c_LCPI25_0:
 	.int	0x00000000
 	.align 4
 _e328e890d4b4945c_ZL15getReplayCamerafPPKfS1_:
-_e328e890d4b4945c_Lfunc_begin26:
+_e328e890d4b4945c_Lfunc_begin25:
 	lis r6, gVRSharedMemory@ha
 	lwz r5, gVRSharedMemory@l(r6)
 	cmplwi	r5, 1
 	li r5, 0
-	bne	cr0, _e328e890d4b4945c_LBB26_9
-	lis r5, _e328e890d4b4945c_LCPI26_0@ha
-	lfs f0, _e328e890d4b4945c_LCPI26_0@l(r5)
+	bne	cr0, _e328e890d4b4945c_LBB25_9
+	lis r5, _e328e890d4b4945c_LCPI25_0@ha
+	lfs f0, _e328e890d4b4945c_LCPI25_0@l(r5)
 	addi r5, r6, gVRSharedMemory@l
 	addi r6, r5, 116
 	addi r7, r5, 4
 	fcmpu cr0, f1, f0
-	bc 12, lt, _e328e890d4b4945c_LBB26_2
-	b _e328e890d4b4945c_LBB26_3
-_e328e890d4b4945c_LBB26_2:
+	bc 12, lt, _e328e890d4b4945c_LBB25_2
+	b _e328e890d4b4945c_LBB25_3
+_e328e890d4b4945c_LBB25_2:
 	addi r6, r7, 0
-_e328e890d4b4945c_LBB26_3:
+_e328e890d4b4945c_LBB25_3:
 	addi r7, r5, 164
 	stw r6, 0(r3)
 	addi r3, r5, 52
-	bc 12, lt, _e328e890d4b4945c_LBB26_5
+	bc 12, lt, _e328e890d4b4945c_LBB25_5
 	ori r3, r7, 0
-	b _e328e890d4b4945c_LBB26_5
-_e328e890d4b4945c_LBB26_5:
+	b _e328e890d4b4945c_LBB25_5
+_e328e890d4b4945c_LBB25_5:
 	li r6, 164
 	li r7, 52
 	stw r3, 0(r4)
 	addi r3, r5, 72
 	addi r4, r5, 184
-	bc 12, lt, _e328e890d4b4945c_LBB26_7
+	bc 12, lt, _e328e890d4b4945c_LBB25_7
 	ori r3, r4, 0
-	b _e328e890d4b4945c_LBB26_8
-_e328e890d4b4945c_LBB26_7:
+	b _e328e890d4b4945c_LBB25_8
+_e328e890d4b4945c_LBB25_7:
 	addi r6, r7, 0
-_e328e890d4b4945c_LBB26_8:
+_e328e890d4b4945c_LBB25_8:
 	lfsx f1, r5, r6
 	lfs f2, 0(r3)
 	fcmpu cr7, f1, f0
@@ -2799,14 +2769,14 @@ _e328e890d4b4945c_LBB26_8:
 	xori r3, r3, 1
 	xori r4, r4, 1
 	and r5, r3, r4
-_e328e890d4b4945c_LBB26_9:
+_e328e890d4b4945c_LBB25_9:
 	mr	r3, r5
 	blr
-_e328e890d4b4945c_Lfunc_end26:
+_e328e890d4b4945c_Lfunc_end25:
 
 	.align 4
 _e328e890d4b4945c_ZL23RecalcSpotLightUniformsf:
-_e328e890d4b4945c_Lfunc_begin27:
+_e328e890d4b4945c_Lfunc_begin26:
 	mflr r0
 	stwu r1, -304(r1)
 	stw r0, 308(r1)
@@ -2831,12 +2801,12 @@ _e328e890d4b4945c_Lfunc_begin27:
 	stw r31, 300(r1)
 	lwz r25, _e328e890d4b4945c_ZL21s_spotLightBlockCount@l(r3)
 	cmplwi	r25, 0
-	beq	cr0, _e328e890d4b4945c_LBB27_26
+	beq	cr0, _e328e890d4b4945c_LBB26_26
 	addi r3, r1, 228
 	addi r4, r1, 224
 	bl _e328e890d4b4945c_ZL15getReplayCamerafPPKfS1_
 	cmplwi	r3, 0
-	beq	cr0, _e328e890d4b4945c_LBB27_26
+	beq	cr0, _e328e890d4b4945c_LBB26_26
 	lwz r30, 228(r1)
 	lis r4, s_spotLightBlocks@ha
 	lwz r29, 224(r1)
@@ -2851,38 +2821,38 @@ _e328e890d4b4945c_Lfunc_begin27:
 	addi r27, r1, 112
 	addi r26, r1, 100
 	li r19, 3
-	bc 12, lt, _e328e890d4b4945c_LBB27_4
+	bc 12, lt, _e328e890d4b4945c_LBB26_4
 	ori r18, r3, 0
-	b _e328e890d4b4945c_LBB27_5
-_e328e890d4b4945c_LBB27_4:
+	b _e328e890d4b4945c_LBB26_5
+_e328e890d4b4945c_LBB26_4:
 	addi r18, r25, 0
-_e328e890d4b4945c_LBB27_5:
+_e328e890d4b4945c_LBB26_5:
 	addi r16, r17, 64
 	addi r15, r30, -16
 	addi r14, r30, -4
 	addi r25, r1, 88
-	b _e328e890d4b4945c_LBB27_7
-_e328e890d4b4945c_LBB27_6:
+	b _e328e890d4b4945c_LBB26_7
+_e328e890d4b4945c_LBB26_6:
 	addi r23, r23, 1
 	cmplw	r23, r18
 	addi r16, r16, 168
-	beq	cr0, _e328e890d4b4945c_LBB27_26
-_e328e890d4b4945c_LBB27_7:
+	beq	cr0, _e328e890d4b4945c_LBB26_26
+_e328e890d4b4945c_LBB26_7:
 	mulli r20, r23, 168
 	mr	r3, r17
 	lwzux r4, r3, r20
 	cmplwi	r4, 0
-	beq	cr0, _e328e890d4b4945c_LBB27_6
+	beq	cr0, _e328e890d4b4945c_LBB26_6
 	addi r3, r3, 28
 	li r4, 0
 	li r5, 0
-	b _e328e890d4b4945c_LBB27_10
-_e328e890d4b4945c_LBB27_9:
+	b _e328e890d4b4945c_LBB26_10
+_e328e890d4b4945c_LBB26_9:
 	addi r5, r5, 1
 	cmplwi	r5, 3
 	addi r4, r4, 16
-	beq	cr0, _e328e890d4b4945c_LBB27_14
-_e328e890d4b4945c_LBB27_10:
+	beq	cr0, _e328e890d4b4945c_LBB26_14
+_e328e890d4b4945c_LBB26_10:
 	slwi r7, r5, 4
 	mr	r6, r30
 	lfsux f0, r6, r7
@@ -2893,11 +2863,11 @@ _e328e890d4b4945c_LBB27_10:
 	mr	r9, r3
 	lfs f2, 8(r6)
 	mtctr r21
-	b _e328e890d4b4945c_LBB27_12
-_e328e890d4b4945c_LBB27_11:
+	b _e328e890d4b4945c_LBB26_12
+_e328e890d4b4945c_LBB26_11:
 	addi r8, r8, -1
-	bdz _e328e890d4b4945c_LBB27_9
-_e328e890d4b4945c_LBB27_12:
+	bdz _e328e890d4b4945c_LBB26_9
+_e328e890d4b4945c_LBB26_12:
 	lfsu f3, 4(r9)
 	cmplwi	r8, 0
 	lfs f4, 16(r9)
@@ -2906,12 +2876,12 @@ _e328e890d4b4945c_LBB27_12:
 	fmadds f3, f0, f3, f4
 	fmadds f3, f2, f5, f3
 	stfsu f3, 4(r7)
-	bne	cr0, _e328e890d4b4945c_LBB27_11
+	bne	cr0, _e328e890d4b4945c_LBB26_11
 	lfs f4, 12(r6)
 	fadds f3, f3, f4
 	stfs f3, 0(r7)
-	b _e328e890d4b4945c_LBB27_11
-_e328e890d4b4945c_LBB27_14:
+	b _e328e890d4b4945c_LBB26_11
+_e328e890d4b4945c_LBB26_14:
 	mr	r3, r29
 	mr	r4, r28
 	mr	r5, r27
@@ -2925,10 +2895,10 @@ _e328e890d4b4945c_LBB27_14:
 	cmplwi	r4, 16
 	add r3, r5, r3
 	li r5, 16
-	bc 12, gt, _e328e890d4b4945c_LBB27_16
+	bc 12, gt, _e328e890d4b4945c_LBB26_16
 	ori r4, r5, 0
-	b _e328e890d4b4945c_LBB27_16
-_e328e890d4b4945c_LBB27_16:
+	b _e328e890d4b4945c_LBB26_16
+_e328e890d4b4945c_LBB26_16:
 	mr	r5, r27
 	bl _e328e890d4b4945c_ZL12gpuWriteRowsjjPKfj
 	lfs f1, 76(r20)
@@ -2943,7 +2913,7 @@ _e328e890d4b4945c_LBB27_16:
 	mr	r4, r24
 	lfs f2, 96(r20)
 	mtctr r19
-_e328e890d4b4945c_LBB27_17:
+_e328e890d4b4945c_LBB26_17:
 	lfsu f3, 16(r3)
 	lfs f4, 4(r3)
 	lfs f5, 8(r3)
@@ -2951,7 +2921,7 @@ _e328e890d4b4945c_LBB27_17:
 	fmadds f3, f3, f0, f4
 	fmadds f3, f5, f2, f3
 	stfsu f3, 4(r4)
-	bdnz _e328e890d4b4945c_LBB27_17
+	bdnz _e328e890d4b4945c_LBB26_17
 	lwz r3, 0(r20)
 	li r5, 3
 	lwz r4, 16(r31)
@@ -2966,14 +2936,14 @@ _e328e890d4b4945c_LBB27_17:
 	bl gpuWriteWordsLE
 	lwz r4, 28(r31)
 	cmplwi	r4, 0
-	beq	cr0, _e328e890d4b4945c_LBB27_6
+	beq	cr0, _e328e890d4b4945c_LBB26_6
 	lfs f0, 12(r30)
 	mr	r3, r14
 	lfs f1, 28(r30)
 	mr	r5, r22
 	lfs f2, 44(r30)
 	mtctr r19
-_e328e890d4b4945c_LBB27_20:
+_e328e890d4b4945c_LBB26_20:
 	lfsu f3, 4(r3)
 	lfs f4, 16(r3)
 	lfs f5, 32(r3)
@@ -2981,14 +2951,14 @@ _e328e890d4b4945c_LBB27_20:
 	fmadds f3, f3, f0, f4
 	fnmadds f3, f5, f2, f3
 	stfsu f3, 4(r5)
-	bdnz _e328e890d4b4945c_LBB27_20
+	bdnz _e328e890d4b4945c_LBB26_20
 	lfs f0, 76(r1)
 	addi r5, r1, 12
 	lfs f1, 80(r1)
 	li r3, 0
 	lfs f2, 84(r1)
 	mr	r6, r5
-_e328e890d4b4945c_LBB27_22:
+_e328e890d4b4945c_LBB26_22:
 	slwi r8, r3, 4
 	add r7, r31, r8
 	lfsu f3, 104(r7)
@@ -2998,7 +2968,7 @@ _e328e890d4b4945c_LBB27_22:
 	lfs f4, 4(r7)
 	lfs f5, 8(r7)
 	mtctr r19
-_e328e890d4b4945c_LBB27_23:
+_e328e890d4b4945c_LBB26_23:
 	lfsu f6, 16(r9)
 	lfs f7, 4(r9)
 	lfs f8, 8(r9)
@@ -3006,7 +2976,7 @@ _e328e890d4b4945c_LBB27_23:
 	fmadds f6, f3, f6, f7
 	fmadds f6, f5, f8, f6
 	stfsu f6, 4(r8)
-	bdnz _e328e890d4b4945c_LBB27_23
+	bdnz _e328e890d4b4945c_LBB26_23
 	lfs f4, 4(r7)
 	addi r8, r1, 24
 	lfs f3, 0(r7)
@@ -3021,15 +2991,15 @@ _e328e890d4b4945c_LBB27_23:
 	cmplwi	r3, 4
 	fadds f3, f3, f4
 	stfsx f3, r7, r8
-	bne	cr0, _e328e890d4b4945c_LBB27_22
+	bne	cr0, _e328e890d4b4945c_LBB26_22
 	lwz r3, 0(r20)
 	li r6, 4
 	lwz r5, 24(r31)
 	add r3, r5, r3
 	addi r5, r1, 12
 	bl _e328e890d4b4945c_ZL12gpuWriteRowsjjPKfj
-	b _e328e890d4b4945c_LBB27_6
-_e328e890d4b4945c_LBB27_26:
+	b _e328e890d4b4945c_LBB26_6
+_e328e890d4b4945c_LBB26_26:
 	lwz r31, 300(r1)
 	lwz r30, 296(r1)
 	lwz r29, 292(r1)
@@ -3052,16 +3022,16 @@ _e328e890d4b4945c_LBB27_26:
 	addi r1, r1, 304
 	mtlr r0
 	blr
-_e328e890d4b4945c_Lfunc_end27:
+_e328e890d4b4945c_Lfunc_end26:
 
 	.align 4
-_e328e890d4b4945c_LCPI28_0:
+_e328e890d4b4945c_LCPI27_0:
 	.int	0x00000000
-_e328e890d4b4945c_LCPI28_1:
+_e328e890d4b4945c_LCPI27_1:
 	.int	0x3fb504f3
 	.align 4
 _e328e890d4b4945c_ZL20RecalcGrudgeUniformsf:
-_e328e890d4b4945c_Lfunc_begin28:
+_e328e890d4b4945c_Lfunc_begin27:
 	mflr r0
 	stwu r1, -272(r1)
 	stw r0, 276(r1)
@@ -3089,30 +3059,30 @@ _e328e890d4b4945c_Lfunc_begin28:
 	stfd f31, 264(r1)
 	lwz r27, _e328e890d4b4945c_ZL16s_stampBindCount@l(r3)
 	cmplwi	r27, 0
-	beq	cr0, _e328e890d4b4945c_LBB28_29
+	beq	cr0, _e328e890d4b4945c_LBB27_29
 	addi r3, r1, 172
 	addi r4, r1, 168
 	fmr f31, f1
 	bl _e328e890d4b4945c_ZL15getReplayCamerafPPKfS1_
 	cmplwi	r3, 0
-	beq	cr0, _e328e890d4b4945c_LBB28_29
+	beq	cr0, _e328e890d4b4945c_LBB27_29
 	cmplwi	r27, 128
 	li r3, 128
-	lis r5, _e328e890d4b4945c_LCPI28_0@ha
-	bc 12, lt, _e328e890d4b4945c_LBB28_4
+	lis r5, _e328e890d4b4945c_LCPI27_0@ha
+	bc 12, lt, _e328e890d4b4945c_LBB27_4
 	ori r21, r3, 0
-	b _e328e890d4b4945c_LBB28_5
-_e328e890d4b4945c_LBB28_4:
+	b _e328e890d4b4945c_LBB27_5
+_e328e890d4b4945c_LBB27_4:
 	addi r21, r27, 0
-_e328e890d4b4945c_LBB28_5:
-	lis r3, _e328e890d4b4945c_LCPI28_1@ha
+_e328e890d4b4945c_LBB27_5:
+	lis r3, _e328e890d4b4945c_LCPI27_1@ha
 	lwz r26, 172(r1)
 	lis r6, s_proxyBlocks@ha
 	lwz r30, 168(r1)
 	lis r4, s_stampBinds@ha
-	lfs f30, _e328e890d4b4945c_LCPI28_0@l(r5)
+	lfs f30, _e328e890d4b4945c_LCPI27_0@l(r5)
 	addi r19, r6, s_proxyBlocks@l
-	lfs f29, _e328e890d4b4945c_LCPI28_1@l(r3)
+	lfs f29, _e328e890d4b4945c_LCPI27_1@l(r3)
 	li r25, 0
 	lis r24, sFrameCounter@ha
 	addi r29, r1, 120
@@ -3122,71 +3092,71 @@ _e328e890d4b4945c_LBB28_5:
 	addi r20, r4, s_stampBinds@l
 	addi r18, r19, -180
 	li r17, 0
-	b _e328e890d4b4945c_LBB28_7
-_e328e890d4b4945c_LBB28_6:
+	b _e328e890d4b4945c_LBB27_7
+_e328e890d4b4945c_LBB27_6:
 	addi r17, r17, 1
 	cmplw	r17, r21
-	beq	cr0, _e328e890d4b4945c_LBB28_29
-_e328e890d4b4945c_LBB28_7:
+	beq	cr0, _e328e890d4b4945c_LBB27_29
+_e328e890d4b4945c_LBB27_7:
 	slwi r3, r17, 3
 	fcmpu cr0, f31, f30
 	add r16, r20, r3
-	bge cr0, _e328e890d4b4945c_LBB28_14
+	bge cr0, _e328e890d4b4945c_LBB27_14
 	mr	r15, r16
 	li r31, 128
 	stwu r25, 4(r15)
 	li r14, 1
 	mr	r27, r18
-	b _e328e890d4b4945c_LBB28_10
-_e328e890d4b4945c_LBB28_9:
+	b _e328e890d4b4945c_LBB27_10
+_e328e890d4b4945c_LBB27_9:
 	addi r31, r31, -1
 	cmplwi	r31, 0
 	addi r14, r14, 1
-	bc 4, gt, _e328e890d4b4945c_LBB28_14
-_e328e890d4b4945c_LBB28_10:
+	bc 4, gt, _e328e890d4b4945c_LBB27_14
+_e328e890d4b4945c_LBB27_10:
 	lwzu r3, 180(r27)
 	addi r3, r3, 1
 	cmplwi	r3, 2
-	blt	cr0, _e328e890d4b4945c_LBB28_9
+	blt	cr0, _e328e890d4b4945c_LBB27_9
 	lwz r3, 172(r27)
 	cmplwi	r3, 0
-	beq	cr0, _e328e890d4b4945c_LBB28_9
+	beq	cr0, _e328e890d4b4945c_LBB27_9
 	lwz r4, 0(r16)
 	mr	r3, r27
 	bl _e328e890d4b4945c_ZL15stampBufMatchesPK13ProxyMVPEntryj
 	cmplwi	r3, 0
-	beq	cr0, _e328e890d4b4945c_LBB28_9
+	beq	cr0, _e328e890d4b4945c_LBB27_9
 	lwz r3, sFrameCounter@l(r24)
 	stw r14, 0(r15)
 	stw r3, 176(r27)
-_e328e890d4b4945c_LBB28_14:
+_e328e890d4b4945c_LBB27_14:
 	lwz r3, 0(r16)
 	cmplwi	r3, 0
-	beq	cr0, _e328e890d4b4945c_LBB28_6
+	beq	cr0, _e328e890d4b4945c_LBB27_6
 	lwz r3, 4(r16)
 	cmplwi	r3, 0
-	beq	cr0, _e328e890d4b4945c_LBB28_6
+	beq	cr0, _e328e890d4b4945c_LBB27_6
 	addi r4, r3, -1
 	mulli r4, r4, 180
 	lwzx r5, r19, r4
 	cmplwi	r5, 0
-	beq	cr0, _e328e890d4b4945c_LBB28_6
+	beq	cr0, _e328e890d4b4945c_LBB27_6
 	add r4, r19, r4
 	lwz r4, 172(r4)
 	cmplwi	r4, 0
-	beq	cr0, _e328e890d4b4945c_LBB28_6
+	beq	cr0, _e328e890d4b4945c_LBB27_6
 	mulli r4, r3, 180
 	add r4, r19, r4
 	li r3, 0
 	addi r4, r4, -60
 	li r5, 0
-	b _e328e890d4b4945c_LBB28_20
-_e328e890d4b4945c_LBB28_19:
+	b _e328e890d4b4945c_LBB27_20
+_e328e890d4b4945c_LBB27_19:
 	addi r5, r5, 1
 	cmplwi	r5, 3
 	addi r3, r3, 16
-	beq	cr0, _e328e890d4b4945c_LBB28_24
-_e328e890d4b4945c_LBB28_20:
+	beq	cr0, _e328e890d4b4945c_LBB27_24
+_e328e890d4b4945c_LBB27_20:
 	add r6, r3, r29
 	slwi r7, r5, 4
 	addi r6, r6, -4
@@ -3194,11 +3164,11 @@ _e328e890d4b4945c_LBB28_20:
 	li r8, 3
 	mr	r9, r4
 	mtctr r23
-	b _e328e890d4b4945c_LBB28_22
-_e328e890d4b4945c_LBB28_21:
+	b _e328e890d4b4945c_LBB27_22
+_e328e890d4b4945c_LBB27_21:
 	addi r8, r8, -1
-	bdz _e328e890d4b4945c_LBB28_19
-_e328e890d4b4945c_LBB28_22:
+	bdz _e328e890d4b4945c_LBB27_19
+_e328e890d4b4945c_LBB27_22:
 	lfsu f1, 4(r9)
 	cmplwi	r8, 0
 	lfs f2, 4(r7)
@@ -3210,12 +3180,12 @@ _e328e890d4b4945c_LBB28_22:
 	fmadds f0, f0, f1, f2
 	fmadds f0, f4, f5, f0
 	stfsu f0, 4(r6)
-	bne	cr0, _e328e890d4b4945c_LBB28_21
+	bne	cr0, _e328e890d4b4945c_LBB27_21
 	lfs f1, 12(r7)
 	fadds f0, f0, f1
 	stfs f0, 0(r6)
-	b _e328e890d4b4945c_LBB28_21
-_e328e890d4b4945c_LBB28_24:
+	b _e328e890d4b4945c_LBB27_21
+_e328e890d4b4945c_LBB27_24:
 	lwz r3, gameMTXInverse@l(r22)
 	mr	r4, r28
 	mtctr r3
@@ -3223,7 +3193,7 @@ _e328e890d4b4945c_LBB28_24:
 	bctrl
 	li r3, 3
 	li r4, 0
-_e328e890d4b4945c_LBB28_25:
+_e328e890d4b4945c_LBB27_25:
 	lfs f0, 8(r30)
 	slwi r6, r4, 4
 	lfs f1, 0(r30)
@@ -3241,17 +3211,17 @@ _e328e890d4b4945c_LBB28_25:
 	fsubs f0, f4, f0
 	stfs f0, 8(r6)
 	li r6, 0
-_e328e890d4b4945c_LBB28_26:
+_e328e890d4b4945c_LBB27_26:
 	lfsu f0, 4(r5)
 	addi r6, r6, 1
 	cmplwi	r6, 3
 	fmuls f0, f0, f29
 	stfs f0, 0(r5)
-	bne	cr0, _e328e890d4b4945c_LBB28_26
+	bne	cr0, _e328e890d4b4945c_LBB27_26
 	addi r3, r3, -1
 	cmplwi	r3, 0
 	addi r4, r4, 1
-	bc 12, gt, _e328e890d4b4945c_LBB28_25
+	bc 12, gt, _e328e890d4b4945c_LBB27_25
 	addi r27, r1, 8
 	addi r4, r1, 120
 	mr	r3, r30
@@ -3266,8 +3236,8 @@ _e328e890d4b4945c_LBB28_26:
 	li r5, 12
 	addi r3, r3, 64
 	bl gpuWriteWordsLE
-	b _e328e890d4b4945c_LBB28_6
-_e328e890d4b4945c_LBB28_29:
+	b _e328e890d4b4945c_LBB27_6
+_e328e890d4b4945c_LBB27_29:
 	lfd f31, 264(r1)
 	lfd f30, 256(r1)
 	lfd f29, 248(r1)
@@ -3293,103 +3263,100 @@ _e328e890d4b4945c_LBB28_29:
 	addi r1, r1, 272
 	mtlr r0
 	blr
-_e328e890d4b4945c_Lfunc_end28:
+_e328e890d4b4945c_Lfunc_end27:
 
 	.align 4
-_e328e890d4b4945c_LCPI29_0:
+_e328e890d4b4945c_LCPI28_0:
 	.int	0x00000000
-_e328e890d4b4945c_LCPI29_2:
+_e328e890d4b4945c_LCPI28_2:
 	.int	0x3e800000
 	.align 4
-_e328e890d4b4945c_LCPI29_1:
+_e328e890d4b4945c_LCPI28_1:
 	.int	0xbf800000
 	.int	0x3f800000
 	.align 4
 hook_recalcPointLightUniforms:
-_e328e890d4b4945c_Lfunc_begin29:
+_e328e890d4b4945c_Lfunc_begin28:
 	mflr r0
-	stwu r1, -192(r1)
-	stw r0, 196(r1)
-	stw r19, 100(r1)
-	stw r20, 104(r1)
-	stw r21, 108(r1)
-	stw r22, 112(r1)
-	stw r23, 116(r1)
-	stw r24, 120(r1)
-	stw r25, 124(r1)
-	stw r26, 128(r1)
-	stw r27, 132(r1)
-	stw r28, 136(r1)
-	stw r29, 140(r1)
-	stw r30, 144(r1)
-	stfd f27, 152(r1)
-	stfd f28, 160(r1)
-	stfd f29, 168(r1)
-	stfd f30, 176(r1)
-	stfd f31, 184(r1)
+	stwu r1, -208(r1)
+	.int 0x7D800026 ; mfcr r12
+	stw r0, 212(r1)
+	stw r19, 116(r1)
+	stw r20, 120(r1)
+	stw r21, 124(r1)
+	stw r22, 128(r1)
+	stw r23, 132(r1)
+	stw r24, 136(r1)
+	stw r25, 140(r1)
+	stw r26, 144(r1)
+	stw r27, 148(r1)
+	stw r28, 152(r1)
+	stw r29, 156(r1)
+	stw r30, 160(r1)
+	stw r12, 112(r1)
+	stfd f27, 168(r1)
+	stfd f28, 176(r1)
+	stfd f29, 184(r1)
+	stfd f30, 192(r1)
+	stfd f31, 200(r1)
 	fmr f31, f1
 	bl _e328e890d4b4945c_ZL20RecalcGrudgeUniformsf
 	fmr f1, f31
 	bl _e328e890d4b4945c_ZL23RecalcSpotLightUniformsf
 	lis r3, _e328e890d4b4945c_ZL17s_lightBlockCount@ha
 	lwz r26, _e328e890d4b4945c_ZL17s_lightBlockCount@l(r3)
-	lis r3, _e328e890d4b4945c_ZL16s_stampBindCount@ha
-	lwz r3, _e328e890d4b4945c_ZL16s_stampBindCount@l(r3)
-	or r3, r26, r3
+	cmplwi cr2, r26, 0
+	bne	cr2, _e328e890d4b4945c_LBB28_2
+	lis r3, _e328e890d4b4945c_ZL19s_capsuleBlockCount@ha
+	lwz r3, _e328e890d4b4945c_ZL19s_capsuleBlockCount@l(r3)
 	cmplwi	r3, 0
-	beq	cr0, _e328e890d4b4945c_LBB29_39
-	fmr f1, f31
-	bl _e328e890d4b4945c_ZL17getEyeViewOffsetXf
-	lis r3, _e328e890d4b4945c_LCPI29_0@ha
-	lfs f0, _e328e890d4b4945c_LCPI29_0@l(r3)
-	fcmpu cr0, f1, f0
-	beq	cr0, _e328e890d4b4945c_LBB29_39
-	addi r3, r1, 52
+	beq	cr0, _e328e890d4b4945c_LBB28_39
+_e328e890d4b4945c_LBB28_2:
+	addi r3, r1, 64
 	bl _e328e890d4b4945c_ZL19getRecordCameraViewPf
 	cmplwi	r3, 0
-	beq	cr0, _e328e890d4b4945c_LBB29_39
-	lis r3, _e328e890d4b4945c_LCPI29_0@ha
-	lfs f28, _e328e890d4b4945c_LCPI29_0@l(r3)
+	beq	cr0, _e328e890d4b4945c_LBB28_39
+	lis r3, _e328e890d4b4945c_LCPI28_0@ha
+	lfs f28, _e328e890d4b4945c_LCPI28_0@l(r3)
 	lis r3, gVRSharedMemory@ha
 	addi r3, r3, gVRSharedMemory@l
 	addi r4, r3, 116
-	fcmpu cr1, f31, f28
+	fcmpu cr0, f31, f28
 	addi r3, r3, 4
-	cmplwi	r26, 0
-	bc 12, 4*cr1+lt, _e328e890d4b4945c_LBB29_5
+	bc 12, lt, _e328e890d4b4945c_LBB28_5
 	ori r30, r4, 0
-	b _e328e890d4b4945c_LBB29_6
-_e328e890d4b4945c_LBB29_5:
+	b _e328e890d4b4945c_LBB28_6
+_e328e890d4b4945c_LBB28_5:
 	addi r30, r3, 0
-_e328e890d4b4945c_LBB29_6:
-	beq	cr0, _e328e890d4b4945c_LBB29_21
+_e328e890d4b4945c_LBB28_6:
+	beq	cr2, _e328e890d4b4945c_LBB28_21
 	cmplwi	r26, 48
 	li r3, 48
 	lis r4, s_lightBlocks@ha
-	li r5, _e328e890d4b4945c_LCPI29_1@l
-	bc 12, lt, _e328e890d4b4945c_LBB29_9
+	li r5, _e328e890d4b4945c_LCPI28_1@l
+	bc 12, lt, _e328e890d4b4945c_LBB28_9
 	ori r25, r3, 0
-	b _e328e890d4b4945c_LBB29_10
-_e328e890d4b4945c_LBB29_9:
+	b _e328e890d4b4945c_LBB28_10
+_e328e890d4b4945c_LBB28_9:
 	addi r25, r26, 0
-_e328e890d4b4945c_LBB29_10:
+_e328e890d4b4945c_LBB28_10:
 	addi r3, r4, s_lightBlocks@l
-	addi r29, r1, 40
-	addi r28, r1, 52
-	addi r27, r1, 28
-	addis r24, r5, _e328e890d4b4945c_LCPI29_1@ha
+	addi r29, r1, 52
+	addi r28, r1, 64
+	addi r27, r1, 40
+	addis r24, r5, _e328e890d4b4945c_LCPI28_1@ha
 	addi r22, r3, -24
 	addi r23, r3, -32
-	addi r26, r1, 16
-	b _e328e890d4b4945c_LBB29_13
-_e328e890d4b4945c_LBB29_11:
-	lfs f6, 40(r1)
+	addi r26, r1, 28
+	b _e328e890d4b4945c_LBB28_13
+_e328e890d4b4945c_LBB28_11:
+	lfs f6, 52(r1)
 	fcmpu cr7, f4, f5
-	lfs f8, 44(r1)
+	lfs f8, 56(r1)
 	.int 0x7C600026 ; mfcr r3
 	.int 0x7C800026 ; mfcr r4
 	li r5, 3
-	lfs f7, 28(r1)
+	lfs f7, 40(r1)
 	clrlwi	r3, r3, 31
 	lfs f9, 52(r21)
 	rlwinm r4, r4, 30, 31, 31
@@ -3408,28 +3375,28 @@ _e328e890d4b4945c_LBB29_11:
 	fmuls f3, f3, f3
 	fdivs f2, f2, f3
 	lfs f3, 44(r21)
-	stfs f2, 24(r1)
+	stfs f2, 36(r1)
 	fsubs f4, f6, f7
 	fsubs f1, f8, f1
 	fadds f2, f3, f4
 	fmadds f0, f5, f1, f0
-	stfs f2, 16(r1)
-	stfs f0, 20(r1)
+	stfs f2, 28(r1)
+	stfs f0, 32(r1)
 	bl gpuWriteWordsLE
-_e328e890d4b4945c_LBB29_12:
+_e328e890d4b4945c_LBB28_12:
 	addi r25, r25, -1
 	cmplwi	r25, 0
-	bc 4, gt, _e328e890d4b4945c_LBB29_21
-_e328e890d4b4945c_LBB29_13:
+	bc 4, gt, _e328e890d4b4945c_LBB28_21
+_e328e890d4b4945c_LBB28_13:
 	lwzu r3, 32(r23)
 	mr	r21, r22
 	addi r22, r22, 32
 	cmplwi	r3, 0
-	beq	cr0, _e328e890d4b4945c_LBB29_12
+	beq	cr0, _e328e890d4b4945c_LBB28_12
 	li r4, 4
 	bl _e328e890d4b4945c_ZL7readU32Pvj
 	cmplwi	r3, 0
-	beq	cr0, _e328e890d4b4945c_LBB29_12
+	beq	cr0, _e328e890d4b4945c_LBB28_12
 	lwz r4, 4(r23)
 	lfs f31, 32(r21)
 	lfs f30, 36(r21)
@@ -3451,65 +3418,65 @@ _e328e890d4b4945c_LBB29_13:
 	mr	r4, r29
 	li r5, 3
 	bl gpuWriteWordsLE
-	lfs f2, 48(r1)
+	lfs f2, 60(r1)
 	fcmpu cr0, f2, f28
-	beq	cr0, _e328e890d4b4945c_LBB29_12
-	lfs f3, 36(r1)
+	beq	cr0, _e328e890d4b4945c_LBB28_12
+	lfs f3, 48(r1)
 	fcmpu cr0, f3, f28
-	beq	cr0, _e328e890d4b4945c_LBB29_12
-	lfs f0, 32(r1)
+	beq	cr0, _e328e890d4b4945c_LBB28_12
+	lfs f0, 44(r1)
 	fdivs f1, f0, f3
 	lfs f0, 48(r21)
 	fsubs f4, f0, f1
 	fcmpu cr0, f4, f28
-	bge cr0, _e328e890d4b4945c_LBB29_19
+	bge cr0, _e328e890d4b4945c_LBB28_19
 	fneg f4, f4
-_e328e890d4b4945c_LBB29_19:
+_e328e890d4b4945c_LBB28_19:
 	fadds f5, f0, f1
 	fcmpu cr0, f5, f28
-	bge cr0, _e328e890d4b4945c_LBB29_11
+	bge cr0, _e328e890d4b4945c_LBB28_11
 	fneg f5, f5
-	b _e328e890d4b4945c_LBB29_11
-_e328e890d4b4945c_LBB29_21:
+	b _e328e890d4b4945c_LBB28_11
+_e328e890d4b4945c_LBB28_21:
 	lis r3, _e328e890d4b4945c_ZL19s_capsuleBlockCount@ha
 	lwz r3, _e328e890d4b4945c_ZL19s_capsuleBlockCount@l(r3)
 	cmplwi	r3, 0
-	beq	cr0, _e328e890d4b4945c_LBB29_39
-	lis r6, _e328e890d4b4945c_LCPI29_0@ha
-	lis r7, _e328e890d4b4945c_LCPI29_2@ha
-	lfs f28, _e328e890d4b4945c_LCPI29_0@l(r6)
+	beq	cr0, _e328e890d4b4945c_LBB28_39
+	lis r6, _e328e890d4b4945c_LCPI28_0@ha
+	lis r7, _e328e890d4b4945c_LCPI28_2@ha
+	lfs f28, _e328e890d4b4945c_LCPI28_0@l(r6)
 	cmplwi	r3, 16
-	lfs f27, _e328e890d4b4945c_LCPI29_2@l(r7)
+	lfs f27, _e328e890d4b4945c_LCPI28_2@l(r7)
 	li r4, 16
 	lis r5, s_capsuleBlocks@ha
-	bc 12, lt, _e328e890d4b4945c_LBB29_24
+	bc 12, lt, _e328e890d4b4945c_LBB28_24
 	ori r23, r4, 0
-	b _e328e890d4b4945c_LBB29_25
-_e328e890d4b4945c_LBB29_24:
+	b _e328e890d4b4945c_LBB28_25
+_e328e890d4b4945c_LBB28_24:
 	addi r23, r3, 0
-_e328e890d4b4945c_LBB29_25:
-	li r3, _e328e890d4b4945c_LCPI29_1@l
+_e328e890d4b4945c_LBB28_25:
+	li r3, _e328e890d4b4945c_LCPI28_1@l
 	addi r4, r5, s_capsuleBlocks@l
-	addi r29, r1, 40
-	addi r28, r1, 52
-	addi r27, r1, 28
-	addis r22, r3, _e328e890d4b4945c_LCPI29_1@ha
+	addi r29, r1, 52
+	addi r28, r1, 64
+	addi r27, r1, 40
+	addis r22, r3, _e328e890d4b4945c_LCPI28_1@ha
 	addi r20, r4, -12
 	addi r21, r4, -28
-	addi r26, r1, 16
-	b _e328e890d4b4945c_LBB29_28
-_e328e890d4b4945c_LBB29_26:
+	addi r26, r1, 28
+	b _e328e890d4b4945c_LBB28_28
+_e328e890d4b4945c_LBB28_26:
 	fcmpu cr7, f4, f5
-	lfs f6, 40(r1)
+	lfs f6, 52(r1)
 	.int 0x7C600026 ; mfcr r3
 	.int 0x7C800026 ; mfcr r4
 	li r5, 3
-	lfs f7, 28(r1)
+	lfs f7, 40(r1)
 	clrlwi	r3, r3, 31
 	rlwinm r4, r4, 30, 31, 31
 	xori r3, r3, 1
 	xori r4, r4, 1
-	lfs f8, 44(r1)
+	lfs f8, 56(r1)
 	and r3, r4, r3
 	fdivs f6, f6, f2
 	slwi r3, r3, 2
@@ -3527,25 +3494,25 @@ _e328e890d4b4945c_LBB29_26:
 	fmuls f3, f3, f3
 	fmadds f0, f6, f1, f0
 	fadds f4, f4, f5
-	stfs f0, 20(r1)
+	stfs f0, 32(r1)
 	fdivs f0, f2, f3
-	stfs f4, 16(r1)
-	stfs f0, 24(r1)
+	stfs f4, 28(r1)
+	stfs f0, 36(r1)
 	bl gpuWriteWordsLE
-_e328e890d4b4945c_LBB29_27:
+_e328e890d4b4945c_LBB28_27:
 	addi r23, r23, -1
 	cmplwi	r23, 0
-	bc 4, gt, _e328e890d4b4945c_LBB29_39
-_e328e890d4b4945c_LBB29_28:
+	bc 4, gt, _e328e890d4b4945c_LBB28_39
+_e328e890d4b4945c_LBB28_28:
 	lwzu r3, 28(r21)
 	mr	r19, r20
 	addi r20, r20, 28
 	cmplwi	r3, 0
-	beq	cr0, _e328e890d4b4945c_LBB29_27
+	beq	cr0, _e328e890d4b4945c_LBB28_27
 	li r4, 4
 	bl _e328e890d4b4945c_ZL7readU32Pvj
 	cmplwi	r3, 0
-	beq	cr0, _e328e890d4b4945c_LBB29_27
+	beq	cr0, _e328e890d4b4945c_LBB28_27
 	addi r25, r3, 64
 	mr	r24, r3
 	mr	r3, r25
@@ -3553,11 +3520,11 @@ _e328e890d4b4945c_LBB29_28:
 	lfs f0, 28(r19)
 	fsubs f0, f1, f0
 	fcmpu cr0, f0, f28
-	bge cr0, _e328e890d4b4945c_LBB29_32
+	bge cr0, _e328e890d4b4945c_LBB28_32
 	fneg f0, f0
-_e328e890d4b4945c_LBB29_32:
+_e328e890d4b4945c_LBB28_32:
 	fcmpu cr0, f0, f27
-	bgt	cr0, _e328e890d4b4945c_LBB29_27
+	bgt	cr0, _e328e890d4b4945c_LBB28_27
 	lfs f31, 16(r19)
 	mr	r3, r30
 	lfs f30, 20(r19)
@@ -3577,52 +3544,54 @@ _e328e890d4b4945c_LBB29_32:
 	mr	r4, r29
 	li r5, 3
 	bl gpuWriteWordsLE
-	lfs f2, 48(r1)
+	lfs f2, 60(r1)
 	fcmpu cr0, f2, f28
-	beq	cr0, _e328e890d4b4945c_LBB29_27
-	lfs f3, 36(r1)
+	beq	cr0, _e328e890d4b4945c_LBB28_27
+	lfs f3, 48(r1)
 	fcmpu cr0, f3, f28
-	beq	cr0, _e328e890d4b4945c_LBB29_27
-	lfs f0, 32(r1)
+	beq	cr0, _e328e890d4b4945c_LBB28_27
+	lfs f0, 44(r1)
 	fdivs f1, f0, f3
 	lfs f0, 32(r19)
 	fsubs f4, f0, f1
 	fcmpu cr0, f4, f28
-	bge cr0, _e328e890d4b4945c_LBB29_37
+	bge cr0, _e328e890d4b4945c_LBB28_37
 	fneg f4, f4
-_e328e890d4b4945c_LBB29_37:
+_e328e890d4b4945c_LBB28_37:
 	fadds f5, f0, f1
 	fcmpu cr0, f5, f28
-	bge cr0, _e328e890d4b4945c_LBB29_26
+	bge cr0, _e328e890d4b4945c_LBB28_26
 	fneg f5, f5
-	b _e328e890d4b4945c_LBB29_26
-_e328e890d4b4945c_LBB29_39:
-	lfd f31, 184(r1)
-	lfd f30, 176(r1)
-	lfd f29, 168(r1)
-	lfd f28, 160(r1)
-	lfd f27, 152(r1)
-	lwz r30, 144(r1)
-	lwz r29, 140(r1)
-	lwz r28, 136(r1)
-	lwz r27, 132(r1)
-	lwz r26, 128(r1)
-	lwz r25, 124(r1)
-	lwz r24, 120(r1)
-	lwz r23, 116(r1)
-	lwz r22, 112(r1)
-	lwz r21, 108(r1)
-	lwz r20, 104(r1)
-	lwz r19, 100(r1)
-	lwz r0, 196(r1)
-	addi r1, r1, 192
+	b _e328e890d4b4945c_LBB28_26
+_e328e890d4b4945c_LBB28_39:
+	lfd f31, 200(r1)
+	lfd f30, 192(r1)
+	lfd f29, 184(r1)
+	lfd f28, 176(r1)
+	lwz r12, 112(r1)
+	lfd f27, 168(r1)
+	.int 0x7D820120 ; mtcrf 32, r12
+	lwz r30, 160(r1)
+	lwz r29, 156(r1)
+	lwz r28, 152(r1)
+	lwz r27, 148(r1)
+	lwz r26, 144(r1)
+	lwz r25, 140(r1)
+	lwz r24, 136(r1)
+	lwz r23, 132(r1)
+	lwz r22, 128(r1)
+	lwz r21, 124(r1)
+	lwz r20, 120(r1)
+	lwz r19, 116(r1)
+	lwz r0, 212(r1)
+	addi r1, r1, 208
 	mtlr r0
 	blr
-_e328e890d4b4945c_Lfunc_end29:
+_e328e890d4b4945c_Lfunc_end28:
 
 	.align 4
 hook_resetPointLightUBOs:
-_e328e890d4b4945c_Lfunc_begin30:
+_e328e890d4b4945c_Lfunc_begin29:
 	mflr r0
 	stwu r1, -48(r1)
 	stw r0, 52(r1)
@@ -3643,42 +3612,42 @@ _e328e890d4b4945c_Lfunc_begin30:
 	stw r30, _e328e890d4b4945c_ZL21s_spotLightBlockCount@l(r3)
 	lwz r3, _e328e890d4b4945c_ZL16s_stampBindCount@l(r29)
 	cmplwi	r3, 0
-	beq	cr0, _e328e890d4b4945c_LBB30_11
+	beq	cr0, _e328e890d4b4945c_LBB29_11
 	cmplwi	r3, 128
 	li r4, 128
 	lis r5, s_stampBinds@ha
-	bc 12, lt, _e328e890d4b4945c_LBB30_3
+	bc 12, lt, _e328e890d4b4945c_LBB29_3
 	ori r28, r4, 0
-	b _e328e890d4b4945c_LBB30_4
-_e328e890d4b4945c_LBB30_3:
+	b _e328e890d4b4945c_LBB29_4
+_e328e890d4b4945c_LBB29_3:
 	addi r28, r3, 0
-_e328e890d4b4945c_LBB30_4:
+_e328e890d4b4945c_LBB29_4:
 	lis r3, s_proxyBlocks@ha
 	addi r4, r5, s_stampBinds@l
 	addi r27, r4, -4
 	addi r26, r3, s_proxyBlocks@l
-	b _e328e890d4b4945c_LBB30_6
-_e328e890d4b4945c_LBB30_5:
+	b _e328e890d4b4945c_LBB29_6
+_e328e890d4b4945c_LBB29_5:
 	addi r28, r28, -1
 	cmplwi	r28, 0
-	bc 4, gt, _e328e890d4b4945c_LBB30_11
-_e328e890d4b4945c_LBB30_6:
+	bc 4, gt, _e328e890d4b4945c_LBB29_11
+_e328e890d4b4945c_LBB29_6:
 	lwzu r4, 8(r27)
 	mr	r25, r27
 	lwzu r3, -4(r25)
 	cmplwi	r3, 0
-	beq	cr0, _e328e890d4b4945c_LBB30_5
+	beq	cr0, _e328e890d4b4945c_LBB29_5
 	cmplwi	r4, 0
-	beq	cr0, _e328e890d4b4945c_LBB30_5
+	beq	cr0, _e328e890d4b4945c_LBB29_5
 	addi r4, r4, -1
 	mulli r4, r4, 180
 	add r24, r26, r4
 	lwz r5, 172(r24)
 	cmplwi	r5, 0
-	beq	cr0, _e328e890d4b4945c_LBB30_5
+	beq	cr0, _e328e890d4b4945c_LBB29_5
 	lwzx r4, r26, r4
 	cmplwi	r4, 0
-	beq	cr0, _e328e890d4b4945c_LBB30_5
+	beq	cr0, _e328e890d4b4945c_LBB29_5
 	addi r4, r24, 12
 	li r5, 16
 	bl gpuWriteWordsLE
@@ -3687,8 +3656,8 @@ _e328e890d4b4945c_LBB30_6:
 	li r5, 12
 	addi r3, r3, 64
 	bl gpuWriteWordsLE
-	b _e328e890d4b4945c_LBB30_5
-_e328e890d4b4945c_LBB30_11:
+	b _e328e890d4b4945c_LBB29_5
+_e328e890d4b4945c_LBB29_11:
 	stw r30, _e328e890d4b4945c_ZL16s_stampBindCount@l(r29)
 	lwz r30, 40(r1)
 	lwz r29, 36(r1)
@@ -3701,121 +3670,121 @@ _e328e890d4b4945c_LBB30_11:
 	addi r1, r1, 48
 	mtlr r0
 	blr
-_e328e890d4b4945c_Lfunc_end30:
+_e328e890d4b4945c_Lfunc_end29:
 
 	.align 4
 hook_uniformBlockDestroyed:
-_e328e890d4b4945c_Lfunc_begin31:
+_e328e890d4b4945c_Lfunc_begin30:
 	mflr r0
 	stwu r1, -16(r1)
 	cmplwi	r3, 0
 	stw r0, 20(r1)
-	beq	cr0, _e328e890d4b4945c_LBB31_29
+	beq	cr0, _e328e890d4b4945c_LBB30_29
 	lis r4, capturedXLow@ha
 	lwz r5, capturedXLow@l(r4)
 	cmplw	r5, r3
-	bne	cr0, _e328e890d4b4945c_LBB31_3
+	bne	cr0, _e328e890d4b4945c_LBB30_3
 	li r5, 0
 	stw r5, capturedXLow@l(r4)
-_e328e890d4b4945c_LBB31_3:
+_e328e890d4b4945c_LBB30_3:
 	lis r4, _e328e890d4b4945c_ZL17s_lightBlockCount@ha
 	lwz r4, _e328e890d4b4945c_ZL17s_lightBlockCount@l(r4)
 	cmplwi	r4, 0
-	beq	cr0, _e328e890d4b4945c_LBB31_10
+	beq	cr0, _e328e890d4b4945c_LBB30_10
 	cmplwi	r4, 48
 	li r5, 48
-	bc 12, lt, _e328e890d4b4945c_LBB31_6
+	bc 12, lt, _e328e890d4b4945c_LBB30_6
 	ori r4, r5, 0
-	b _e328e890d4b4945c_LBB31_6
-_e328e890d4b4945c_LBB31_6:
+	b _e328e890d4b4945c_LBB30_6
+_e328e890d4b4945c_LBB30_6:
 	lis r5, s_lightBlocks@ha
 	addi r5, r5, s_lightBlocks@l
 	mtctr r4
 	addi r4, r5, -32
 	li r5, 0
-	b _e328e890d4b4945c_LBB31_8
-_e328e890d4b4945c_LBB31_7:
-	bdz _e328e890d4b4945c_LBB31_10
-_e328e890d4b4945c_LBB31_8:
+	b _e328e890d4b4945c_LBB30_8
+_e328e890d4b4945c_LBB30_7:
+	bdz _e328e890d4b4945c_LBB30_10
+_e328e890d4b4945c_LBB30_8:
 	lwzu r6, 32(r4)
 	cmplw	r6, r3
-	bne	cr0, _e328e890d4b4945c_LBB31_7
+	bne	cr0, _e328e890d4b4945c_LBB30_7
 	stw r5, 0(r4)
-	b _e328e890d4b4945c_LBB31_7
-_e328e890d4b4945c_LBB31_10:
+	b _e328e890d4b4945c_LBB30_7
+_e328e890d4b4945c_LBB30_10:
 	lis r4, _e328e890d4b4945c_ZL19s_capsuleBlockCount@ha
 	lwz r4, _e328e890d4b4945c_ZL19s_capsuleBlockCount@l(r4)
 	cmplwi	r4, 0
-	beq	cr0, _e328e890d4b4945c_LBB31_17
+	beq	cr0, _e328e890d4b4945c_LBB30_17
 	cmplwi	r4, 16
 	li r5, 16
-	bc 12, lt, _e328e890d4b4945c_LBB31_13
+	bc 12, lt, _e328e890d4b4945c_LBB30_13
 	ori r4, r5, 0
-	b _e328e890d4b4945c_LBB31_13
-_e328e890d4b4945c_LBB31_13:
+	b _e328e890d4b4945c_LBB30_13
+_e328e890d4b4945c_LBB30_13:
 	lis r5, s_capsuleBlocks@ha
 	addi r5, r5, s_capsuleBlocks@l
 	mtctr r4
 	addi r4, r5, -28
 	li r5, 0
-	b _e328e890d4b4945c_LBB31_15
-_e328e890d4b4945c_LBB31_14:
-	bdz _e328e890d4b4945c_LBB31_17
-_e328e890d4b4945c_LBB31_15:
+	b _e328e890d4b4945c_LBB30_15
+_e328e890d4b4945c_LBB30_14:
+	bdz _e328e890d4b4945c_LBB30_17
+_e328e890d4b4945c_LBB30_15:
 	lwzu r6, 28(r4)
 	cmplw	r6, r3
-	bne	cr0, _e328e890d4b4945c_LBB31_14
+	bne	cr0, _e328e890d4b4945c_LBB30_14
 	stw r5, 0(r4)
-	b _e328e890d4b4945c_LBB31_14
-_e328e890d4b4945c_LBB31_17:
+	b _e328e890d4b4945c_LBB30_14
+_e328e890d4b4945c_LBB30_17:
 	lis r4, _e328e890d4b4945c_ZL21s_spotLightBlockCount@ha
 	lwz r4, _e328e890d4b4945c_ZL21s_spotLightBlockCount@l(r4)
 	cmplwi	r4, 0
-	beq	cr0, _e328e890d4b4945c_LBB31_24
+	beq	cr0, _e328e890d4b4945c_LBB30_24
 	cmplwi	r4, 8
 	li r5, 8
-	bc 12, lt, _e328e890d4b4945c_LBB31_20
+	bc 12, lt, _e328e890d4b4945c_LBB30_20
 	ori r4, r5, 0
-	b _e328e890d4b4945c_LBB31_20
-_e328e890d4b4945c_LBB31_20:
+	b _e328e890d4b4945c_LBB30_20
+_e328e890d4b4945c_LBB30_20:
 	lis r5, s_spotLightBlocks@ha
 	addi r5, r5, s_spotLightBlocks@l
 	mtctr r4
 	addi r4, r5, -168
 	li r5, 0
-	b _e328e890d4b4945c_LBB31_22
-_e328e890d4b4945c_LBB31_21:
-	bdz _e328e890d4b4945c_LBB31_24
-_e328e890d4b4945c_LBB31_22:
+	b _e328e890d4b4945c_LBB30_22
+_e328e890d4b4945c_LBB30_21:
+	bdz _e328e890d4b4945c_LBB30_24
+_e328e890d4b4945c_LBB30_22:
 	lwzu r6, 168(r4)
 	cmplw	r6, r3
-	bne	cr0, _e328e890d4b4945c_LBB31_21
+	bne	cr0, _e328e890d4b4945c_LBB30_21
 	stw r5, 0(r4)
-	b _e328e890d4b4945c_LBB31_21
-_e328e890d4b4945c_LBB31_24:
+	b _e328e890d4b4945c_LBB30_21
+_e328e890d4b4945c_LBB30_24:
 	li r4, 128
 	lis r5, s_proxyBlocks@ha
 	mtctr r4
 	addi r4, r5, s_proxyBlocks@l
 	addi r4, r4, -180
 	li r5, 0
-	b _e328e890d4b4945c_LBB31_26
-_e328e890d4b4945c_LBB31_25:
-	bdz _e328e890d4b4945c_LBB31_28
-_e328e890d4b4945c_LBB31_26:
+	b _e328e890d4b4945c_LBB30_26
+_e328e890d4b4945c_LBB30_25:
+	bdz _e328e890d4b4945c_LBB30_28
+_e328e890d4b4945c_LBB30_26:
 	lwzu r6, 180(r4)
 	cmplw	r6, r3
-	bne	cr0, _e328e890d4b4945c_LBB31_25
+	bne	cr0, _e328e890d4b4945c_LBB30_25
 	stw r5, 0(r4)
-	b _e328e890d4b4945c_LBB31_25
-_e328e890d4b4945c_LBB31_28:
+	b _e328e890d4b4945c_LBB30_25
+_e328e890d4b4945c_LBB30_28:
 	bl envInvalidateBlock
-_e328e890d4b4945c_LBB31_29:
+_e328e890d4b4945c_LBB30_29:
 	lwz r0, 20(r1)
 	addi r1, r1, 16
 	mtlr r0
 	blr
-_e328e890d4b4945c_Lfunc_end31:
+_e328e890d4b4945c_Lfunc_end30:
 
 	.align 4
 s_lightBlocks:
