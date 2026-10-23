@@ -389,7 +389,8 @@ static void hook_ModifyBoneMatrix(PPCInterpreter_t* hCPU) {
     std::string boneName(Guest::CString(boneNamePtr));
     const auto modelName = Guest::Get<sead::FixedSafeString100>(gsysModelPtr + 0x128);
     EnsureSkeletonInitialized();
-    if (modelName.getLE() != "GameROMPlayer")
+    const uint32_t playerActor = Player::GetAddress();
+    if (modelName.getLE() != "GameROMPlayer" || playerActor == 0 || Guest::Get<uint32_t>(playerActor + 0x330).getLE() != gsysModelPtr)
         return;
 
     const bool isLeft = boneName.ends_with("_L");
@@ -424,7 +425,7 @@ static void hook_ModifyBoneMatrix(PPCInterpreter_t* hCPU) {
         Guest::Set(scalePtr, scale);
     };
 
-    const bool isThirdPerson = GameState::IsThirdPerson();
+    const bool isThirdPerson = GameState::IsThirdPerson() || !GameState::IsInGame();
 
     // one material per bone, so a whole head model converges well within a single frame
     HeadVisibility::SubmitNextMaterial(hCPU, !isThirdPerson);

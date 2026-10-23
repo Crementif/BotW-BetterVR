@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "weapon.h"
 #include "skeleton.h"
+#include "player.h"
 #include "cemu/cemu_host.h"
 #include "game/botw/game_state.h"
 #include "rendering/haptics.h"
@@ -267,7 +268,7 @@ static void hook_ChangeWeaponMtx(PPCInterpreter_t* hCPU) {
     const uint32_t holder = hCPU->gpr[3];
     const uint32_t boneNamePtr = hCPU->gpr[4];
     const uint32_t actor = hCPU->gpr[8];
-    if (holder == 0 || boneNamePtr == 0 || actor == 0)
+    if (holder == 0 || holder != Player::GetAddress() || boneNamePtr == 0 || actor == 0)
         return;
 
     const auto holderName = Guest::Get<sead::FixedSafeString40>(holder + offsetof(ActorWiiU, name));
