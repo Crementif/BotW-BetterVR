@@ -13,10 +13,6 @@ bool HeadVisibility::IsFaceBone(std::string_view boneName) {
     return false;
 }
 
-bool HeadVisibility::IsFaceMaterialTriggerBone(std::string_view boneName) {
-    return boneName == "Face_Root" || boneName == "Head" || boneName == "Eyeball_L" || boneName == "Eyeball_R";
-}
-
 static constexpr uint32_t ActorGsysModelOffset = 0x330;
 static constexpr uint32_t ModelUnitCountOffset = 0x1C;
 static constexpr uint32_t ModelUnitArrayOffset = 0x24;
@@ -56,7 +52,7 @@ void HeadVisibility::OnSkeletonRoot() {
     s_playerHeadMaterialsRefreshedThisFrame = false;
 }
 
-static void CollectHeadMaterialsFromModel(uint32_t gsysModelPtr) {
+static void CollectHeadMaterialsFromModel(uint32_t gsysModelPtr, bool headgear) {
     uint32_t unitCount = 0;
     uint32_t unitArray = 0;
     Guest::ReadBE(gsysModelPtr + ModelUnitCountOffset, &unitCount);
@@ -79,7 +75,9 @@ static void CollectHeadMaterialsFromModel(uint32_t gsysModelPtr) {
         if (materialArray == 0) continue;
 
         for (uint16_t materialIdx = 0; materialIdx < materialCount; materialIdx++) {
-            if (GetModelUnitMaterialName(materialArray, materialIdx).empty()) continue;
+            const std::string_view name = GetModelUnitMaterialName(materialArray, materialIdx);
+            if (name.empty()) continue;
+            if (!headgear && name != "Mt_Eyeball_L" && name != "Mt_Eyeball_R" && name != "Mt_Eyelashes" && name != "Mt_Face" && name != "Mt_Head") continue;
             if (s_playerHeadMaterialCount >= s_playerHeadMaterials.size()) return;
             s_playerHeadMaterials[s_playerHeadMaterialCount++] = { unitPtr, materialIdx };
         }
@@ -90,7 +88,7 @@ static void CollectHeadMaterialsFromActor(uint32_t actorPtr) {
     uint32_t gsysModelPtr = 0;
     Guest::ReadBE(actorPtr + ActorGsysModelOffset, &gsysModelPtr);
     if (gsysModelPtr == 0) return;
-    CollectHeadMaterialsFromModel(gsysModelPtr);
+    CollectHeadMaterialsFromModel(gsysModelPtr, true);
 }
 
 static uint32_t ResolveBaseProcLinkActor(uint32_t baseProcLinkAddress) {
@@ -110,6 +108,10 @@ static void RefreshPlayerHeadMaterials() {
 
     const uint32_t playerActorPtr = Player::GetAddress();
     if (playerActorPtr == 0) return;
+
+    const uint32_t playerModel = Guest::Get<uint32_t>(playerActorPtr + ActorGsysModelOffset).getLE();
+    if (playerModel != 0)
+        CollectHeadMaterialsFromModel(playerModel, false);
 
     const uint32_t headArmorLinkAddress = playerActorPtr + offsetof(PlayerActor, armors) + offsetof(PlayerArmors, armorHead);
     const uint32_t headArmorActorPtr = ResolveBaseProcLinkActor(headArmorLinkAddress);

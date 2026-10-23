@@ -427,19 +427,10 @@ static void hook_ModifyBoneMatrix(PPCInterpreter_t* hCPU) {
     if (isThirdPerson) {
         // wrist is game-animated in third person
         s_lastAppliedRightWristRotValid = false;
-        if (HeadVisibility::IsFaceMaterialTriggerBone(boneName)) {
-            hCPU->gpr[7] = 1;
-            hCPU->gpr[8] = 0;
-        }
         if (HeadVisibility::IsFaceBone(boneName)) {
             Guest::Set(scalePtr, glm::fvec3(1.0f));
         }
         return;
-    }
-
-    if (HeadVisibility::IsFaceMaterialTriggerBone(boneName)) {
-        hCPU->gpr[7] = 1;
-        hCPU->gpr[8] = 1;
     }
 
     if (HeadVisibility::IsFaceBone(boneName)) {
