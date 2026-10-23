@@ -126,6 +126,8 @@ public:
 
         glm::vec3 dir = targetPos - rootPos;
         float dist = glm::length(dir);
+        if (!std::isfinite(dist) || dist < 0.000001f || !std::isfinite(l1) || !std::isfinite(l2) || l1 < 0.000001f || l2 < 0.000001f)
+            return;
 
         // weighted stretch: upper arm absorbs more of the extra distance
         float epsilon = 0.001f;
@@ -142,7 +144,15 @@ public:
         float alpha = glm::acos(glm::clamp(cosAlpha, -1.0f, 1.0f));
 
         glm::vec3 dirNorm = glm::normalize(dir);
-        glm::vec3 planeNormal = glm::normalize(glm::cross(dirNorm, poleVector));
+        glm::vec3 planeNormal = glm::cross(dirNorm, poleVector);
+        if (!std::isfinite(glm::length2(planeNormal)))
+            return;
+        if (glm::length2(planeNormal) < 0.000001f) {
+            // the target is in line with the elbow hint, so bend any way
+            const glm::vec3 fallbackPole = std::abs(dirNorm.y) < 0.9f ? glm::vec3(0, 1, 0) : glm::vec3(1, 0, 0);
+            planeNormal = glm::cross(dirNorm, fallbackPole);
+        }
+        planeNormal = glm::normalize(planeNormal);
         glm::vec3 ortho = glm::normalize(glm::cross(planeNormal, dirNorm));
 
         glm::vec3 arm1Dir = glm::normalize(dirNorm * std::cos(alpha) + ortho * std::sin(alpha));

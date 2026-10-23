@@ -194,6 +194,8 @@ static glm::fvec3 s_latchedGripOffsetInRightHand = glm::fvec3(0.0f);
 static float s_latchedBladeDirectionSign = 1.0f;
 
 static glm::fquat MinimalArcQuat(const glm::fvec3& from, const glm::fvec3& to) {
+    if (!IsAllFinite(from) || !IsAllFinite(to) || glm::length2(from) < 0.000001f || glm::length2(to) < 0.000001f)
+        return glm::identity<glm::fquat>();
     const glm::fvec3 fromDir = glm::normalize(from);
     const glm::fvec3 toDir = glm::normalize(to);
     const float alignment = glm::clamp(glm::dot(fromDir, toDir), -1.0f, 1.0f);
