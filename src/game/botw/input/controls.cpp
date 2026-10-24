@@ -743,6 +743,10 @@ static void ProcessRightTriggerBindings(
                 Haptics::Play(leftRumbleFixed);
             }
         }
+        else if (Player::IsRiding(true)) {
+            buttonHold |= VPAD_BUTTON_Y;  // Soothe the horse
+            Haptics::Play(rightRumbleFixed);
+        }
     }
 }
 
