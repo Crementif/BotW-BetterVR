@@ -137,6 +137,10 @@ set_source_files_properties(cemu/host_module.cpp PROPERTIES INCLUDE_DIRECTORIES 
 
 find_package(glm CONFIG REQUIRED)
 target_link_libraries(BetterVR PRIVATE BetterVR_ImPlot BetterVR_ImGuiVulkan OpenXR::openxr_loader glm::glm fmt::fmt pugixml::pugixml CURL::libcurl)
+# std::atomic of structs wider than 8 bytes calls into libatomic outside of MSVC
+if (NOT MSVC)
+    target_link_libraries(BetterVR PRIVATE atomic)
+endif ()
 
 # the version comes from the workspace's project() line, so a standalone Cemu configure gets it too
 set(BETTERVR_VERSION_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated/version")

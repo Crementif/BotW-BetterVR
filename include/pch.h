@@ -71,6 +71,10 @@
 #include <openxr/openxr.h>
 #include <openxr/openxr_platform.h>
 
+// Xlib's macros clash with enum values like EquipType::None
+#undef None
+#undef Status
+
 // ImGui includes
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include <imgui.h>
