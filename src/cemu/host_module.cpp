@@ -31,10 +31,6 @@ static constexpr float kFoveationOuterRadius = 0.45f;
 static constexpr float kExaggeratedFoveationInnerRadius = 0.1f;
 static constexpr float kExaggeratedFoveationOuterRadius = 0.15f;
 
-void CemuHost::SetMultiviewActive(bool active) {
-    HostModule::SetMultiviewStereoActive(active);
-}
-
 void CemuHost::SetFoveationCentres(const float left[2], const float right[2]) {
     HostModule::SetFoveationCentres(left, right);
 }

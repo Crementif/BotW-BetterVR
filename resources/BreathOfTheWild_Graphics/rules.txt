@@ -2,8 +2,6 @@
 titleIds = 00050000101C9300,00050000101C9400,00050000101C9500
 name = Graphics (Modified Version For BetterVR)
 path = "The Legend of Zelda: Breath of the Wild/Graphics (For BetterVR)"
-# for Cemu builds with BetterVR compiled in, which provide this pack themselves
-supersedes = "The Legend of Zelda: Breath of the Wild/Graphics (For BetterVR), The Legend of Zelda: Breath of the Wild/Graphics"
 description = Allows you to change the game resolution, shadow resolution and anti-aliasing.||Made by Kiri, Skalfate, rajkosto and NAVras.
 version = 7
 default = 1

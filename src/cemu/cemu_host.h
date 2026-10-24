@@ -8,8 +8,6 @@ public:
     CemuHost();
 
     static uint64_t GetCurrentTitleId();
-    // false issues the right view through the replay again
-    static void SetMultiviewActive(bool active);
     static void RegisterHook(const char* name, HookFunction function);
     // 0,0 is the top left, 1,1 the bottom right
     static void SetFoveationCentres(const float left[2], const float right[2]);
