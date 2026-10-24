@@ -11,7 +11,7 @@ RND_Vulkan::RND_Vulkan(VkInstance vkInstance, VkPhysicalDevice vkPhysDevice, VkD
     // AMD GPU FIX: Initialize sType before calling vkGetPhysicalDeviceMemoryProperties2
     m_memoryProperties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_PROPERTIES_2;
     m_memoryProperties.pNext = nullptr;
-    m_physicalDeviceDispatch->GetPhysicalDeviceMemoryProperties2KHR(vkPhysDevice, &m_memoryProperties);
+    m_physicalDeviceDispatch->GetPhysicalDeviceMemoryProperties2(vkPhysDevice, &m_memoryProperties);
 
     VkPhysicalDeviceProperties props{};
     m_instanceDispatch->GetPhysicalDeviceProperties(vkPhysDevice, &props);
