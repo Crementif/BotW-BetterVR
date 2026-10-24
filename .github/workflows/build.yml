@@ -69,7 +69,7 @@ jobs:
           $ErrorActionPreference = "Stop"
           $bundle = "$env:GITHUB_WORKSPACE\bundle"
           New-Item -ItemType Directory -Force -Path "$bundle\BetterVR\packs" | Out-Null
-          Copy-Item cemu-src\bin\Cemu_release.exe "$bundle\BetterVR_Launcher.exe"
+          Copy-Item Cemu\Cemu_release.exe "$bundle\BetterVR_Launcher.exe"
           Copy-Item cemu-src\bin\resources, cemu-src\bin\gameProfiles "$bundle\BetterVR" -Recurse
           foreach ($pack in @("BreathOfTheWild_BetterVR", "BreathOfTheWild_Graphics", "graphicPacks")) {
             Copy-Item "resources\$pack" "$bundle\BetterVR\packs\$pack" -Recurse
@@ -137,7 +137,7 @@ jobs:
         working-directory: cemu-src
         run: |
           mkdir -p ../bundle
-          mv bin/Cemu_release bin/Cemu
+          mv ../Cemu/Cemu_release bin/Cemu
           mkdir -p bin/packs
           cp -r ../resources/BreathOfTheWild_BetterVR ../resources/BreathOfTheWild_Graphics ../resources/graphicPacks bin/packs/
           find bin/packs \( -name 'CemuPatchCompiler*' -o -name 'patch_debug_*.asm' \) -delete
