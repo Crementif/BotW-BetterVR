@@ -200,6 +200,28 @@ private:
 using FloatSetting = NumberSetting<float>;
 using UIntSetting = NumberSetting<uint32_t>;
 
+// hexadecimal, as older releases and their launcher wrote it
+class TitleIdSetting : public ModSetting<uint64_t> {
+public:
+    using ModSetting<uint64_t>::operator=;
+
+    TitleIdSetting(const char* name): ModSetting<uint64_t>(name, 0) {}
+
+    [[nodiscard]] std::string Serialize() const override {
+        return fmt::format("{:016X}", load());
+    }
+
+    void Deserialize(std::string_view valueString) override {
+        uint64_t parsed = 0;
+        const auto [parseEnd, ec] = std::from_chars(valueString.data(), valueString.data() + valueString.size(), parsed, 16);
+        if (ec != std::errc() || parseEnd != valueString.data() + valueString.size()) {
+            this->ResetWithError(valueString);
+            return;
+        }
+        *this = parsed;
+    }
+};
+
 class BoolSetting : public ModSetting<bool> {
 private:
     void (*m_onChange)(bool);
@@ -554,7 +576,7 @@ struct ModSettings {
     BoolSetting logThreadIds{ "LogThreadIds", false, &Log::SetShowThreadIds };
     BoolSetting tutorialPromptShown{ "TutorialPromptShown", false };
     BoolSetting bootDirectlyIntoGame{ "BootDirectlyIntoGame", false };
-    NumberSetting<uint64_t> bootDirectlyTitleId{ "BootDirectlyTitleId", 0 };
+    TitleIdSetting bootDirectlyTitleId{ "BootDirectlyTitleId" };
 
     FloatSetting axisThreshold{ "AxisThreshold", kDefaultAxisThreshold, 0.0f, 1.0f };
     FloatSetting stickDeadzone{ "StickDeadzone", kDefaultStickDeadzone, 0.0f, 1.0f };

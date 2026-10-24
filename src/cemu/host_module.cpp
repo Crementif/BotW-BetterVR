@@ -178,6 +178,33 @@ static void KeepOlderBetterVRReleasesOut() {
         Log::print<ERROR>("Cemu has to use {} as its Vulkan loader, since System32 has none", besideExecutable.string());
     }
 }
+
+// the zip releases' scripts start the regular Cemu with their Vulkan layer
+static void RemoveOlderReleaseLaunchFiles() {
+    static constexpr std::array LaunchFiles = { L"Launch_BetterVR.bat", L"BetterVR LAUNCH CEMU IN VR.bat", L"BetterVR LAUNCH CEMU IN VR - COMPATIBILITY MODE.bat", L"BetterVR UNINSTALL.bat", L"BetterVR_Layer.dll", L"BetterVR_Layer.json", L"BetterVR_Layer.lib", L"BetterVR_Layer.pdb", L"VkLayer_BetterVR_Hook.dll", L"BetterVR.txt" };
+    for (const wchar_t* fileName : LaunchFiles) {
+        const std::filesystem::path path = Platform::GetExecutableDirectory() / fileName;
+        std::error_code error;
+        if (std::filesystem::remove(path, error)) {
+            Log::print<INFO>("Removed {} that an older BetterVR release left", path.string());
+        }
+    }
+}
+
+// releases before 0.9.24 kept their settings next to Cemu.exe
+static void TakeOverOlderReleaseSettings(const std::filesystem::path& settingsIni) {
+    const std::filesystem::path besideExecutable = Platform::GetExecutableDirectory() / settingsIni.filename();
+    std::error_code error;
+    if (std::filesystem::exists(settingsIni, error) || !std::filesystem::exists(besideExecutable, error)) {
+        return;
+    }
+    std::filesystem::copy_file(besideExecutable, settingsIni, error);
+    if (error) {
+        Log::print<ERROR>("Couldn't copy the settings of an older BetterVR release from {}: {}", besideExecutable.string(), error.message());
+        return;
+    }
+    Log::print<INFO>("Took over the settings of an older BetterVR release from {}", besideExecutable.string());
+}
 #endif
 
 class BetterVRModule : public HostModule::Module {
@@ -190,6 +217,8 @@ public:
         Log::SetFilePath(HostModule::GetUserDataPath() / "BetterVR_log.txt");
 #if defined(_WIN32)
         KeepOlderBetterVRReleasesOut();
+        RemoveOlderReleaseLaunchFiles();
+        TakeOverOlderReleaseSettings(HostModule::GetUserDataPath() / "BetterVR_settings.ini");
         // overlay layers that hook Cemu's presents get in the way of the OpenXR runtime
         SetEnvironmentVariableW(L"DISABLE_VULKAN_OBS_CAPTURE", L"1");
         SetEnvironmentVariableW(L"DISABLE_LAYER_NV_PRESENT_1", L"1");
