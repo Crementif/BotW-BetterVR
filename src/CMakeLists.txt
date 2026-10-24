@@ -237,7 +237,8 @@ endif ()
 add_custom_target(BetterVR_ValidateAsm
     COMMAND "${CMAKE_COMMAND}" -DPACK_DIR=${BETTERVR_PACK_DIR} -P "${BETTERVR_ROOT}/cmake/validate_asm_relocs.cmake"
     COMMAND "${CMAKE_COMMAND}" -DPACK_DIR=${BETTERVR_PACK_DIR} -P "${BETTERVR_ROOT}/cmake/validate_asm_labels.cmake"
-    COMMENT "Checking hand-written asm for broken address materialization and unresolved labels"
+    COMMAND "${CMAKE_COMMAND}" -DPACK_DIR=${BETTERVR_PACK_DIR} -P "${BETTERVR_ROOT}/cmake/validate_patch_compiled.cmake"
+    COMMENT "Checking hand-written asm for broken address materialization and unresolved labels, and patch_compiled.asm for an outdated compiler"
     VERBATIM
 )
 add_dependencies(BetterVR_ValidateAsm BetterVR_Patches)
