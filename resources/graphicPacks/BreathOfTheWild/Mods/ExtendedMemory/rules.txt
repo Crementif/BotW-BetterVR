@@ -4,6 +4,7 @@ name = Extended Memory
 path = "The Legend of Zelda: Breath of the Wild/Mods/Extended Memory"
 description = Adds an extra 2GB of emulated RAM.|Only enable this if a mod you want to use requires this since it'll use more RAM.
 version = 6
+default = true
 
 [RAM]
 mapping0 = 0x10000000-0xA0000000 # extend MEM2 region (default range is 0x10000000-0x50000000)
