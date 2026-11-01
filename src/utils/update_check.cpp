@@ -41,6 +41,7 @@ static std::optional<std::string> FetchLatestTag() {
     curl_easy_setopt(curl, CURLOPT_USERAGENT, "BotW-BetterVR");
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
     curl_easy_setopt(curl, CURLOPT_TIMEOUT, 15L);
+    curl_easy_setopt(curl, CURLOPT_SSL_OPTIONS, CURLSSLOPT_NATIVE_CA);
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, AppendResponse);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
     const CURLcode result = curl_easy_perform(curl);
