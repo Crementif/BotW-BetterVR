@@ -187,6 +187,24 @@ static void RemoveOlderReleaseLaunchFiles() {
     }
 }
 
+// the older launcher copied its pack into Cemu's graphic packs, where it would activate next to the bundled one
+static void RemoveOlderReleasePacks() {
+    for (const Game::Title& title : Game::GetTitles()) {
+        const std::filesystem::path path = HostModule::GetUserDataPath() / "graphicPacks" / title.vrPack;
+        std::error_code error;
+        if (!std::filesystem::exists(path / "rules.txt", error)) {
+            continue;
+        }
+        std::filesystem::remove_all(path, error);
+        if (error) {
+            Log::print<ERROR>("Couldn't remove {} that an older BetterVR release left: {}", path.string(), error.message());
+        }
+        else {
+            Log::print<INFO>("Removed {} that an older BetterVR release left", path.string());
+        }
+    }
+}
+
 // releases before 0.9.24 kept their settings next to Cemu.exe
 static void TakeOverOlderReleaseSettings(const std::filesystem::path& settingsIni) {
     const std::filesystem::path besideExecutable = Platform::GetExecutableDirectory() / settingsIni.filename();
@@ -214,6 +232,7 @@ public:
 #if defined(_WIN32)
         KeepOlderBetterVRReleasesOut();
         RemoveOlderReleaseLaunchFiles();
+        RemoveOlderReleasePacks();
         TakeOverOlderReleaseSettings(HostModule::GetUserDataPath() / "BetterVR_settings.ini");
         // overlay layers that hook Cemu's presents get in the way of the OpenXR runtime
         SetEnvironmentVariableW(L"DISABLE_VULKAN_OBS_CAPTURE", L"1");
