@@ -58,6 +58,8 @@ static void UpdateGameLeftToRightWeaponTransform() {
 static constexpr float BowFullDrawPullDistance = 0.30f;
 static constexpr float BowSnapMaxEngageDistance = 0.35f;
 static constexpr float BowSnapRampSeconds = 0.15f;
+static constexpr float BowSnapMinDrawLength = 0.05f;
+static constexpr float BowSnapMaxDrawLength = 0.9f;
 static constexpr float BowMinPullPower = 0.35f;
 static constexpr uint64_t BowReleasedPullLifetimeMs = 500;
 static bool s_bowSnapTriggerHeld = false;
@@ -348,15 +350,16 @@ static std::optional<glm::mat4> CalcBowDrawTargetModel(const BoneFrameContext& c
 static glm::mat4 ResolveArmTargetModel(const BoneFrameContext& ctx, OpenXR::EyeSide arm) {
     if (arm == OpenXR::EyeSide::RIGHT && s_armPoseFrame.handState[arm] == ArmPoseState::BowDrawSnap) {
         if (const std::optional<glm::mat4> bowTargetMtx = CalcBowDrawTargetModel(ctx); bowTargetMtx.has_value()) {
-            // keep the game's draw grip, turned about the bow arm so the arrow still points at the bow from the controller
+            // keep the game's draw grip so the arrow lies on the bow, only pulled back along it as far as the controller is
             const glm::mat4 controllerMtx = CalcControllerTargetModel(ctx, arm);
             const glm::vec3 bowHandPos = glm::vec3(CalcControllerTargetModel(ctx, OpenXR::EyeSide::LEFT)[3]);
             const glm::vec3 gameDrawDir = glm::vec3(bowTargetMtx.value()[3]) - bowHandPos;
-            const glm::vec3 controllerDrawDir = glm::vec3(controllerMtx[3]) - bowHandPos;
-            glm::fquat drawRot = glm::quat_cast(glm::mat3(bowTargetMtx.value()));
-            if (glm::length2(gameDrawDir) > 1.0e-4f && glm::length2(controllerDrawDir) > 1.0e-4f)
-                drawRot = MinimalArcQuat(gameDrawDir, controllerDrawDir) * drawRot;
-            const glm::mat4 drawMtx = glm::translate(glm::identity<glm::mat4>(), glm::vec3(controllerMtx[3])) * glm::mat4_cast(drawRot);
+            glm::vec3 drawPos = glm::vec3(bowTargetMtx.value()[3]);
+            if (glm::length2(gameDrawDir) > 1.0e-4f) {
+                const glm::vec3 drawAxis = glm::normalize(gameDrawDir);
+                drawPos = bowHandPos + drawAxis * glm::clamp(glm::dot(glm::vec3(controllerMtx[3]) - bowHandPos, drawAxis), BowSnapMinDrawLength, BowSnapMaxDrawLength);
+            }
+            const glm::mat4 drawMtx = glm::translate(glm::identity<glm::mat4>(), drawPos) * glm::mat4(glm::mat3(bowTargetMtx.value()));
             if (s_armPoseFrame.bowSnapWeight >= 1.0f)
                 return drawMtx;
             return BlendTransforms(controllerMtx, drawMtx, s_armPoseFrame.bowSnapWeight);
@@ -595,6 +598,11 @@ static void hook_ModifyBoneMatrix(PPCInterpreter_t* hCPU) {
             s_bowSnapEngaged = false;
         }
         else if (s_bowPull.valid) {
+            // an arrow hand brought to the string later still snaps onto it, and the pull counts from there
+            if (!s_bowSnapEngaged && s_arrowNearBowStart) {
+                s_bowSnapEngaged = true;
+                s_bowPull.engageSeparation = bowHandSeparation;
+            }
             s_bowPull.ratio = glm::clamp((bowHandSeparation - s_bowPull.engageSeparation) / BowFullDrawPullDistance, 0.0f, 1.0f);
         }
 
