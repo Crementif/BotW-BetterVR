@@ -51,3 +51,6 @@ addi r1, r1, 0x0C
 blr
 
 0x0305EAF8 = bla createNewScreenHook
+
+; sead::Projection::cameraPosToScreenPos, so name labels and markers line up with the floating HUD panel
+0x030C1134 = ba import.coreinit.hook_PlaceScreenMarker

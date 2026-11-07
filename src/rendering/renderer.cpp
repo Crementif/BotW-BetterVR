@@ -847,6 +847,14 @@ static glm::fvec3 GetHorizontalGazeDirection(const glm::quat& headOrientation) {
     return glm::normalize(yawOnly) * glm::fvec3(0.0f, 0.0f, -1.0f);
 }
 
+static std::mutex s_hudQuadMutex;
+static std::optional<RND_Renderer::HudQuad> s_hudQuad;
+
+std::optional<RND_Renderer::HudQuad> RND_Renderer::GetHudQuad() {
+    std::scoped_lock lock(s_hudQuadMutex);
+    return s_hudQuad;
+}
+
 std::vector<XrCompositionLayerQuad> RND_Renderer::Layer2D::FinishRendering(long frameIdx) {
     this->m_swapchain->FinishRendering();
 
@@ -910,6 +918,10 @@ std::vector<XrCompositionLayerQuad> RND_Renderer::Layer2D::FinishRendering(long 
     const float height = aspectRatio <= 1.0f ? 1.0f / aspectRatio : 1.0f;
 
     const float LAYER_SIZE = GetSettings().hudSize;
+    {
+        std::scoped_lock lock(s_hudQuadMutex);
+        s_hudQuad = HudQuad{ ToGLM(layerPose.position), ToGLM(layerPose.orientation), glm::fvec2(width * LAYER_SIZE, height * LAYER_SIZE) };
+    }
 
     std::vector<XrCompositionLayerQuad> layers;
 

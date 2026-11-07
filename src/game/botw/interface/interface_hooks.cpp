@@ -2,6 +2,11 @@
 #include "interface_hooks.h"
 #include "cemu/cemu_host.h"
 #include "game/botw/game_state.h"
+#include "game/botw/camera/stereo_view.h"
+#include "game/botw/player/hand_aim.h"
+#include "game/botw/player/roomscale.h"
+#include "rendering/renderer.h"
+#include "rendering/tracking.h"
 
 static void hook_FixStaminaGaugeScreenPosition(PPCInterpreter_t* hCPU) {
     hCPU->instructionPointer = hCPU->sprNew.LR;
@@ -26,6 +31,64 @@ static void hook_FixExtraStaminaGaugeIconPositions(PPCInterpreter_t* hCPU) {
     }
 
     hCPU->instructionPointer = 0x02FB29C4;
+}
+
+// sead::Projection::cameraPosToScreenPos (0x030C1068) finishing its screen position, replaces stfs f7, 8(r30)
+// the game places name labels and markers for its own flat screen, but the headset shows the HUD on a smaller floating panel,
+// so they go where the line from the eyes to the spot crosses that panel instead
+static void hook_PlaceScreenMarker(PPCInterpreter_t* hCPU) {
+    hCPU->instructionPointer = 0x030C1138;
+
+    const uint32_t screenPosPtr = hCPU->gpr[30];
+    const uint32_t cameraPosPtr = hCPU->gpr[31];
+    const uint32_t projectionMtxPtr = hCPU->gpr[3];
+    const float depth = (float)hCPU->fpr[7].fp0;
+    Guest::WriteBE(screenPosPtr + 0x8, &depth);
+
+    // only the HUD screens, sead::Projection::project also feeds on-screen checks in gameplay code
+    const uint32_t returnAddress = Guest::Get<uint32_t>(hCPU->gpr[1] + 0x14).getLE();
+    if (returnAddress != 0x02ED3BF0 && returnAddress != 0x02F565AC && returnAddress != 0x02F9743C && returnAddress != 0x02FB24CC && returnAddress != 0x0360A500)
+        return;
+
+    if (!Tracking::IsSessionRunning() || !GameState::IsInGame() || GameState::UseMonoFrameBufferTemporarilyDuringMenusOrPictures() || GameState::UseBlackBarsDuringEvents())
+        return;
+
+    // only perspective projections, with a last row of (0, 0, -1, 0)
+    std::array<float, 4> lastRow = {};
+    for (uint32_t i = 0; i < lastRow.size(); i++)
+        Guest::ReadBE(projectionMtxPtr + 0x30 + i * 4, &lastRow[i]);
+    if (lastRow[0] != 0.0f || lastRow[1] != 0.0f || lastRow[2] != -1.0f || lastRow[3] != 0.0f)
+        return;
+
+    const std::optional<glm::mat4> gameCameraWorld = StereoView::GetGameCameraWorld();
+    const std::optional<RND_Renderer::HudQuad> hud = RND_Renderer::GetHudQuad();
+    const std::optional<glm::fmat4> head = Tracking::HeadPose();
+    if (!gameCameraWorld.has_value() || !hud.has_value() || !head.has_value())
+        return;
+
+    const glm::vec3 cameraPos = Guest::Get<BEVec3>(cameraPosPtr).getLE();
+    const glm::vec3 worldPos = glm::vec3(gameCameraWorld.value() * glm::vec4(cameraPos, 1.0f));
+    glm::vec3 stagePos = glm::vec3(glm::inverse(HandAim::ResolveCameraReferenceMtx(-1)) * glm::vec4(worldPos, 1.0f));
+    if (GameState::IsFirstPerson()) {
+        const glm::vec3 appliedHeadPos = Roomscale::GetAppliedHeadPosition();
+        stagePos.x += appliedHeadPos.x;
+        stagePos.z += appliedHeadPos.z;
+    }
+
+    const glm::vec3 eyePos = glm::vec3(head.value()[3]);
+    const glm::vec3 panelNormal = hud->orientation * glm::vec3(0.0f, 0.0f, 1.0f);
+    const glm::vec3 toMarker = stagePos - eyePos;
+    const float along = glm::dot(toMarker, panelNormal);
+    if (along > -0.01f)
+        return;
+
+    const glm::vec3 hit = eyePos + toMarker * (glm::dot(hud->position - eyePos, panelNormal) / along);
+    const glm::vec3 onPanel = glm::inverse(hud->orientation) * (hit - hud->position);
+    const glm::vec2 screenPos = glm::vec2(onPanel.x / (hud->size.x * 0.5f), onPanel.y / (hud->size.y * 0.5f));
+    if (!std::isfinite(screenPos.x) || !std::isfinite(screenPos.y))
+        return;
+    Guest::WriteBE(screenPosPtr, &screenPos.x);
+    Guest::WriteBE(screenPosPtr + 0x4, &screenPos.y);
 }
 
 // todo: this only runs when it's shown for the first time!
@@ -93,5 +156,6 @@ void Interface::RegisterHooks() {
     CemuHost::RegisterHook("hook_FixStaminaGaugeScreenPosition", &hook_FixStaminaGaugeScreenPosition);
     CemuHost::RegisterHook("hook_FixExtraStaminaGaugeIconPositions", &hook_FixExtraStaminaGaugeIconPositions);
     CemuHost::RegisterHook("hook_CreateNewScreen", &hook_CreateNewScreen);
+    CemuHost::RegisterHook("hook_PlaceScreenMarker", &hook_PlaceScreenMarker);
     CemuHost::RegisterHook("hook_FixUIBlending", &hook_FixUIBlending);
 }

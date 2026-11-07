@@ -222,6 +222,13 @@ public:
         long m_currentFrameIdx = 0;
     };
 
+    struct HudQuad {
+        glm::fvec3 position;
+        glm::fquat orientation;
+        glm::fvec2 size;
+    };
+    static std::optional<HudQuad> GetHudQuad();
+
     class Layer2D {
     public:
         explicit Layer2D(VkExtent2D inputRes, VkExtent2D outputRes);

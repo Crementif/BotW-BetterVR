@@ -13,6 +13,14 @@ using EyeSide = OpenXR::EyeSide;
 static std::atomic_uint32_t s_sharedMemoryAddress = 0;
 static std::atomic<float> s_flatCameraFovYRadians = glm::radians(90.0f);
 
+static std::mutex s_gameCameraMutex;
+static std::optional<glm::mat4> s_gameCameraWorld;
+
+std::optional<glm::mat4> StereoView::GetGameCameraWorld() {
+    std::scoped_lock lock(s_gameCameraMutex);
+    return s_gameCameraWorld;
+}
+
 uint32_t StereoView::GetSharedMemoryAddress() {
     return s_sharedMemoryAddress.load(std::memory_order_relaxed);
 }
@@ -140,6 +148,11 @@ static void hook_GetRenderCamera(PPCInterpreter_t* hCPU) {
             sharedMem.rightView = camera.mtx;
         });
         return;
+    }
+
+    {
+        std::scoped_lock lock(s_gameCameraMutex);
+        s_gameCameraWorld = glm::inverse(glm::mat4(camera.mtx.getLEMatrix()));
     }
 
     auto [gameplayPos, gameplayRot] = Camera::ResolveGameplayBasePose(camera);
