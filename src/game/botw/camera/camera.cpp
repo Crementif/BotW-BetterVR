@@ -139,7 +139,7 @@ static float YawDegreesFromRotation(const glm::fquat& rot) {
 }
 
 static bool ShouldAdoptGameCameraYaw() {
-    return !s_hasBaseYaw || !GameState::IsFirstPerson() || !GameState::IsInGame() || Events::IsActive();
+    return !s_hasBaseYaw || !GameState::IsFirstPerson() || Events::IsActive();
 }
 
 static float ConsumePendingCameraYawDelta() {
@@ -666,13 +666,18 @@ static void hook_ReplaceCameraMode(PPCInterpreter_t* hCPU) {
     static uint32_t s_lastLoggedCameraInstance = 0;
     static uint32_t s_lastLoggedCameraChaseInstance = 0;
     static bool s_wasFlatCameraMode = false;
+    static uint32_t s_lastCameraChaseInstance = 0;
 
     const bool isFlatCameraMode = GameState::IsFlatCameraModeActive();
     const bool isSnapTurnCamera = currentCameraVtbl == kCameraChaseVtbl || currentCameraVtbl == kCameraTailVtbl;
-    if (s_wasFlatCameraMode != isFlatCameraMode) {
+    // a new CameraChase means a load or warp, so take the game's facing again
+    if (s_wasFlatCameraMode != isFlatCameraMode || s_lastCameraChaseInstance != cameraChaseInstance) {
         s_hasBaseYaw = false;
         s_pendingGameYawCorrection = 0.0f;
         s_pendingGameStickYawDelta = 0.0f;
+        s_lastCameraChaseInstance = cameraChaseInstance;
+    }
+    if (s_wasFlatCameraMode != isFlatCameraMode) {
         if (isFlatCameraMode) {
             StereoView::ResetFlatCameraFov();
         }
