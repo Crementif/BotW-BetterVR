@@ -605,7 +605,7 @@ static void hook_SkipCameraCollision(PPCInterpreter_t* hCPU) {
 
     static std::atomic_int s_lastDecision = -1;
     if (s_lastDecision.exchange(skipCollision ? 1 : 0) != (skipCollision ? 1 : 0)) {
-        Log::print<INFO>("[CameraCollision] {} camera collision (thirdPerson={}, cutscene={})", skipCollision ? "skipping" : "running", GameState::IsThirdPerson(), Events::IsActive());
+        Log::print<VERBOSE>("[CameraCollision] {} camera collision (thirdPerson={}, cutscene={})", skipCollision ? "skipping" : "running", GameState::IsThirdPerson(), Events::IsActive());
     }
 }
 
@@ -686,7 +686,7 @@ static void hook_ReplaceCameraMode(PPCInterpreter_t* hCPU) {
     }
 
     if (currentCameraVtbl != s_lastLoggedCameraVtbl || currCameraInstance != s_lastLoggedCameraInstance || cameraChaseInstance != s_lastLoggedCameraChaseInstance) {
-        Log::print<INFO>("Camera changed (vtbl={:#X}, camera={:#X}, chase={:#X}, snapTurnActive={}, flatCameraActive={})", currentCameraVtbl, currCameraInstance, cameraChaseInstance, isSnapTurnCamera, isFlatCameraMode);
+        Log::print<VERBOSE>("Camera changed (vtbl={:#X}, camera={:#X}, chase={:#X}, snapTurnActive={}, flatCameraActive={})", currentCameraVtbl, currCameraInstance, cameraChaseInstance, isSnapTurnCamera, isFlatCameraMode);
         s_lastLoggedCameraVtbl = currentCameraVtbl;
         s_lastLoggedCameraInstance = currCameraInstance;
         s_lastLoggedCameraChaseInstance = cameraChaseInstance;

@@ -166,21 +166,17 @@ static void hook_GetEventName(PPCInterpreter_t* hCPU) {
     }
     s_currentEvent = eventName;
     s_currentEntryPoint = entryPointName;
-    Log::print<INFO>("Event '{}' is now active (using entry point '{}').", eventName, entryPointName);
-
     Events::Settings settings = defaultFirstPersonSettings;
     if (auto it = s_eventSettings.find(s_currentEvent); it != s_eventSettings.end()) {
         settings = it->second;
-        Log::print<INFO>(" - First Person: {}", settings.firstPerson ? "ON" : "OFF");
-        Log::print<INFO>(" - Ignore Camera Rotation: {}", settings.ignoreCameraRotation ? "ON" : "OFF");
-        Log::print<INFO>(" - Disable Player-Driven Link Hands: {}", settings.disablePlayerDrivenLinkHands ? "ON" : "OFF");
+        Log::print<INFO>("Event '{}' started at '{}' (first person {}, ignore camera rotation {}, game-animated hands {})", eventName, entryPointName, settings.firstPerson ? "ON" : "OFF", settings.ignoreCameraRotation ? "ON" : "OFF", settings.disablePlayerDrivenLinkHands ? "ON" : "OFF");
     }
     else {
-        Log::print<INFO>(" - No specific settings found for this event, using defaults.");
+        Log::print<INFO>("Event '{}' started at '{}' (default settings)", eventName, entryPointName);
     }
     s_currentEventSettings = settings;
     if (!s_eventActive && std::chrono::steady_clock::now() - s_lastEventEnd > ChainedEventGap && s_eventModeOverride.exchange(EventMode::NO_EVENT) != EventMode::NO_EVENT) {
-        Log::print<INFO>(" - Cleared the camera picked in the previous cutscene");
+        Log::print<INFO>("Cleared the camera picked in the previous cutscene");
     }
     s_eventActive = true;
     PublishPresentation();

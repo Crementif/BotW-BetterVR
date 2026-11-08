@@ -121,7 +121,7 @@ static std::filesystem::path WriteGraphicsPack(const std::filesystem::path& sour
     std::ifstream sourceRules(source / "rules.txt", std::ios::binary);
     std::string rules((std::istreambuf_iterator<char>(sourceRules)), std::istreambuf_iterator<char>());
     EyeResolution::FillGraphicsRules(rules, eyeWidth, eyeHeight, EyeResolution::kMinimumWidth, [](const EyeResolution::Preset& preset, const std::string& label, bool wide) {
-        Log::print<INFO>("Graphics pack preset {}{} is {}", preset.multiplierLabel, wide ? " (Recording Mode)" : "", label);
+        Log::print<VERBOSE>("Graphics pack preset {}{} is {}", preset.multiplierLabel, wide ? " (Recording Mode)" : "", label);
     });
     std::ofstream(target / "rules.txt", std::ios::binary | std::ios::trunc) << rules;
     return target;
