@@ -75,6 +75,26 @@ You can find the controller image here (click to enlarge):
 <img src="https://raw.githubusercontent.com/Crementif/BotW-BetterVR/refs/heads/main/resources/controller_help.png" width="540">
 </a>
 
+### Technical Overview
+#### Rendering an image to the VR headset
+This mod ships with no game files, so you might ask how it works.
+
+Up until 0.9.23, BetterVR was a Vulkan layer, which came in the form of a .DLL file, that intercepted the Vulkan commands that Cemu submits. Since OpenXR frameworks aren't designed to be instantiated inside something that is intercepting Vulkan commands, it used Vulkan <-> D3D12 interop to pipe the rendered output to a D3D12 application that was *just* used for rendering the captured image to the VR headset.
+
+Using an external DLL originally made a lot of sense when Cemu wasn't open-sourced. In hindsight, it probably would've saved a lot of time spent trying to get the mod to work without using D3D12. So `BetterVR_Launcher.exe` is now its own build of Cemu, a thin fork found in `cemu-src` with the mod compiled into it. The game runs each frame once, and Cemu draws that same frame a second time for the other eye with that eye's camera. It also means that the mod can talk to the VR headset directly, which is what made a Linux version possible.
+
+#### How to make it VR
+However, while drawing the game's rendered output to the VR headset is one thing, getting a native game to render a 3D image is a whole other thing. For that, the mod has a bunch of PowerPC assembly patches (the Wii U has a PowerPC CPU) to modify the game's code. Among many other patches, you'll find patches that change the camera or player model positions each frame, or trigger an attack.
+
+Usually the assembly code will call into the C++ code if it wants to do complicated algebra to specify where the camera or Link's hands should be for example.
+
+Additionally, since combat is a large part of the original game, there's also a new swing and stab detection system that allows the player to cut trees and enemies down when they execute proper swings and stabbing motions. This prevents a situation where weapon hitboxes are abused to instantly stagger an enemy. There's plans for an even deeper integration, but as of today that's about it. This is fully optional since the mod still features an attack button, but the latter will offer a lot more immersion.
+
+Understanding how the game works, finding and patching the exact parts inside the game's executable is by far the most difficult part and it took thousands of hours of reverse-engineering. Its without a doubt the most time consuming task of this VR mod, especially since this game uses a custom C++ engine of which is not much known about other then the good work of the (largely unfinished, but still very helpful) decompilation project.
+
+If you want to know more about the technical details, feel free to ask in the BetterVR related channels in the [Flat2VR Discord server](https://discord.com/invite/flat2vr).
+There's enough that was skipped over or left out in this explanation.
+
 ### Build Instructions (For Developers)
 
 ```
