@@ -209,7 +209,7 @@ static void RemoveOlderReleasePacks() {
     }
 }
 
-// releases before 0.9.24 kept their settings next to Cemu.exe
+// releases before 1.0.0 kept their settings next to Cemu.exe
 static void TakeOverOlderReleaseSettings(const std::filesystem::path& settingsIni) {
     const std::filesystem::path besideExecutable = Platform::GetExecutableDirectory() / settingsIni.filename();
     std::error_code error;
