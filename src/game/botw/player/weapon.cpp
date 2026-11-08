@@ -262,6 +262,33 @@ bool Weapons::IsThrowableHeld() {
     return actor != 0 && ObjectCanBeThrown(Guest::Get<uint32_t>(actor + offsetof(Weapon, flags2)).getLE());
 }
 
+// small things by their LiftType: bombs, small pots, Octorok grass and stones, letter bottles, Cuccos, skull heads and ice balls
+static bool IsCarriedInOneHand(std::string_view actorName) {
+    static constexpr std::string_view oneHandActors[] = {
+        "RemoteBomb",
+        "RemoteBomb2",
+        "RemoteBombCube",
+        "RemoteBombCube2",
+        "Pot",
+        "Obj_KorokPot_A_01",
+        "FldObj_Bottle_Letter",
+        "Animal_Kokko_A",
+        "Animal_Kokko_B",
+        "Lizalfos_IceBall",
+        "Wizzrobe_WeatherIceBall",
+    };
+    if (std::ranges::find(oneHandActors, actorName) != std::end(oneHandActors))
+        return true;
+    return actorName.contains("Pot_A_S_Act") || actorName.starts_with("OctObj_") || actorName.contains("_Bone_Junior_Head");
+}
+
+bool Weapons::IsThrowableCarriedInBothHands() {
+    if (!IsThrowableHeld())
+        return false;
+    const auto name = Guest::Get<sead::FixedSafeString40>(s_heldActors[OpenXR::EyeSide::RIGHT] + offsetof(ActorWiiU, name));
+    return !IsCarriedInOneHand(std::string_view(name.data, strnlen(name.data, sizeof(name.data))));
+}
+
 static void hook_ChangeWeaponMtx(PPCInterpreter_t* hCPU) {
     BetterVRProfiler::Scope profile(BetterVRProfiler::Section::WeaponHandHook);
     hCPU->instructionPointer = hCPU->sprNew.LR;

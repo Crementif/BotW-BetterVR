@@ -26,6 +26,7 @@ namespace Weapons {
     HandObservations ReadHandObservations();
     void ResetHandObservations();
     bool IsThrowableHeld();
+    bool IsThrowableCarriedInBothHands();
 
     void RequestDrop(uint32_t side);
     void CancelDrops();

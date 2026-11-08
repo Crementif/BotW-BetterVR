@@ -109,7 +109,7 @@ static GameAnimSnapshot s_lastGameAnimSnapshot;
 
 static GameAnimSnapshot ReadGameAnimSnapshot() {
     GameAnimSnapshot snapshot;
-    snapshot.carryingThrowable = Weapons::IsThrowableHeld() && Weapons::GetHeldActor(OpenXR::EyeSide::RIGHT) != 0;
+    snapshot.carryingThrowable = Weapons::IsThrowableCarriedInBothHands();
     return snapshot;
 }
 
