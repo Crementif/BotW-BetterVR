@@ -370,10 +370,17 @@ static void hook_OverrideThrowVelocity(PPCInterpreter_t* hCPU) {
         return;
     }
 
-    Log::print<CONTROLS>("[Throw] hand velocity {} instead of {}", handVelocity.value(), gameVelocity);
-    Guest::WriteBE(velocityPtr, &handVelocity->x);
-    Guest::WriteBE(velocityPtr + 0x8, &handVelocity->z);
-    hCPU->fpr[0].fp0 = handVelocity->y;
+    // keep hand throws within reach of the game's own throw distance
+    constexpr float MaxSpeedOverGame = 1.2f;
+    glm::fvec3 velocity = handVelocity.value();
+    const float maxSpeed = glm::length(gameVelocity) * MaxSpeedOverGame;
+    if (maxSpeed > 0.0f && glm::length(velocity) > maxSpeed)
+        velocity *= maxSpeed / glm::length(velocity);
+
+    Log::print<CONTROLS>("[Throw] hand velocity {} instead of {}", velocity, gameVelocity);
+    Guest::WriteBE(velocityPtr, &velocity.x);
+    Guest::WriteBE(velocityPtr + 0x8, &velocity.z);
+    hCPU->fpr[0].fp0 = velocity.y;
 }
 
 static void hook_OverrideGuardDirection(PPCInterpreter_t* hCPU) {
