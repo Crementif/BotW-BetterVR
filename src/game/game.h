@@ -9,6 +9,8 @@ namespace Game {
         std::string_view graphicsPack;
         // a community pack the game needs in VR, applied after the VR pack
         std::string_view requiredPack;
+        // the update the patches are made for
+        uint16_t requiredVersion;
         // the 3D render targets before the graphics pack scales them to the eye resolution
         uint32_t renderWidth;
         uint32_t renderHeight;

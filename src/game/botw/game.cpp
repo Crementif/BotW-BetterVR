@@ -22,6 +22,7 @@ static constexpr std::array kTitles = {
         .graphicsPack = "BreathOfTheWild_Graphics",
         // the game crashes in VR without it
         .requiredPack = "BreathOfTheWild/Mods/FPS++",
+        .requiredVersion = 208,
         .renderWidth = 1280,
         .renderHeight = 720,
     },

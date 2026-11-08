@@ -285,6 +285,9 @@ public:
             if (!title.requiredPack.empty()) {
                 HostModule::RegisterGraphicPack(packs / "graphicPacks" / title.requiredPack, HostModule::PackOrder::AfterUser);
             }
+            for (uint64_t titleId : title.titleIds) {
+                HostModule::RequireTitleVersion(titleId, title.requiredVersion, "BetterVR");
+            }
         }
         // well above the headset's refresh rate, so FPS++'s FPS limit doesn't cap the headset
         HostModule::SetVsyncFrequency(180);
