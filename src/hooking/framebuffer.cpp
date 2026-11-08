@@ -360,19 +360,33 @@ void VkDeviceOverrides::CmdClearDepthStencilImage(const vkroots::VkCommandBuffer
         RND_Renderer::RenderFrame& frame = renderer->GetFrame(frameCounter);
 
         if (side == OpenXR::EyeSide::LEFT || side == OpenXR::EyeSide::RIGHT) {
-            // 3D layer - depth texture for 3D rendering
-            if (s_curr3DDepthImage == VK_NULL_HANDLE) {
-                lockImageResolutions.lock();
-                if (const auto it = imageResolutions.find(image); it != imageResolutions.end()) {
-                    if (it->second.second == VK_FORMAT_D32_SFLOAT) {
-                        s_curr3DDepthImage = it->first;
+            // Cemu can switch depth targets after menus without destroying the old
+            // target. Select a matching source for each new stereo generation rather
+            // than pinning the first VkImage for its entire lifetime. Once either
+            // eye has depth, keep that source fixed for the rest of this generation.
+            VkImage expectedDepthImage = frame.acceptedDepthImages[EyeSide::LEFT];
+            if (expectedDepthImage == VK_NULL_HANDLE) {
+                expectedDepthImage = frame.acceptedDepthImages[EyeSide::RIGHT];
+            }
+            if (expectedDepthImage == VK_NULL_HANDLE) {
+                expectedDepthImage = s_curr3DDepthImage;
+                if (side == EyeSide::LEFT && frame.IsStereoRecord() && frame.activeStereoGeneration != 0 &&
+                    !frame.HasFatalIssue() && frame.HasAcceptedCapture(RND_Renderer::CaptureMask_ColorLeft)) {
+                    std::lock_guard<std::mutex> imageLock(lockImageResolutions);
+                    const auto depth = imageResolutions.find(image);
+                    const auto color = imageResolutions.find(frame.acceptedColorImages[EyeSide::LEFT]);
+                    if (depth != imageResolutions.end() && color != imageResolutions.end() &&
+                        depth->second.second == VK_FORMAT_D32_SFLOAT &&
+                        depth->second.first.width == color->second.first.width &&
+                        depth->second.first.height == color->second.first.height) {
+                        expectedDepthImage = image;
+                        s_curr3DDepthImage = image;
                     }
                 }
-                lockImageResolutions.unlock();
             }
 
-            if (image != s_curr3DDepthImage) {
-                Log::print<RENDERING>("Depth image is not the same as the current 3D depth image! ({} != {})", (void*)image, (void*)s_curr3DDepthImage);
+            if (image != expectedDepthImage) {
+                Log::print<RENDERING>("Depth image is not the same as the current 3D depth image! ({} != {})", (void*)image, (void*)expectedDepthImage);
                 returnToLayout();
                 return;
             }
