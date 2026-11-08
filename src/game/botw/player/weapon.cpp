@@ -79,12 +79,15 @@ void Weapons::CancelDrops() {
 }
 
 
+static void RegrowReleasedCarry();
+
 // has to run once per game frame like hook_ChangeWeaponMtx, or held weapons get dropped
 void Weapons::OnGameFrame() {
     if (!Tracking::IsSessionRunning()) {
         return;
     }
 
+    RegrowReleasedCarry();
     for (uint32_t side = 0; side < 2; side++) {
         if (++s_framesSinceHeldActorBound[side] < HeldWeaponStaleFrames)
             continue;
@@ -289,6 +292,63 @@ bool Weapons::IsThrowableCarriedInBothHands() {
     return !IsCarriedInOneHand(std::string_view(name.data, strnlen(name.data, sizeof(name.data))));
 }
 
+// gsys::Model render scale, so physics and explosions keep their real size
+static constexpr uint32_t ActorGsysModelOffset = 0x330;
+static constexpr uint32_t GsysModelScaleOffset = 0x64;
+static constexpr float OneHandCarryScale = 0.75f;
+static constexpr float CarryScaleStepPerFrame = 0.2f;
+
+struct ShrunkCarry {
+    uint32_t actor = 0;
+    uint32_t actorId = 0;
+    glm::fvec3 originalScale = glm::fvec3(1.0f);
+    float shrink = 0.0f;
+};
+static ShrunkCarry s_shrunkCarry;
+
+static uint32_t GetShrunkCarryModel() {
+    const ShrunkCarry& carry = s_shrunkCarry;
+    if (carry.actor == 0 || Guest::Get<uint32_t>(carry.actor + offsetof(BaseProc, id)).getLE() != carry.actorId)
+        return 0;
+    return Guest::Get<uint32_t>(carry.actor + ActorGsysModelOffset).getLE();
+}
+
+static void ApplyShrunkCarryScale(uint32_t gsysModel) {
+    const glm::fvec3 scale = s_shrunkCarry.originalScale * glm::mix(1.0f, OneHandCarryScale, s_shrunkCarry.shrink);
+    Guest::Set(gsysModel + GsysModelScaleOffset, scale);
+}
+
+static void ShrinkOneHandCarry(uint32_t actor) {
+    if (s_shrunkCarry.actor != actor) {
+        if (const uint32_t previousModel = GetShrunkCarryModel(); previousModel != 0)
+            Guest::Set(previousModel + GsysModelScaleOffset, s_shrunkCarry.originalScale);
+        s_shrunkCarry = {};
+        const uint32_t gsysModel = Guest::Get<uint32_t>(actor + ActorGsysModelOffset).getLE();
+        if (gsysModel == 0)
+            return;
+        s_shrunkCarry = { actor, Guest::Get<uint32_t>(actor + offsetof(BaseProc, id)).getLE(), Guest::Get<BEVec3>(gsysModel + GsysModelScaleOffset).getLE(), 0.0f };
+    }
+    if (const uint32_t gsysModel = GetShrunkCarryModel(); gsysModel != 0) {
+        s_shrunkCarry.shrink = std::min(1.0f, s_shrunkCarry.shrink + CarryScaleStepPerFrame);
+        ApplyShrunkCarryScale(gsysModel);
+    }
+}
+
+// a thrown or dropped object grows back over a few frames
+static void RegrowReleasedCarry() {
+    if (s_shrunkCarry.actor == 0 || (s_heldActors[OpenXR::EyeSide::RIGHT] == s_shrunkCarry.actor && s_framesSinceHeldActorBound[OpenXR::EyeSide::RIGHT] == 0 && GameState::IsFirstPerson()))
+        return;
+    const uint32_t gsysModel = GetShrunkCarryModel();
+    s_shrunkCarry.shrink = std::max(0.0f, s_shrunkCarry.shrink - CarryScaleStepPerFrame);
+    if (gsysModel != 0)
+        ApplyShrunkCarryScale(gsysModel);
+    if (gsysModel == 0 || s_shrunkCarry.shrink <= 0.0f)
+        s_shrunkCarry = {};
+}
+
+// ModelBindInfo::mtx, the offset BindActor_CalcMaybe (0x031253F0) puts the item at from the bone matrix
+static constexpr uint32_t ModelBindInfoMtxOffset = 0x3C;
+
 static void hook_ChangeWeaponMtx(PPCInterpreter_t* hCPU) {
     BetterVRProfiler::Scope profile(BetterVRProfiler::Section::WeaponHandHook);
     hCPU->instructionPointer = hCPU->sprNew.LR;
@@ -344,6 +404,8 @@ static void hook_ChangeWeaponMtx(PPCInterpreter_t* hCPU) {
         else if (s_arrowNockedInRightHand)
             equipType = EquipType::Arrow;
         s_observedThrowable = ObjectCanBeThrown(Guest::Get<uint32_t>(actor + offsetof(Weapon, flags2)).getLE());
+        if (s_observedThrowable && IsCarriedInOneHand(actorName))
+            ShrinkOneHandCarry(actor);
     }
     s_observedEquipTypes[side] = equipType;
     s_observedOccupied[side] = true;
