@@ -16,6 +16,7 @@ static BoneHierarchy s_skeleton;
 static bool s_skeletonParsed = false;
 static glm::vec3 s_restEyeOffset = glm::vec3(0.0f);
 static glm::vec3 s_manualBodyOffset = glm::vec3(0.0f, 0.0f, -0.075f);
+static constexpr glm::vec3 NeckToEyeOffset = glm::vec3(0.0f, 0.10f, -0.09f);
 static constexpr float MaximumGameHandSeparationSq = 4.0f;
 static constexpr std::array<std::array<const char*, 5>, 2> GameAnimArmChainBoneNames = { { { "Clavicle_L", "Arm_1_L", "Arm_2_L", "Wrist_L", "Weapon_L" },
                                                                                           { "Clavicle_R", "Arm_1_R", "Arm_2_R", "Wrist_R", "Weapon_R" } } };
@@ -492,6 +493,12 @@ static void hook_ModifyBoneMatrix(PPCInterpreter_t* hCPU) {
 
         // position the root so that yawRot * s_restEyeOffset lands at the headset position
         glm::vec3 targetPos = glm::vec3(headsetModel[3]) - (yawRot * s_restEyeOffset) + (yawRot * s_manualBodyOffset);
+
+        // the eyes swing around the neck when tilting the head, so keep the body under the neck instead
+        const glm::fquat headRot = glm::quat_cast(glm::mat3(headsetModel));
+        glm::vec3 neckToEyeShift = (headRot * NeckToEyeOffset) - (RenderUtils::swingTwistY(headRot).second * NeckToEyeOffset);
+        neckToEyeShift.y = 0.0f;
+        targetPos -= neckToEyeShift;
 
         // update skeleton for children (hands)
         if (Bone* rootBone = s_skeleton.GetBone("Skl_Root")) {
