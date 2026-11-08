@@ -22,6 +22,10 @@ It currently supports the following features:
 * A properly set up [Cemu](http://cemu.info/) emulator that's able to run the game. See [this guide](https://cemu.cfw.guide/) for more info.
   * **Before reporting issues, make sure that you have a WORKING version of the game that can go in-game on your PC before you install this mod!**
 
+### Known Issues
+
+* The first launch after installing or updating stutters more than usual, since BetterVR keeps its own shader caches and has to rebuild them. This goes away after a bit of playing.
+
 ### Mod Installation
 
 > [!TIP]
@@ -85,7 +89,6 @@ Crementif: Main Developer
 Acudofy: Sword & stab analysis system  
 Holydh: Developed the input systems  
 leoetlino: For the [BotW Decomp project](https://github.com/zeldaret/botw), which was very useful  
-Exzap: Technical support and optimization help  
 Exzap: Technical support and optimization help  
 Mako Marci: Edited the trailer, made the logo and controller guide  
 Tim, Mako Marci, Solarwolf07, Elliott Tate & Derra: Helped with testing, recording, feedback and support  
