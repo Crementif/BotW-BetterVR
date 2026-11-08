@@ -59,6 +59,10 @@ void CemuHost::SetGraphicsPreset(std::string_view category, std::string_view pre
     }
 }
 
+void CemuHost::OpenGraphicPacksWindow() {
+    HostModule::OpenGraphicPacksWindow();
+}
+
 void CemuHost::SetFoveationExaggerated(bool exaggerated) {
     if (exaggerated) {
         HostModule::SetFoveationRadii(kExaggeratedFoveationInnerRadius, kExaggeratedFoveationOuterRadius);

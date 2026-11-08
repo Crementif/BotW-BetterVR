@@ -826,6 +826,11 @@ void RND_Renderer::ImGuiOverlay::DrawSystemPage(bool* changed) {
             settings.bootDirectlyIntoGame.AddToGUI(changed);
         });
         DrawRecordingModeSetting();
+        DrawSetting("Graphics & Mods", "Opens Cemu's Graphic Packs window outside VR for additional settings.", [&]() {
+            if (ImGui::Button("Edit Graphics & Mods", ImVec2(-FLT_MIN, 0.0f))) {
+                CemuHost::OpenGraphicPacksWindow();
+            }
+        });
         DrawSetting("Show FPS Overlay", [&]() {
             settings.performanceOverlay.AddComboToGUI(changed);
         });
