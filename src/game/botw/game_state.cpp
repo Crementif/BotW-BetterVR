@@ -9,6 +9,9 @@
 #include "instance.h"
 
 static std::atomic_bool s_eventActive = false;
+// the camera picked with the cutscene button, kept across events the game chains together
+static std::atomic<EventMode> s_eventModeOverride = EventMode::NO_EVENT;
+static constexpr std::chrono::seconds ChainedEventGap = std::chrono::seconds(3);
 static std::atomic<Events::Settings> s_currentEventSettings = Events::Settings{};
 static std::unordered_map<std::string, Events::Settings> s_eventSettings;
 static std::atomic_uint32_t s_recordingOutputMode = 0;
@@ -63,8 +66,23 @@ bool Events::IsActive() {
     return s_eventActive.load(std::memory_order_relaxed);
 }
 
+static EventMode GetActiveEventMode() {
+    const EventMode overrideMode = s_eventModeOverride.load(std::memory_order_relaxed);
+    return overrideMode != EventMode::NO_EVENT ? overrideMode : GetSettings().GetCutsceneCameraMode();
+}
+
+void Events::ToggleCameraMode() {
+    if (!IsActive() || GameState::IsFlatCameraModeActive()) {
+        return;
+    }
+
+    const EventMode mode = GameState::IsFirstPerson() ? EventMode::ALWAYS_THIRD_PERSON : EventMode::ALWAYS_FIRST_PERSON;
+    s_eventModeOverride = mode;
+    Log::print<INFO>("Switched this cutscene to {} person", mode == EventMode::ALWAYS_FIRST_PERSON ? "first" : "third");
+}
+
 std::optional<Events::Settings> Events::GetFirstPersonSettings() {
-    if (!IsActive() || GetSettings().GetCutsceneCameraMode() == EventMode::ALWAYS_THIRD_PERSON) {
+    if (!IsActive() || GetActiveEventMode() == EventMode::ALWAYS_THIRD_PERSON) {
         return std::nullopt;
     }
 
@@ -73,6 +91,11 @@ std::optional<Events::Settings> Events::GetFirstPersonSettings() {
         settings.ignoreCameraRotation = true;
     }
     return settings;
+}
+
+bool Events::UsesAnimatedHands() {
+    const std::optional<Settings> settings = GetFirstPersonSettings();
+    return settings.has_value() && settings->disablePlayerDrivenLinkHands && GameState::IsFirstPerson();
 }
 
 static void ApplyEventSetting(Events::Settings& entry, std::string_view setting) {
@@ -121,6 +144,7 @@ static void hook_GetEventName(PPCInterpreter_t* hCPU) {
 
     static std::string s_currentEvent;
     static std::string s_currentEntryPoint;
+    static std::chrono::steady_clock::time_point s_lastEventEnd = {};
 
     const bool isEventActive = hCPU->gpr[3] != 0;
     if (!isEventActive) {
@@ -128,6 +152,7 @@ static void hook_GetEventName(PPCInterpreter_t* hCPU) {
             Log::print<INFO>("Event '{}' has now ended", s_currentEvent);
             s_currentEvent.clear();
             s_currentEntryPoint.clear();
+            s_lastEventEnd = std::chrono::steady_clock::now();
             s_eventActive = false;
             PublishPresentation();
         }
@@ -154,6 +179,9 @@ static void hook_GetEventName(PPCInterpreter_t* hCPU) {
         Log::print<INFO>(" - No specific settings found for this event, using defaults.");
     }
     s_currentEventSettings = settings;
+    if (!s_eventActive && std::chrono::steady_clock::now() - s_lastEventEnd > ChainedEventGap && s_eventModeOverride.exchange(EventMode::NO_EVENT) != EventMode::NO_EVENT) {
+        Log::print<INFO>(" - Cleared the camera picked in the previous cutscene");
+    }
     s_eventActive = true;
     PublishPresentation();
 }
@@ -167,7 +195,7 @@ bool GameState::IsFirstPerson() {
         return GetSettings().GetCameraMode() == CameraMode::FIRST_PERSON;
     }
 
-    const EventMode mode = GetSettings().GetCutsceneCameraMode();
+    const EventMode mode = GetActiveEventMode();
     if (mode == EventMode::ALWAYS_THIRD_PERSON) {
         return false;
     }
@@ -245,6 +273,8 @@ static void PublishPresentation() {
     presentation.blackBars = GameState::UseBlackBarsDuringEvents();
     presentation.loadingScreenVisible = Screens::IsLoadingVisible();
     presentation.aimingItemHeld = Weapons::IsAimingItemHeld();
+    presentation.cutsceneCameraSwitchable = Events::IsActive() && !GameState::IsShowingMenu();
+    presentation.cutsceneFirstPerson = GameState::IsFirstPerson();
     presentation.recordingOutputMode = GameState::GetRecordingOutputMode();
     s_presentation.store(presentation, std::memory_order_relaxed);
 }

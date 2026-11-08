@@ -1108,12 +1108,53 @@ static void DrawUpdateBanner(bool isMenuOpen) {
     ImGui::PopStyleVar(2);
 }
 
+static void DrawCutsceneCameraPrompt(bool isMenuOpen) {
+    constexpr double kShowAfter = 1.0;
+    constexpr double kShownFor = 6.0;
+    constexpr double kFadeOutFor = 1.0;
+    static double s_shownSince = -1.0;
+    static bool s_wasFirstPerson = false;
+
+    const Game::Presentation game = Game::GetPresentation();
+    const ControllerType controllerType = VRManager::instance().XR->m_capabilities.activeControllerType;
+    if (!game.cutsceneCameraSwitchable || isMenuOpen || controllerType == ControllerType::Unknown || controllerType == ControllerType::Simple) {
+        s_shownSince = -1.0;
+        return;
+    }
+
+    // short events like opening a chest end before it shows, switching shows it again right away
+    const double now = ImGui::GetTime();
+    if (s_shownSince < 0.0) {
+        s_shownSince = now;
+        s_wasFirstPerson = game.cutsceneFirstPerson;
+    }
+    else if (game.cutsceneFirstPerson != s_wasFirstPerson) {
+        s_shownSince = now - kShowAfter;
+        s_wasFirstPerson = game.cutsceneFirstPerson;
+    }
+    const double shownFor = now - s_shownSince - kShowAfter;
+    if (shownFor < 0.0 || shownFor >= kShownFor) {
+        return;
+    }
+
+    const ImVec2 displaySize = ImGui::GetIO().DisplaySize;
+    ImGui::PushStyleVar(ImGuiStyleVar_Alpha, (float)std::clamp((kShownFor - shownFor) / kFadeOutFor, 0.0, 1.0));
+    ImGui::SetNextWindowBgAlpha(0.85f);
+    ImGui::SetNextWindowPos(ImVec2(displaySize.x * 0.5f, displaySize.y * 0.85f), ImGuiCond_Always, ImVec2(0.5f, 1.0f));
+    if (ImGui::Begin("CutsceneCameraPrompt", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoInputs)) {
+        ImGui::Text(ICON_KI_STICK_LEFT_TOP "  Click the left stick to watch this cutscene in %s person", game.cutsceneFirstPerson ? "third" : "first");
+    }
+    ImGui::End();
+    ImGui::PopStyleVar();
+}
+
 void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
     auto& isMenuOpen = ImGuiMenus::g_isOpen;
     auto& settings = GetSettings();
 
     DrawTutorialPromptAndControllerVerification(isMenuOpen);
     DrawUpdateBanner(isMenuOpen);
+    DrawCutsceneCameraPrompt(isMenuOpen);
 
     static bool wasMenuPrevOpened = false;
     static bool shouldLogSavedSettingsOnClose = false;

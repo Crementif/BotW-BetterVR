@@ -728,7 +728,7 @@ static void ProcessHandThrow(uint32_t& buttonHold, const OpenXR::InputState& inp
         state.samplesSinceThrowableSeen = 0;
     else if (state.samplesSinceThrowableSeen != UINT32_MAX)
         state.samplesSinceThrowableSeen++;
-    state.handThrowCarrying = state.samplesSinceThrowableSeen <= throwableMissedSamplesTolerated && GameState::IsFirstPerson();
+    state.handThrowCarrying = state.samplesSinceThrowableSeen <= throwableMissedSamplesTolerated && GameState::IsFirstPerson() && !Events::IsActive();
     if (!state.handThrowCarrying) {
         state.handThrowArmed = false;
         return;
@@ -1095,7 +1095,10 @@ static void ProcessGameplayInput(uint32_t& buttonHold, OpenXR::InputState& input
         }
     }
 
-    if (s_crouchScopeButton.lastEvent == ButtonState::Event::ShortPress) {
+    if (s_crouchScopeButton.lastEvent == ButtonState::Event::ShortPress && Events::IsActive()) {
+        Events::ToggleCameraMode();
+    }
+    else if (s_crouchScopeButton.lastEvent == ButtonState::Event::ShortPress) {
         buttonHold |= VPAD_BUTTON_STICK_L;
     }
     

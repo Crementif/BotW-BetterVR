@@ -10,6 +10,7 @@
 #include "game/botw/camera/camera.h"
 #include "rendering/tracking.h"
 #include "utils/debug_draw.h"
+#include "utils/render_utils.h"
 
 static BoneHierarchy s_skeleton;
 static bool s_skeletonParsed = false;
@@ -23,6 +24,8 @@ static std::array<std::array<glm::mat4, 5>, 2> s_gameAnimArmChainLocals = {};
 static std::array<uint32_t, 2> s_gameAnimArmChainSeenMasks = { 0, 0 };
 static glm::mat4 s_gameLeftToRightWeaponMtx = glm::identity<glm::mat4>();
 static bool s_gameLeftToRightWeaponMtxValid = false;
+// cutscenes marked HND_OFF animate Link's arms themselves
+static bool s_passAnimatedHands = false;
 
 static void UpdateGameLeftToRightWeaponTransform() {
     if (!s_skeletonParsed)
@@ -213,6 +216,15 @@ static glm::fquat MinimalArcQuat(const glm::fvec3& from, const glm::fvec3& to) {
     }
 
     return glm::angleAxis(std::acos(alignment), glm::normalize(glm::cross(fromDir, toDir)));
+}
+
+static bool IsArmBone(int boneIndex) {
+    for (int index = boneIndex; index >= 0; index = s_skeleton.GetBone(index)->parentIndex) {
+        const std::string& name = s_skeleton.GetBone(index)->name;
+        if (name == "Clavicle_L" || name == "Clavicle_R")
+            return true;
+    }
+    return false;
 }
 
 static void EnsureSkeletonInitialized() {
@@ -407,6 +419,7 @@ static void hook_ModifyBoneMatrix(PPCInterpreter_t* hCPU) {
     // reset grip state on root to prevent stranding on tracking loss
     if (boneName == "Skl_Root") {
         s_skeletonPassInputs = Tracking::Hands();
+        s_passAnimatedHands = Events::UsesAnimatedHands();
         UpdateGameLeftToRightWeaponTransform();
         s_twoHandGrip = {};
         s_armPoseFrame = {};
@@ -473,7 +486,9 @@ static void hook_ModifyBoneMatrix(PPCInterpreter_t* hCPU) {
         headsetModel[3].x = 0.0f;
         headsetModel[3].z = 0.0f;
 
-        glm::fquat yawRot = ExtractPlayerBodyYaw(headsetModel);
+        const glm::mat4 animRootLocal = glm::mat4(Guest::Get<BEMatrix34>(matrixPtr).getLEMatrix());
+        // animated hands reach for what the cutscene put in front of Link, so his body keeps the cutscene's facing
+        glm::fquat yawRot = s_passAnimatedHands ? RenderUtils::swingTwistY(glm::quat_cast(glm::mat3(animRootLocal))).second : ExtractPlayerBodyYaw(headsetModel);
 
         // position the root so that yawRot * s_restEyeOffset lands at the headset position
         glm::vec3 targetPos = glm::vec3(headsetModel[3]) - (yawRot * s_restEyeOffset) + (yawRot * s_manualBodyOffset);
@@ -624,11 +639,14 @@ static void hook_ModifyBoneMatrix(PPCInterpreter_t* hCPU) {
             s_armPoseFrame.handState[OpenXR::EyeSide::LEFT] = ArmPoseState::TwoHandGrip;
 
         s_lastAppliedRightWristRot = s_twoHandGrip.engaged ? s_twoHandGrip.rightGripRotWorld : rightHandRotWorld;
-        s_lastAppliedRightWristRotValid = true;
+        s_lastAppliedRightWristRotValid = !s_passAnimatedHands;
 
         writeBoneQuat(targetPos, yawRot, boneScale);
         return;
     }
+
+    if (s_passAnimatedHands && IsArmBone(boneIndex))
+        return;
 
     if (boneName == "Arm_1_L" || boneName == "Arm_1_R" || boneName == "Elbow_L" || boneName == "Elbow_R" || boneName == "Wrist_Assist_L" || boneName == "Wrist_Assist_R") {
 

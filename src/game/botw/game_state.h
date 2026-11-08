@@ -19,7 +19,9 @@ namespace Events {
     };
 
     bool IsActive();
+    void ToggleCameraMode();
     std::optional<Settings> GetFirstPersonSettings();
+    bool UsesAnimatedHands();
 }
 
 namespace GameState {
