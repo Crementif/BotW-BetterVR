@@ -101,8 +101,8 @@ bool Events::UsesAnimatedHands() {
 static void ApplyEventSetting(Events::Settings& entry, std::string_view setting) {
     if (setting == "FP_ON") entry.firstPerson = true;
     else if (setting == "FP_OFF") entry.firstPerson = false;
-    else if (setting == "HND_ON") entry.disablePlayerDrivenLinkHands = false;
-    else if (setting == "HND_OFF") entry.disablePlayerDrivenLinkHands = true;
+    else if (setting == "HND_ON") entry.disablePlayerDrivenLinkHands = true;
+    else if (setting == "HND_OFF") entry.disablePlayerDrivenLinkHands = false;
     else if (setting == "PAN_ON") entry.ignoreCameraRotation = false;
     else if (setting == "PAN_OFF") entry.ignoreCameraRotation = true;
     else if (setting == "CTRL_ON") entry.demoEnableCameraInput = false;
