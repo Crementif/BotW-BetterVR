@@ -54,10 +54,6 @@ void Weapons::ResetHandObservations() {
     s_observedThrowable = false;
 }
 
-bool Weapons::IsThrowableHeld() {
-    return s_observedThrowable;
-}
-
 struct PendingWeaponDrop {
     uint32_t actor = 0;
     uint32_t actorId = 0;
@@ -258,6 +254,12 @@ constexpr uint32_t FLAG_THROWABLE = 0x00004000;
 bool ObjectCanBeThrown(uint32_t flags)
 {
     return (flags & FLAG_THROWABLE);
+}
+
+// read from the bound actor, the observation flag gets cleared every input poll
+bool Weapons::IsThrowableHeld() {
+    const uint32_t actor = s_heldActors[OpenXR::EyeSide::RIGHT];
+    return actor != 0 && ObjectCanBeThrown(Guest::Get<uint32_t>(actor + offsetof(Weapon, flags2)).getLE());
 }
 
 static void hook_ChangeWeaponMtx(PPCInterpreter_t* hCPU) {
