@@ -16,6 +16,7 @@
 #include "imgui_assets.h"
 #include "font_kenney.h"
 #include "font_roboto.h"
+#include "font_material_symbols.h"
 
 using namespace BetterVRImGui;
 
@@ -64,7 +65,8 @@ static void BeginImGuiFrame() {
     ImGui::NewFrame();
 }
 
-static void FillCustomGlyphRect(ImFontAtlas* atlas, int rectIndex, const unsigned char* alphaPixels) {
+// the bitmaps only exist at the two menu sizes, so they get resampled to the size the atlas is baked at
+static void FillCustomGlyphRect(ImFontAtlas* atlas, int rectIndex, const unsigned char* alphaPixels, int sourceSize) {
     if (rectIndex < 0) {
         return;
     }
@@ -75,12 +77,62 @@ static void FillCustomGlyphRect(ImFontAtlas* atlas, int rectIndex, const unsigne
     atlas->GetTexDataAsRGBA32(&atlasPixels, &atlasWidth, &atlasHeight);
 
     const ImFontAtlasCustomRect* rect = atlas->GetCustomRectByIndex(rectIndex);
+    const float step = (float)sourceSize / (float)rect->Width;
     for (int y = 0; y < rect->Height; y++) {
         ImU32* atlasRow = (ImU32*)atlasPixels + (rect->Y + y) * atlasWidth + rect->X;
+        const float sourceY = std::clamp(((float)y + 0.5f) * step - 0.5f, 0.0f, (float)(sourceSize - 1));
+        const int y0 = (int)sourceY;
+        const int y1 = std::min(y0 + 1, sourceSize - 1);
+        const float fy = sourceY - (float)y0;
         for (int x = 0; x < rect->Width; x++) {
-            atlasRow[x] = IM_COL32(255, 255, 255, alphaPixels[y * rect->Width + x]);
+            const float sourceX = std::clamp(((float)x + 0.5f) * step - 0.5f, 0.0f, (float)(sourceSize - 1));
+            const int x0 = (int)sourceX;
+            const int x1 = std::min(x0 + 1, sourceSize - 1);
+            const float fx = sourceX - (float)x0;
+            const float top = (float)alphaPixels[y0 * sourceSize + x0] * (1.0f - fx) + (float)alphaPixels[y0 * sourceSize + x1] * fx;
+            const float bottom = (float)alphaPixels[y1 * sourceSize + x0] * (1.0f - fx) + (float)alphaPixels[y1 * sourceSize + x1] * fx;
+            atlasRow[x] = IM_COL32(255, 255, 255, (int)(top * (1.0f - fy) + bottom * fy + 0.5f));
         }
     }
+}
+
+static ImVec4 CalculateCenteredAspectRegion(const ImVec2& bounds, float targetAspect = 16.0f / 9.0f) {
+    ImVec4 region = ImVec4(0.0f, 0.0f, bounds.x, bounds.y);
+
+    if (bounds.x <= 0.0f || bounds.y <= 0.0f) {
+        return region;
+    }
+
+    float width = bounds.x;
+    float height = width / targetAspect;
+    if (height > bounds.y) {
+        height = bounds.y;
+        width = height * targetAspect;
+    }
+
+    region = ImVec4((bounds.x - width) * 0.5f, (bounds.y - height) * 0.5f, width, height);
+    return region;
+}
+
+// a punched-in window only shows the 16:9 center of the image
+static ImVec2 CalculatePhysicalRes(uint32_t windowWidth, uint32_t windowHeight, VkExtent2D outputRes) {
+    const float fbAspect = std::max((float)outputRes.width / (float)outputRes.height, RenderUtils::WindowAspectRatio);
+    uint32_t renderPhysicalWidth = windowWidth;
+    uint32_t renderPhysicalHeight = windowHeight;
+    if ((float)windowWidth / (float)windowHeight > fbAspect) {
+        renderPhysicalWidth = (uint32_t)(windowHeight * fbAspect);
+    }
+    else {
+        renderPhysicalHeight = (uint32_t)(windowWidth / fbAspect);
+    }
+    return ImVec2((float)renderPhysicalWidth, (float)renderPhysicalHeight);
+}
+
+// keep a shared 16:9 canvas with a 1080p size (DPI-wise)
+static constexpr float kMenuCanvasScale = 1.85f;
+
+static float CalculateFontScale(VkExtent2D outputRes) {
+    return std::max((float)outputRes.height * kMenuCanvasScale / 1080.0f, 1.0f);
 }
 
 RND_Renderer::ImGuiOverlay::ImGuiOverlay(VkCommandBuffer cb, VkExtent2D fbRes, VkFormat fbFormat): m_outputRes(fbRes) {
@@ -93,28 +145,40 @@ RND_Renderer::ImGuiOverlay::ImGuiOverlay(VkCommandBuffer cb, VkExtent2D fbRes, V
     ImGui::LoadIniSettingsFromDisk(s_iniPath.c_str());
     ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
 
+    m_fontScale = CalculateFontScale(fbRes);
+    const float scale = m_fontScale;
+    ImGui::GetIO().FontGlobalScale = 1.0f / scale;
+    Log::print<INFO>("Baking the menu fonts at {:.2f}x for a {}x{} overlay", scale, fbRes.width, fbRes.height);
+
     ImFontConfig fontCfg{};
     fontCfg.OversampleH = 2;
     fontCfg.OversampleV = 2;
     fontCfg.FontDataOwnedByAtlas = false;
-    ImFont* textFont = ImGui::GetIO().Fonts->AddFontFromMemoryCompressedTTF(roboto_compressed_data, roboto_compressed_size, 16.0f, &fontCfg);
+    ImFont* textFont = ImGui::GetIO().Fonts->AddFontFromMemoryCompressedTTF(roboto_compressed_data, roboto_compressed_size, 16.0f * scale, &fontCfg);
 
     ImFontConfig iconCfg{};
     iconCfg.MergeMode = true;
     iconCfg.PixelSnapH = true;
-    iconCfg.GlyphMinAdvanceX = 16.0f;
-    iconCfg.GlyphOffset = ImVec2(0.0f, 2.0f);
+    iconCfg.GlyphMinAdvanceX = 16.0f * scale;
+    iconCfg.GlyphOffset = ImVec2(0.0f, 2.0f * scale);
     iconCfg.OversampleH = 2;
     iconCfg.OversampleV = 2;
     iconCfg.FontDataOwnedByAtlas = false;
     static const ImWchar icon_ranges[] = { ICON_MIN_KI, ICON_MAX_16_KI, 0 };
     iconCfg.GlyphRanges = icon_ranges;
-    ImFont* iconFont = ImGui::GetIO().Fonts->AddFontFromMemoryCompressedTTF(kenney_compressed_data, kenney_compressed_size, 16.0f, &iconCfg);
+    ImFont* iconFont = ImGui::GetIO().Fonts->AddFontFromMemoryCompressedTTF(kenney_compressed_data, kenney_compressed_size, 16.0f * scale, &iconCfg);
 
-    ImFont* titleFont = ImGui::GetIO().Fonts->AddFontFromMemoryCompressedTTF(roboto_compressed_data, roboto_compressed_size, 22.0f, &fontCfg);
+    ImFontConfig symbolCfg = iconCfg;
+    static const ImWchar symbol_ranges[] = { ICON_MIN_MS, ICON_MAX_MS, 0 };
+    symbolCfg.GlyphRanges = symbol_ranges;
+    ImGui::GetIO().Fonts->AddFontFromMemoryTTF((void*)material_symbols_data, (int)material_symbols_size, 18.0f * scale, &symbolCfg);
+
+    ImFont* titleFont = ImGui::GetIO().Fonts->AddFontFromMemoryCompressedTTF(roboto_compressed_data, roboto_compressed_size, 22.0f * scale, &fontCfg);
     ImFontConfig titleIconCfg = iconCfg;
-    titleIconCfg.GlyphMinAdvanceX = 22.0f;
-    ImFont* titleIconFont = ImGui::GetIO().Fonts->AddFontFromMemoryCompressedTTF(kenney_compressed_data, kenney_compressed_size, 22.0f, &titleIconCfg);
+    titleIconCfg.GlyphMinAdvanceX = 22.0f * scale;
+    ImFont* titleIconFont = ImGui::GetIO().Fonts->AddFontFromMemoryCompressedTTF(kenney_compressed_data, kenney_compressed_size, 22.0f * scale, &titleIconCfg);
+    symbolCfg.GlyphMinAdvanceX = 24.0f * scale;
+    ImGui::GetIO().Fonts->AddFontFromMemoryTTF((void*)material_symbols_data, (int)material_symbols_size, 24.0f * scale, &symbolCfg);
 
     if (iconFont == nullptr || textFont == nullptr || titleFont == nullptr || titleIconFont == nullptr) {
         Log::print<ERROR>("Failed to load custom fonts for ImGui overlay, using default font");
@@ -127,15 +191,17 @@ RND_Renderer::ImGuiOverlay::ImGuiOverlay(VkCommandBuffer cb, VkExtent2D fbRes, V
         int bodyRects[std::size(kExtraMenuGlyphs)] = {};
         int titleRects[std::size(kExtraMenuGlyphs)] = {};
         for (size_t i = 0; i < std::size(kExtraMenuGlyphs); i++) {
-            bodyRects[i] = atlas->AddCustomRectFontGlyph(textFont, kExtraMenuGlyphs[i].codepoint, extra_glyph_body_size, extra_glyph_body_size, 16.0f, ImVec2(0.0f, 1.0f));
-            titleRects[i] = atlas->AddCustomRectFontGlyph(titleFont, kExtraMenuGlyphs[i].codepoint, extra_glyph_title_size, extra_glyph_title_size, 22.0f, ImVec2(0.0f, 1.0f));
+            const int bodySize = (int)std::round(extra_glyph_body_size * scale);
+            const int titleSize = (int)std::round(extra_glyph_title_size * scale);
+            bodyRects[i] = atlas->AddCustomRectFontGlyph(textFont, kExtraMenuGlyphs[i].codepoint, bodySize, bodySize, 16.0f * scale, ImVec2(0.0f, scale));
+            titleRects[i] = atlas->AddCustomRectFontGlyph(titleFont, kExtraMenuGlyphs[i].codepoint, titleSize, titleSize, 22.0f * scale, ImVec2(0.0f, scale));
         }
 
         atlas->Build();
 
         for (size_t i = 0; i < std::size(kExtraMenuGlyphs); i++) {
-            FillCustomGlyphRect(atlas, bodyRects[i], kExtraMenuGlyphs[i].bodyPixels);
-            FillCustomGlyphRect(atlas, titleRects[i], kExtraMenuGlyphs[i].titlePixels);
+            FillCustomGlyphRect(atlas, bodyRects[i], kExtraMenuGlyphs[i].bodyPixels, extra_glyph_body_size);
+            FillCustomGlyphRect(atlas, titleRects[i], kExtraMenuGlyphs[i].titlePixels, extra_glyph_title_size);
         }
     }
 
@@ -371,24 +437,6 @@ RND_Renderer::ImGuiOverlay::~ImGuiOverlay() {
     ImGui::SetCurrentContext(previousContext != m_context ? previousContext : nullptr);
 }
 
-static ImVec4 CalculateCenteredAspectRegion(const ImVec2& bounds, float targetAspect = 16.0f / 9.0f) {
-    ImVec4 region = ImVec4(0.0f, 0.0f, bounds.x, bounds.y);
-
-    if (bounds.x <= 0.0f || bounds.y <= 0.0f) {
-        return region;
-    }
-
-    float width = bounds.x;
-    float height = width / targetAspect;
-    if (height > bounds.y) {
-        height = bounds.y;
-        width = height * targetAspect;
-    }
-
-    region = ImVec4((bounds.x - width) * 0.5f, (bounds.y - height) * 0.5f, width, height);
-    return region;
-}
-
 static void TransformDrawList(ImDrawList* drawList, const ImVec2& scale, const ImVec2& offset) {
     for (auto& vert : drawList->VtxBuffer) {
         vert.pos.x = vert.pos.x * scale.x + offset.x;
@@ -408,35 +456,22 @@ void RND_Renderer::ImGuiOverlay::Update() {
     BetterVRProfiler::Scope profile(BetterVRProfiler::Section::ImGuiUpdate);
     ScopedImGuiContext imguiContext(m_context);
 
-    ImGui::GetIO().FontGlobalScale = 1.0f;
+    ImGui::GetIO().FontGlobalScale = 1.0f / m_fontScale;
     auto& io = ImGui::GetIO();
 
     const HostWindow::Pointer pointer = HostWindow::QueryPointer();
     uint32_t windowWidth = pointer.available ? pointer.clientWidth : m_outputRes.width;
     uint32_t windowHeight = pointer.available ? pointer.clientHeight : m_outputRes.height;
 
-    // a punched-in window only shows the 16:9 center of the image
-    float fbAspect = std::max((float)m_outputRes.width / (float)m_outputRes.height, RenderUtils::WindowAspectRatio);
-
-    uint32_t renderPhysicalWidth = windowWidth;
-    uint32_t renderPhysicalHeight = windowHeight;
-    if ((float)windowWidth / (float)windowHeight > fbAspect) {
-        renderPhysicalWidth = (uint32_t)(windowHeight * fbAspect);
-    }
-    else {
-        renderPhysicalHeight = (uint32_t)(windowWidth / fbAspect);
-    }
-    ImVec2 physicalRes = ImVec2((float)renderPhysicalWidth, (float)renderPhysicalHeight);
+    ImVec2 physicalRes = CalculatePhysicalRes(windowWidth, windowHeight, m_outputRes);
+    uint32_t renderPhysicalWidth = (uint32_t)physicalRes.x;
+    uint32_t renderPhysicalHeight = (uint32_t)physicalRes.y;
     ImVec2 framebufferRes = ImVec2((float)m_outputRes.width, (float)m_outputRes.height);
     ImVec4 physicalUiRegion = CalculateCenteredAspectRegion(physicalRes);
 
-    // keep a shared 16:9 canvas with a 1080p size (DPI-wise)
-    float uiScaleFactor = std::max(physicalUiRegion.w / 1080.0f, 1.0f);
-    uiScaleFactor *= 1.85f;
-
     constexpr float kRefWidth = 1920.0f;
     constexpr float kRefHeight = 1080.0f;
-    ImVec2 logicalRes = ImVec2(kRefWidth / uiScaleFactor, kRefHeight / uiScaleFactor);
+    ImVec2 logicalRes = ImVec2(kRefWidth / kMenuCanvasScale, kRefHeight / kMenuCanvasScale);
 
     io.DisplaySize = logicalRes;
 

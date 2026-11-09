@@ -554,6 +554,7 @@ struct ModSettings {
     FloatSetting bowArcOpacity{ "BowArcTransparency", 0.7f, 0.0f, 1.0f };
 
     BoolSetting enableDebuggerTools{ "EnableDebugOverlay", false };
+    BoolSetting showDebugConsole{ "ShowDebugConsole", false, &Log::SetConsoleVisible };
     BoolSetting debugShowEntityBoxesIn3DView{ "DebugShowEntityBoxesIn3DView", false };
     BoolSetting debugShowRoomscalePhysics{ "DebugShowRoomscalePhysics", false };
     BoolSetting debugShowRaycastLines{ "DebugShowRaycastLines", false };
@@ -562,7 +563,6 @@ struct ModSettings {
     BoolSetting preventFirstPersonRagdoll{ "PreventFirstPersonRagdoll", true };
     EnumSetting<AngularVelocityFixerMode> buggyAngularVelocity{ "BuggyAngularVelocity", AngularVelocityFixerMode::AUTO };
     EnumSetting<PerformanceOverlayMode> performanceOverlay{ "PerformanceOverlay", PerformanceOverlayMode::DISABLE };
-    UIntSetting performanceOverlayFrequency{ "PerformanceOverlayFrequency", 90 };
     EnumSetting<FoveatedRenderingMode> foveatedRendering{ "FoveatedRendering", FoveatedRenderingMode::ON };
     BoolSetting logRendering{ "LogRendering", false, Log::SetCategory<RENDERING> };
     BoolSetting logInterop{ "LogInterop", false, Log::SetCategory<INTEROP> };
@@ -602,7 +602,9 @@ struct ModSettings {
     }
     bool UseBlackBarsForCutscenes() const { return useBlackBarsForCutscenes; }
 
+    static constexpr float BOW_ARC_DOT_ONLY = 0.01f;
     float GetBowArcOpacity() const { return bowArcOpacity; }
+    bool IsBowArcDotOnly() const { return bowArcOpacity > 0.0f && bowArcOpacity < 0.05f; }
     bool ShouldAimThirdPersonBowFromCamera() const { return thirdPersonBowCameraAim; }
     bool AlwaysPreventFirstPersonCutsceneCameraMovement() const { return alwaysPreventFirstPersonCutsceneCameraMovement; }
     bool ShouldPreventFirstPersonRagdoll() const { return preventFirstPersonRagdoll; }

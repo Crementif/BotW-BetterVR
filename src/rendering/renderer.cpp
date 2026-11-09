@@ -61,6 +61,26 @@ RND_Renderer::~RND_Renderer() {
     }
 }
 
+// runtimes report a longer period while they fill in frames, which is always a whole multiple of the real one
+void RND_Renderer::UpdateDisplayPeriodGuess(XrDuration periodNs) {
+    const XrDuration guessNs = m_displayPeriodGuessNs;
+    if (periodNs <= 0 || periodNs == guessNs) {
+        return;
+    }
+    const double ratio = (double)periodNs / (double)guessNs;
+    if (guessNs == 0 || ratio < 0.98 || std::abs(ratio - std::round(ratio)) > 0.08) {
+        m_displayPeriodGuessNs = periodNs;
+    }
+}
+
+float RND_Renderer::GetDisplayRefreshRate() const {
+    if (const float reported = VRManager::instance().XR->GetDisplayRefreshRate(); reported > 0.0f) {
+        return reported;
+    }
+    const XrDuration guessNs = m_displayPeriodGuessNs;
+    return guessNs > 0 ? (float)(1e9 / (double)guessNs) : 0.0f;
+}
+
 void RND_Renderer::StartFrame() {
     Log::print<RENDERING>("\n========\nSTART START START START");
     const bool isMenuOpen = ImGuiMenus::g_isOpen;
@@ -126,6 +146,7 @@ void RND_Renderer::StartFrame() {
     m_xrFrameActive = true;
 
     m_predictedDisplayPeriodMs = (double)m_frameState.predictedDisplayPeriod / 1e6;
+    UpdateDisplayPeriodGuess(m_frameState.predictedDisplayPeriod);
 
     Log::print<RENDERING>("[StartFrame] took the pumped XR frame, predicted period = {:.2f}ms", m_predictedDisplayPeriodMs);
 

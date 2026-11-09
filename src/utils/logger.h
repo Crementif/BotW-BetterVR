@@ -203,6 +203,7 @@ public:
 
     static void SetShowTimestamps(bool enabled);
     static void SetShowThreadIds(bool enabled);
+    static void SetConsoleVisible(bool visible);
 
     template <LogType L>
     static inline void print(const char* message) {

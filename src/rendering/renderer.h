@@ -119,6 +119,7 @@ public:
     };
 
     void StartFrame();
+    void UpdateDisplayPeriodGuess(XrDuration periodNs);
     void EndFrame();
     void FinishGuestFrame();
     std::optional<std::array<XrView, 2>> UpdateViews(XrTime predictedDisplayTime);
@@ -171,6 +172,7 @@ public:
     }
 
     double GetAverageFrameTimeMs() const { return m_averageFrameTimeMs; }
+    float GetDisplayRefreshRate() const;
 
     void BeginStereoCaptureGeneration(long frameIdx);
     void BeginHudCaptureGeneration(long frameIdx);
@@ -274,11 +276,10 @@ public:
     private:
         void DrawPlaystylePage(bool* changed);
         void DrawComfortPage(bool* changed);
-        void DrawCombatPage(bool* changed);
         void DrawControlsPage(bool* changed);
-        void DrawInterfacePage(bool* changed);
+        void DrawDisplayPage(bool* changed);
         void DrawSystemPage(bool* changed);
-        void DrawGuidePage(const char* icon, const char* title, size_t helpImageIndex);
+        void DrawGuidePage(size_t helpImageIndex);
         void DrawCreditsPage();
         void DrawDebugPage(bool* changed);
 
@@ -294,6 +295,7 @@ public:
 
         VkSampler m_sampler = VK_NULL_HANDLE;
         VkExtent2D m_outputRes = {};
+        float m_fontScale = 1.0f;
     };
 
     std::unique_ptr<Layer3D> m_layer3D;
@@ -405,5 +407,6 @@ protected:
     XrTime m_frameTimeWindowNs = 0;
     uint32_t m_frameTimeWindowFrames = 0;
     double m_predictedDisplayPeriodMs = 0.0;
+    std::atomic<XrDuration> m_displayPeriodGuessNs = 0;
     double m_lastOverheadMs = 0.0;
 };

@@ -121,6 +121,9 @@ OpenXR::OpenXR() {
         else if (strcmp(extensionProperties.extensionName, XR_EXT_HP_MIXED_REALITY_CONTROLLER_EXTENSION_NAME) == 0) {
             m_capabilities.supportsHPMixedRealityController = true;
         }
+        else if (strcmp(extensionProperties.extensionName, XR_FB_DISPLAY_REFRESH_RATE_EXTENSION_NAME) == 0) {
+            m_capabilities.supportsDisplayRefreshRate = true;
+        }
         else if (strcmp(extensionProperties.extensionName, XR_EXT_EYE_GAZE_INTERACTION_EXTENSION_NAME) == 0) {
             m_capabilities.supportsEyeGaze = true;
         }
@@ -152,6 +155,7 @@ OpenXR::OpenXR() {
     if (m_capabilities.supportsPicoUltraController) enabledExtensions.emplace_back(XR_BD_ULTRA_CONTROLLER_INTERACTION_EXTENSION_NAME);
     if (m_capabilities.supportsCosmosController) enabledExtensions.emplace_back(XR_HTC_VIVE_COSMOS_CONTROLLER_INTERACTION_EXTENSION_NAME);
     if (m_capabilities.supportsHPMixedRealityController) enabledExtensions.emplace_back(XR_EXT_HP_MIXED_REALITY_CONTROLLER_EXTENSION_NAME);
+    if (m_capabilities.supportsDisplayRefreshRate) enabledExtensions.emplace_back(XR_FB_DISPLAY_REFRESH_RATE_EXTENSION_NAME);
     if (m_capabilities.supportsEyeGaze) enabledExtensions.emplace_back(XR_EXT_EYE_GAZE_INTERACTION_EXTENSION_NAME);
 
     XrInstanceCreateInfo xrInstanceCreateInfo = { XR_TYPE_INSTANCE_CREATE_INFO };
@@ -193,6 +197,10 @@ OpenXR::OpenXR() {
     if (timeBridgeSupported) {
         xrGetInstanceProcAddr(m_instance, kTimeBridgeFromXrTimeName, (PFN_xrVoidFunction*)&func_xrConvertTimeToPlatformTime);
         xrGetInstanceProcAddr(m_instance, kTimeBridgeToXrTimeName, (PFN_xrVoidFunction*)&func_xrConvertPlatformTimeToTime);
+    }
+    if (m_capabilities.supportsDisplayRefreshRate) {
+        xrGetInstanceProcAddr(m_instance, "xrGetDisplayRefreshRateFB", (PFN_xrVoidFunction*)&func_xrGetDisplayRefreshRateFB);
+        m_capabilities.supportsDisplayRefreshRate = func_xrGetDisplayRefreshRateFB != nullptr;
     }
     if (debugUtilsSupported) {
         xrGetInstanceProcAddr(m_instance, "xrCreateDebugUtilsMessengerEXT", (PFN_xrVoidFunction*)&func_xrCreateDebugUtilsMessengerEXT);
@@ -454,6 +462,12 @@ void OpenXR::CreateSession(const XrGraphicsBindingVulkan2KHR& vulkanBinding) {
     m_seenFirstLoadingScreen = false;
     m_lastSeenPlayMode.reset();
     ReplaceStageSpace(0.0f);
+
+    m_displayRefreshRate = 0.0f;
+    if (float refreshRate = 0.0f; m_capabilities.supportsDisplayRefreshRate && XR_SUCCEEDED(func_xrGetDisplayRefreshRateFB(m_session, &refreshRate))) {
+        m_displayRefreshRate = refreshRate;
+        Log::print<INFO>("The headset runs at {:.0f} Hz", refreshRate);
+    }
 
     XrReferenceSpaceCreateInfo headSpaceCreateInfo = { XR_TYPE_REFERENCE_SPACE_CREATE_INFO };
     headSpaceCreateInfo.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_VIEW;
@@ -921,6 +935,10 @@ void OpenXR::ProcessEvents() {
                 break;
             case XR_TYPE_EVENT_DATA_EVENTS_LOST:
                 Log::print<WARNING>("OpenXR has indicated that events are being lost!");
+                break;
+            case XR_TYPE_EVENT_DATA_DISPLAY_REFRESH_RATE_CHANGED_FB:
+                m_displayRefreshRate = ((XrEventDataDisplayRefreshRateChangedFB*)&eventData)->toDisplayRefreshRate;
+                Log::print<INFO>("The headset switched to {:.0f} Hz", m_displayRefreshRate.load());
                 break;
             case XR_TYPE_EVENT_DATA_INTERACTION_PROFILE_CHANGED: {
                 Log::print<INFO>("OpenXR has indicated that the interaction profile has changed, re-detecting controller type...");

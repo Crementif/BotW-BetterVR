@@ -26,7 +26,7 @@ static void* Settings_ReadOpen(ImGuiContext*, ImGuiSettingsHandler*, const char*
     return &GetSettings();
 }
 
-static constexpr std::array kRetiredOptionKeys = { "PlayMode" };
+static constexpr std::array kRetiredOptionKeys = { "PlayMode", "PerformanceOverlayFrequency" };
 
 static void Settings_ReadLine(ImGuiContext*, ImGuiSettingsHandler*, void* entry, const char* line) {
     auto* s = (ModSettings*)entry;

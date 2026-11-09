@@ -34,6 +34,7 @@ public:
         bool supportsPicoUltraController;
         bool supportsCosmosController;
         bool supportsHPMixedRealityController;
+        bool supportsDisplayRefreshRate;
         bool supportsEyeGaze;
         ControllerType activeControllerType = ControllerType::Unknown;
     } m_capabilities = {};
@@ -106,6 +107,7 @@ public:
     std::optional<glm::fvec3> LocateEyeGaze(XrTime predictedDisplayTime) const;
     void UpdateSeatedHeightCalibration(XrTime predictedDisplayTime, const std::optional<XrSpaceLocation>& headLocation);
     void RequestSeatedHeightCalibration(XrTime notBeforeTime = 0);
+    float GetDisplayRefreshRate() const { return m_displayRefreshRate; }
     std::optional<float> GetCalibratedSeatedEyeHeight() const;
 
     void ProcessEvents();
@@ -208,6 +210,8 @@ private:
     PFN_xrConvertTimeToTimespecTimeKHR func_xrConvertTimeToPlatformTime = nullptr;
     PFN_xrConvertTimespecTimeToTimeKHR func_xrConvertPlatformTimeToTime = nullptr;
 #endif
+    PFN_xrGetDisplayRefreshRateFB func_xrGetDisplayRefreshRateFB = nullptr;
+    std::atomic<float> m_displayRefreshRate = 0.0f;
     PFN_xrCreateDebugUtilsMessengerEXT func_xrCreateDebugUtilsMessengerEXT = nullptr;
     PFN_xrDestroyDebugUtilsMessengerEXT func_xrDestroyDebugUtilsMessengerEXT = nullptr;
 };

@@ -293,6 +293,23 @@ static std::condition_variable& s_drained = *new std::condition_variable();
 static std::thread s_writerThread;
 static std::atomic_bool s_running = false;
 static bool s_writerBusy = false;
+static constinit std::atomic_bool s_consoleWanted = false;
+static bool s_consoleOpen = false;
+
+// only the writer thread opens or closes the console, so a write never races a closing console
+static void SyncConsole() {
+    const bool wanted = s_consoleWanted.load(std::memory_order_relaxed);
+    if (wanted == s_consoleOpen) {
+        return;
+    }
+    s_consoleOpen = wanted;
+    if (wanted) {
+        OpenConsole();
+    }
+    else {
+        CloseConsole();
+    }
+}
 
 // Reusing s_queueMutex here would self-deadlock with Start/StopWriterThread
 static std::mutex s_transitionMutex;
@@ -370,6 +387,7 @@ static void WriteBatch(const std::string& batch) {
 }
 
 static void DrainQueue() {
+    SyncConsole();
     while (true) {
         size_t count = 0;
         uint32_t dropped = 0;
@@ -409,7 +427,7 @@ static void WriterThreadMain() {
     while (s_running.load(std::memory_order_relaxed)) {
         {
             std::unique_lock<std::mutex> lock(s_queueMutex);
-            s_wakeWriter.wait(lock, [] { return s_produceCount > 0 || !s_running.load(std::memory_order_relaxed); });
+            s_wakeWriter.wait(lock, [] { return s_produceCount > 0 || !s_running.load(std::memory_order_relaxed) || s_consoleWanted.load(std::memory_order_relaxed) != s_consoleOpen; });
         }
         DrainQueue();
     }
@@ -527,8 +545,6 @@ void Log::SetFilePath(const std::filesystem::path& path) {
 }
 
 Log::Log() {
-    OpenConsole();
-
     OpenLogFile();
     StartWriterThread();
 
@@ -547,7 +563,10 @@ Log::~Log() {
         CloseLogFile();
     }
 
-    CloseConsole();
+    if (s_consoleOpen) {
+        s_consoleOpen = false;
+        CloseConsole();
+    }
 }
 
 void Log::OnInstanceCreated() {
@@ -587,6 +606,14 @@ void Log::SetShowTimestamps(bool enabled) {
 
 void Log::SetShowThreadIds(bool enabled) {
     s_showThreadIds.store(enabled, std::memory_order_relaxed);
+}
+
+void Log::SetConsoleVisible(bool visible) {
+    s_consoleWanted.store(visible, std::memory_order_relaxed);
+    if (s_running.load(std::memory_order_relaxed)) {
+        std::lock_guard<std::mutex> lock(s_queueMutex);
+        s_wakeWriter.notify_one();
+    }
 }
 
 void Log::Flush() {

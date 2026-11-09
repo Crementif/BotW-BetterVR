@@ -1291,14 +1291,15 @@ static uint32_t ScaleColorAlpha(uint32_t color, float scale) {
 }
 
 static void DrawAimingArc(const AimingArcCache& cache) {
-    const uint32_t targetColor = DebugDrawColor(100, 180, 255, 100);
+    const uint32_t targetColor = DebugDrawColor(255, 214, 64, 100);
     const uint32_t fallMarkerColor = DebugDrawColor(255, 52, 36, 200);
     constexpr float kThickness = 1.5f;
     constexpr bool kPreviewXray = false;
 
-    const float alphaScale = GetSettings().GetBowArcOpacity();
+    const bool dotOnly = GetSettings().IsBowArcDotOnly();
+    const float alphaScale = dotOnly ? 1.0f : GetSettings().GetBowArcOpacity();
 
-    if (cache.pointCount >= 2) {
+    if (!dotOnly && cache.pointCount >= 2) {
         std::array<uint32_t, kPresetDefaultMaxFrames + 2> colors = {};
         std::array<float, kPresetDefaultMaxFrames + 2> distanceFractions = {};
         BuildArcDistanceFractions(cache.points, cache.pointCount, distanceFractions);
@@ -1319,7 +1320,7 @@ static void DrawAimingArc(const AimingArcCache& cache) {
     }
 
     if (cache.hasTargetPos) {
-        DebugDraw::instance().Sphere(cache.targetPos, 0.16f, ScaleColorAlpha(targetColor, alphaScale), 12, kPreviewXray);
+        DebugDraw::instance().Sphere(cache.targetPos, 0.16f, ScaleColorAlpha(targetColor, dotOnly ? 2.2f : alphaScale), 12, true);
     }
 }
 
