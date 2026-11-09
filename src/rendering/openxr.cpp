@@ -886,7 +886,7 @@ void OpenXR::ProcessEvents() {
             case XR_SESSION_STATE_READY: {
                 Log::print<VERBOSE>("OpenXR has indicated that the session is ready!");
                 if (m_renderer) {
-                    Log::print<WARNING>("OpenXR has indicated that the session is ready, but we already have a renderer!");
+                    m_renderer->BeginSession();
                 }
                 else {
                     m_renderer = std::make_unique<RND_Renderer>(m_session);

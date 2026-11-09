@@ -13,6 +13,7 @@ public:
     explicit RND_Renderer(XrSession xrSession);
     ~RND_Renderer();
 
+    bool BeginSession();
     void EndSession();
 
     enum CaptureMaskBits : uint32_t {

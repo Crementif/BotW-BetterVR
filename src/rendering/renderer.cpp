@@ -34,6 +34,21 @@ RND_Renderer::RND_Renderer(XrSession xrSession): m_session(xrSession) {
     m_sessionRunning = true;
 }
 
+bool RND_Renderer::BeginSession() {
+    if (m_sessionRunning || m_session == XR_NULL_HANDLE) {
+        return m_sessionRunning;
+    }
+    StopFramePump();
+    XrSessionBeginInfo beginInfo = { XR_TYPE_SESSION_BEGIN_INFO };
+    beginInfo.primaryViewConfigurationType = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
+    if (XrResult result = xrBeginSession(m_session, &beginInfo); XR_FAILED(result)) {
+        Log::print<ERROR>("Failed to begin OpenXR session again (result {})!", (int)result);
+        return false;
+    }
+    m_sessionRunning = true;
+    return true;
+}
+
 void RND_Renderer::EndSession() {
     if (!m_sessionRunning || m_session == XR_NULL_HANDLE) {
         return;
@@ -113,7 +128,7 @@ void RND_Renderer::StartFrame() {
 
     m_isInitialized = true;
 
-    if (!m_framePumpThread.joinable()) {
+    if (m_sessionRunning && !m_framePumpThread.joinable()) {
         {
             std::lock_guard<std::mutex> lock(m_framePumpMutex);
             m_framePumpWaitRequested = true;
