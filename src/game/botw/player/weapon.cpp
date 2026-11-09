@@ -285,11 +285,31 @@ static bool IsCarriedInOneHand(std::string_view actorName) {
     return actorName.contains("Pot_A_S_Act") || actorName.starts_with("OctObj_") || actorName.contains("_Bone_Junior_Head");
 }
 
+static bool IsCarriedInBothHands(std::string_view actorName) {
+    static constexpr std::string_view giantParts[] = {
+        "_L_Act",
+        "_LL_Act",
+        "IceBlock",
+        "AncientBall",
+        "BeamDevice",
+        "Beamos_Static",
+        "Giant_Bone_Eye",
+        "ElectricBoxGenerator",
+        "KorokStoneLift",
+        "SnowBall",
+        "SnowBowl",
+        "MeatRock",
+    };
+    if (actorName.starts_with("Obj_LiftRock") || actorName.starts_with("Enemy_Golem_Little"))
+        return true;
+    return std::ranges::any_of(giantParts, [&](std::string_view part) { return actorName.contains(part); });
+}
+
 bool Weapons::IsThrowableCarriedInBothHands() {
     if (!IsThrowableHeld())
         return false;
     const auto name = Guest::Get<sead::FixedSafeString40>(s_heldActors[OpenXR::EyeSide::RIGHT] + offsetof(ActorWiiU, name));
-    return !IsCarriedInOneHand(std::string_view(name.data, strnlen(name.data, sizeof(name.data))));
+    return IsCarriedInBothHands(std::string_view(name.data, strnlen(name.data, sizeof(name.data))));
 }
 
 // gsys::Model render scale, so physics and explosions keep their real size
