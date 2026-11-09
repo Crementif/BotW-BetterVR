@@ -74,7 +74,7 @@ jobs:
           foreach ($pack in @("BreathOfTheWild_BetterVR", "BreathOfTheWild_Graphics", "graphicPacks")) {
             Copy-Item "resources\$pack" "$bundle\BetterVR\packs\$pack" -Recurse
           }
-          Get-ChildItem "$bundle\BetterVR\packs" -Recurse -File -Include "CemuPatchCompiler*", "patch_debug_*.asm" | Remove-Item
+          Get-ChildItem "$bundle\BetterVR" -Recurse -File -Include "CemuPatchCompiler*", "patch_debug_*.asm", "*.md" | Remove-Item
           Remove-Item "$bundle\BetterVR\packs\BreathOfTheWild_BetterVR\src" -Recurse
 
       - name: Upload the bundle
@@ -140,7 +140,7 @@ jobs:
           mv ../Cemu/Cemu_release bin/Cemu
           mkdir -p bin/packs
           cp -r ../resources/BreathOfTheWild_BetterVR ../resources/BreathOfTheWild_Graphics ../resources/graphicPacks bin/packs/
-          find bin/packs \( -name 'CemuPatchCompiler*' -o -name 'patch_debug_*.asm' \) -delete
+          find bin/packs \( -name 'CemuPatchCompiler*' -o -name 'patch_debug_*.asm' -o -name '*.md' \) -delete
           rm -r bin/packs/BreathOfTheWild_BetterVR/src
           export LD_LIBRARY_PATH="/usr/local/lib:$LD_LIBRARY_PATH"
           export DEPLOY_GTK_VERSION=3
