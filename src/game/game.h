@@ -29,8 +29,12 @@ namespace Game {
         bool blackBars;
         bool loadingScreenVisible;
         bool aimingItemHeld;
+        bool cutsceneActive;
         bool cutsceneCameraSwitchable;
         bool cutsceneFirstPerson;
+        bool cutsceneShowsCameraPrompt;
+        bool dialogVisible;
+        uint32_t cutsceneCameraToggles;
         uint32_t recordingOutputMode;
     };
     Presentation GetPresentation();

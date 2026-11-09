@@ -1535,41 +1535,75 @@ static void DrawUpdateBanner(bool isMenuOpen) {
     ImGui::PopStyleVar(2);
 }
 
+// only cutscenes marked PROMPT_ON in patch_Settings_Cutscenes.asm offer it, once per cutscene and never over dialogue
 static void DrawCutsceneCameraPrompt(bool isMenuOpen) {
-    constexpr double kShowAfter = 1.0;
-    constexpr double kShownFor = 6.0;
+    constexpr double kShowAfter = 3.0;
+    constexpr double kShownFor = 5.0;
+    constexpr double kMinimalShownFor = 2.5;
     constexpr double kFadeOutFor = 1.0;
+    constexpr double kChainedCutsceneGap = 3.0;
+    constexpr uint32_t kSwitchesBeforeMinimal = 3;
+    static double s_cutsceneStart = -1.0;
+    static double s_cutsceneEnd = -1.0;
     static double s_shownSince = -1.0;
-    static bool s_wasFirstPerson = false;
+    static uint32_t s_seenToggles = 0;
 
+    auto& settings = GetSettings();
     const Game::Presentation game = Game::GetPresentation();
-    const ControllerType controllerType = VRManager::instance().XR->m_capabilities.activeControllerType;
-    if (!game.cutsceneCameraSwitchable || isMenuOpen || controllerType == ControllerType::Unknown || controllerType == ControllerType::Simple) {
-        s_shownSince = -1.0;
+    const double now = ImGui::GetTime();
+    if (!game.cutsceneActive) {
+        if (s_cutsceneStart >= 0.0) {
+            s_cutsceneEnd = now;
+            s_cutsceneStart = -1.0;
+        }
+        s_seenToggles = game.cutsceneCameraToggles;
         return;
     }
+    if (s_cutsceneStart < 0.0) {
+        s_cutsceneStart = now;
+        if (now - s_cutsceneEnd > kChainedCutsceneGap) {
+            s_shownSince = -1.0;
+        }
+    }
 
-    // short events like opening a chest end before it shows, switching shows it again right away
-    const double now = ImGui::GetTime();
-    if (s_shownSince < 0.0) {
+    // switching shows the minimal prompt as confirmation, even in cutscenes that don't offer it
+    if (game.cutsceneCameraToggles != s_seenToggles) {
+        s_seenToggles = game.cutsceneCameraToggles;
         s_shownSince = now;
-        s_wasFirstPerson = game.cutsceneFirstPerson;
+        if (settings.cutsceneCameraSwitches < kSwitchesBeforeMinimal) {
+            settings.cutsceneCameraSwitches = settings.cutsceneCameraSwitches + 1;
+            ImGui::MarkIniSettingsDirty();
+        }
     }
-    else if (game.cutsceneFirstPerson != s_wasFirstPerson) {
-        s_shownSince = now - kShowAfter;
-        s_wasFirstPerson = game.cutsceneFirstPerson;
+
+    const ControllerType controllerType = VRManager::instance().XR->m_capabilities.activeControllerType;
+    const bool canShow = game.cutsceneCameraSwitchable && !game.dialogVisible && !isMenuOpen && controllerType != ControllerType::Unknown && controllerType != ControllerType::Simple;
+    if (s_shownSince < 0.0) {
+        if (!game.cutsceneShowsCameraPrompt || !canShow || now - s_cutsceneStart < kShowAfter) {
+            return;
+        }
+        s_shownSince = now;
     }
-    const double shownFor = now - s_shownSince - kShowAfter;
-    if (shownFor < 0.0 || shownFor >= kShownFor) {
+
+    const bool minimal = settings.cutsceneCameraSwitches >= kSwitchesBeforeMinimal;
+    const double shownFor = now - s_shownSince;
+    const double showFor = minimal ? kMinimalShownFor : kShownFor;
+    if (!canShow || shownFor >= showFor) {
         return;
     }
 
     const ImVec2 displaySize = ImGui::GetIO().DisplaySize;
-    ImGui::PushStyleVar(ImGuiStyleVar_Alpha, (float)std::clamp((kShownFor - shownFor) / kFadeOutFor, 0.0, 1.0));
-    ImGui::SetNextWindowBgAlpha(0.85f);
-    ImGui::SetNextWindowPos(ImVec2(displaySize.x * 0.5f, displaySize.y * 0.85f), ImGuiCond_Always, ImVec2(0.5f, 1.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_Alpha, (float)std::clamp((showFor - shownFor) / kFadeOutFor, 0.0, 1.0) * (minimal ? 0.7f : 1.0f));
+    ImGui::SetNextWindowBgAlpha(minimal ? 0.6f : 0.85f);
+    ImGui::SetNextWindowPos(ImVec2(displaySize.x * 0.5f, displaySize.y * (minimal ? 0.9f : 0.85f)), ImGuiCond_Always, ImVec2(0.5f, 1.0f));
     if (ImGui::Begin("CutsceneCameraPrompt", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoInputs)) {
-        ImGui::Text(ICON_KI_STICK_LEFT_TOP "  Click the left stick to watch this cutscene in %s person", game.cutsceneFirstPerson ? "third" : "first");
+        if (minimal) {
+            ImGui::SetWindowFontScale(0.8f);
+            ImGui::Text(ICON_KI_STICK_LEFT_TOP " %s person", game.cutsceneFirstPerson ? "Third" : "First");
+        }
+        else {
+            ImGui::Text(ICON_KI_STICK_LEFT_TOP "  Click the left stick to watch this cutscene in %s person", game.cutsceneFirstPerson ? "third" : "first");
+        }
     }
     ImGui::End();
     ImGui::PopStyleVar();

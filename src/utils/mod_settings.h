@@ -575,6 +575,7 @@ struct ModSettings {
     BoolSetting logTimestamps{ "LogTimestamps", true, &Log::SetShowTimestamps };
     BoolSetting logThreadIds{ "LogThreadIds", false, &Log::SetShowThreadIds };
     BoolSetting tutorialPromptShown{ "TutorialPromptShown", false };
+    UIntSetting cutsceneCameraSwitches{ "CutsceneCameraSwitches", 0 };
     BoolSetting bootDirectlyIntoGame{ "BootDirectlyIntoGame", false };
     TitleIdSetting bootDirectlyTitleId{ "BootDirectlyTitleId" };
 

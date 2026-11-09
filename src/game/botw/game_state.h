@@ -16,6 +16,7 @@ namespace Events {
         bool disablePlayerDrivenLinkHands; // let event control the hands instead of the VR controllers
         bool ignoreCameraRotation;         // some events will pan the camera, but in first-person it should usually be ignored to avoid nausea. Doors opening is okay, but panning down to a chest is not.
         bool demoEnableCameraInput;        // there's already events that allow user camera control. This isn't used or overwritten atm.
+        bool showCameraPrompt;             // long camera pans or Link being moved, so the camera switch prompt is worth showing
     };
 
     bool IsActive();

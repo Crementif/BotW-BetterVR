@@ -8,6 +8,7 @@ moduleMatches = 0x6267BFD0
 ; PAN: PAN_OFF/PAN_ON (Ignore Relative Camera Movement / Disable Panning)
 ; HND: HND_ON/HND_OFF (Disable player hands control / Use animated hands)
 ; CTRL: CTRL_ON/CTRL_OFF (Enable camera input; derived from Demo_EnableCameraInput node presence)
+; PROMPT: PROMPT_ON (optional, offer the cutscene camera switch prompt)
 ; Entries without flags are commented out.
 data_TableOfCutsceneEventsSettings:
 
@@ -57,32 +58,32 @@ data_TableOfCutsceneEventsSettings:
 .string "Demo000_2,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Treasure Chest Get Demo (inventory full)
 .string "Demo001_0,FP_ON,PAN_OFF,HND_OFF,CTRL_ON" ; name: Cooking Demo
 .string "Demo002_0,FP_ON,PAN_OFF,HND_OFF,CTRL_ON" ; name: Pick up Get Demo
-.string "Demo003_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Shiekah Slate download demo
-.string "Demo004_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Map Tower Demo
+.string "Demo003_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Shiekah Slate download demo
+.string "Demo004_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Map Tower Demo
 .string "Demo005_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Warp demo
 .string "Demo005_1,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Warp out demo
 .string "Demo006_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Game Over Demo
 .string "Demo007_0,FP_ON,PAN_OFF,HND_OFF,CTRL_ON" ; name: Sleeping in bed demo
 .string "Demo007_1,FP_ON,PAN_OFF,HND_OFF,CTRL_ON" ; name: Passing time at a campfire demo
 .string "Demo007_2,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Sleeping in an inn (subflow) demo
-.string "Demo008_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: CDungeon entrance demo 1: door opening
+.string "Demo008_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: CDungeon entrance demo 1: door opening
 .string "Demo008_1,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: CDungeon entrance demo 2: elevator going down into shrine
-.string "Demo008_2,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: CDungeon entrance demo 3: arriving in dungeon
+.string "Demo008_2,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: CDungeon entrance demo 3: arriving in dungeon
 .string "Demo008_3,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: CDungeon entrance demo 4: elevator going up back to main world
 .string "Demo008_4,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: CDungeon entrance demo 5: going outside shrine
-.string "Demo008_9,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: CDungeon entrance demo 1: door opening (for emergent lithograph)
+.string "Demo008_9,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: CDungeon entrance demo 1: door opening (for emergent lithograph)
 .string "Demo010_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Using the scope for the first time
 .string "Demo010_1,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Exiting the scope for the first time
 .string "Demo011_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Blood Moon
 .string "Demo012_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Horse equipment change demo
 .string "Demo013_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Cucco angry demo
 .string "Demo014_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Yiga assassin calling others demo
-.string "Demo016_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Dungeon appearing demo on pedestal activation
+.string "Demo016_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Dungeon appearing demo on pedestal activation
 .string "Demo017_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Hidden Korok found Demo
 .string "Demo018_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Rescue Demo
 .string "Demo019_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Retry Demo
-.string "Demo020_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Taking off from flight range demo
-.string "Demo021_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Arriving in sky demo
+.string "Demo020_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Taking off from flight range demo
+.string "Demo021_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Arriving in sky demo
 .string "Demo022_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Demonstration at Teva with Do | skydiving at the divine beast
 .string "Demo023_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Assassin changing Demo
 .string "Demo024_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Door opening demo
@@ -94,17 +95,17 @@ data_TableOfCutsceneEventsSettings:
 .string "Demo026_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Combat shrine: enemy appearing demo
 .string "Demo027_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Old Man Appears Demo (Common)
 .string "Demo027_2,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Old Man Camera Demo (under the tower)
-.string "Demo028_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Great Fairy: Unlock Fountain Demo
-.string "Demo029_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Great Fairy: Upgrade Armor Demo
-.string "Demo030_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Malanya: Horse Resurrection Demo
-.string "Demo032_0,FP_ON,PAN_ON,HND_OFF,CTRL_OFF" ; name: Sheikah Slate repair demo
-.string "Demo033_0,FP_ON,PAN_OFF,HND_ON,CTRL_OFF" ; name: CDungeon Monk Demo
+.string "Demo028_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Great Fairy: Unlock Fountain Demo
+.string "Demo029_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Great Fairy: Upgrade Armor Demo
+.string "Demo030_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Malanya: Horse Resurrection Demo
+.string "Demo032_0,FP_ON,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Sheikah Slate repair demo
+.string "Demo033_0,FP_ON,PAN_OFF,HND_ON,CTRL_OFF,PROMPT_ON" ; name: CDungeon Monk Demo
 .string "Demo033_1,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: CDungeon Monk Demo (cleared)
 .string "Demo034_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Goddess Statue exchanging demo
 .string "Demo035_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Horned Statue demo
 .string "Demo037_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Lost Woods ZoneOut
 .string "Demo038_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Lost Woods: For lost stray safety position
-.string "Demo039_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Divine Beast: Map Download
+.string "Demo039_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Divine Beast: Map Download
 .string "Demo040_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Enemy Base Chest Unlock
 .string "Demo041_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Terminal access processing subflow
 .string "Demo042_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Slate menu - First time open
@@ -113,7 +114,7 @@ data_TableOfCutsceneEventsSettings:
 .string "Demo044_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Relics terminal operation
 .string "Demo045_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Great Fairy: Initial Encounter
 .string "Demo046_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Dyeing Demo
-.string "Demo047_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Marlon flowering demo
+.string "Demo047_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Marlon flowering demo
 .string "Demo048_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Respawn demo
 .string "Demo048_1,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Respawn demo (for Vah Ruta battle)
 .string "Demo049_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Controls guide demo
@@ -139,7 +140,7 @@ data_TableOfCutsceneEventsSettings:
 .string "Demo305_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: [Rito kids] Five sisters fly away | rito kids discover the just unlocked shrine, and fly away: https://youtu.be/LeM4bfJ3Ecg?t=633
 .string "Demo309_0,FP_ON,PAN_ON,HND_OFF,CTRL_OFF" ; name: Impa shows the 13th memory picture | https://youtu.be/Za2yRAMcGCc?t=1027
 .string "Demo309_1,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Zelda's voice after seeing the last memory
-.string "Demo309_2,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Memory demo | Memories seem to start with a little panning: https://youtu.be/ROcgrugcbOk?t=1141
+.string "Demo309_2,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Memory demo | Memories seem to start with a little panning: https://youtu.be/ROcgrugcbOk?t=1141
 .string "Demo318_0,FP_ON,PAN_OFF,HND_OFF,CTRL_ON" ; name: Zelda's voice after leaving the Shrine of Resurrection
 .string "Demo327_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: [Goron's Rock Carrying] Demonstration of cooking roast rock and son's eating and destroying the rock | There's like a whole cooking scene with multiple cuts. Probably not fit for VR: https://youtu.be/vSbd99LkE9o?t=508
 .string "Demo330_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: [Snaarathi Race] Demo at the start of the race
@@ -157,9 +158,9 @@ data_TableOfCutsceneEventsSettings:
 .string "Demo346_5,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Detected by sentry demo | detection sentries when you try to run up the mountain to the divine beast in the mountain area https://youtu.be/UH2mAfvC2HI?t=8955
 .string "Demo346_6,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Cannon hitting Vah Rudania demo
 .string "Demo346_9,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Vah Rudania before scream demo
-.string "Demo347_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Assassin Boss � confrontation
-.string "Demo347_1,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Assassin Boss � Kill
-.string "Demo347_2,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: [Vah Naboris Challenge] Generating barrier with Thunder Helm demo
+.string "Demo347_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Assassin Boss � confrontation
+.string "Demo347_1,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Assassin Boss � Kill
+.string "Demo347_2,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: [Vah Naboris Challenge] Generating barrier with Thunder Helm demo
 .string "Demo347_3,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: [Vah Naboris Challenge] Last attack on Vah Naboris demo | https://youtu.be/UH2mAfvC2HI?t=11649
 .string "Demo347_4,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Introducing the gods of thunder The demonstrating animals before demo
 .string "Demo347_5,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: First meeting with Riju
@@ -181,19 +182,19 @@ data_TableOfCutsceneEventsSettings:
 .string "Demo600_1,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Zelda's voice (sky) CASE 2
 .string "Demo601_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Challenge explanation ~ One-Hit Obliterator appears
 .string "Demo601_1,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: One-Hit Obliterator Get
-.string "Demo602_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: CDungeon Appearance | Used for when the master trial DLC dungeons appear
+.string "Demo602_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: CDungeon Appearance | Used for when the master trial DLC dungeons appear
 .string "Demo602_1,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: CDungeon Appearance (Yiga?)
 .string "Demo603_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Shrine entry prohibition
-.string "Demo604_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Clear One-Hit Obliterator shrine
+.string "Demo604_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Clear One-Hit Obliterator shrine
 .string "Demo605_0,FP_OFF,PAN_ON,HND_OFF,CTRL_ON" ; name: Interruption of One-Hit Obliterator challenge
 .string "Demo606_0,FP_OFF,PAN_ON,HND_OFF,CTRL_ON" ; name: Restart of One-Hit Obliterator challenge
-.string "Demo607_0,FP_OFF,PAN_ON,HND_OFF,CTRL_ON" ; name: Kass's Songs - Swordsman's Song
-.string "Demo609_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Clear One-Hit Obliterator challenge
+.string "Demo607_0,FP_OFF,PAN_ON,HND_OFF,CTRL_ON,PROMPT_ON" ; name: Kass's Songs - Swordsman's Song
+.string "Demo609_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Clear One-Hit Obliterator challenge
 .string "Demo610_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Kass's Songs - Champion's Song (Goron City)
 .string "Demo610_1,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Kass's Songs - Champion's Song (Rito Village)
-.string "Demo610_2,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Kass's Songs - Champion's Song (Zora Village)
+.string "Demo610_2,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Kass's Songs - Champion's Song (Zora Village)
 .string "Demo610_3,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Kass's Songs - Champion's Song (city of Geld)
-.string "Demo611_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Champion shrine clear
+.string "Demo611_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Champion shrine clear
 .string "Demo612_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Kass's Songs ~ Daruk's Song
 .string "Demo612_1,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Kass's Songs ~ Revali's Song
 .string "Demo612_2,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Kass's Songs ~ Mipha's Song
@@ -222,18 +223,18 @@ data_TableOfCutsceneEventsSettings:
 .string "Demo643_2,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Examine control terminal
 .string "Demo643_3,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Examine the deepest door
 .string "Demo644_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Final Trial boss: to the second form
-.string "Demo644_1,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Final Trial boss: to the third form
-.string "Demo645_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Final Trial Clear
+.string "Demo644_1,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Final Trial boss: to the third form
+.string "Demo645_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Final Trial Clear
 .string "Demo646_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Kass's Songs - A song to glorify the champions
 .string "Demo647_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Decorate photos
-.string "Demo648_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Final Trial boss appears
+.string "Demo648_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Final Trial boss appears
 .string "Demo649_0,FP_ON,PAN_ON,HND_OFF,CTRL_ON" ; name: Motorcycle fuel filling demo
 .string "Demo650_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Gyro terminal operation for DLC dungeon
 .string "Demo650_1,FP_ON,PAN_ON,HND_OFF,CTRL_OFF" ; name: Door open demo (AoC 2)
 .string "Demo650_2,FP_ON,PAN_ON,HND_OFF,CTRL_OFF" ; name: Door open demo (AoC 2) (actors not stopped)
 .string "Demo700_0,FP_ON,PAN_OFF,HND_ON,CTRL_OFF" ; name: Sheikah Slate get demo
-.string "Demo701_0,FP_ON,PAN_OFF,HND_ON,CTRL_OFF" ; name: Open the second door that leads to the ground | should we prevent hands from all cutscenes or just these?  Camera flips back to look at Link, but maybe we don't want that.  Note: Nah we don't want that - mako  Alright, tested it without panning and it looks great! -Tim
-.string "Demo702_0,FP_ON,PAN_ON,HND_OFF,CTRL_OFF" ; name: Teba flies to Flight Range with Tulin
+.string "Demo701_0,FP_ON,PAN_OFF,HND_ON,CTRL_OFF,PROMPT_ON" ; name: Open the second door that leads to the ground | should we prevent hands from all cutscenes or just these?  Camera flips back to look at Link, but maybe we don't want that.  Note: Nah we don't want that - mako  Alright, tested it without panning and it looks great! -Tim
+.string "Demo702_0,FP_ON,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Teba flies to Flight Range with Tulin
 .string "Demo704_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Vah Medoh - Explanation by the champion on first time enter
 .string "Demo705_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Vah Rudania - Explanation by the champion on first time enter
 .string "Demo706_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Vah Naboris - Explanation by the champion on first time enter
@@ -1024,42 +1025,42 @@ data_TableOfCutsceneEventsSettings:
 .string "CurveSpeed_Zora_W_D,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
 .string "CurveSpeed_Zora_W_N,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
 .string "CurveSpeed_Zora_W_P,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo100_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
+.string "Demo100_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
 .string "Demo101_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
 .string "Demo101_1,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo101_2,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo101_3,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo101_4,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
+.string "Demo101_2,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
+.string "Demo101_3,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
+.string "Demo101_4,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
 .string "Demo101_5,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
 .string "Demo101_6,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
 .string "Demo101_7,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
 .string "Demo101_8,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo101_9,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo102_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo103_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo104_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
+.string "Demo101_9,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
+.string "Demo102_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
+.string "Demo103_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
+.string "Demo104_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
 .string "Demo104_1,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
 .string "Demo105_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
 .string "Demo105_1,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo109_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
+.string "Demo109_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
 .string "Demo109_1,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo109_2,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo110_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo111_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo112_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo113_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo114_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo115_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo116_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo117_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo118_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo119_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo120_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo121_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo122_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo123_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo124_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo125_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
+.string "Demo109_2,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
+.string "Demo110_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
+.string "Demo111_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
+.string "Demo112_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
+.string "Demo113_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
+.string "Demo114_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
+.string "Demo115_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
+.string "Demo116_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
+.string "Demo117_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
+.string "Demo118_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
+.string "Demo119_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
+.string "Demo120_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
+.string "Demo121_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
+.string "Demo122_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
+.string "Demo123_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
+.string "Demo124_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
+.string "Demo125_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
 .string "Demo126_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
 .string "Demo127_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
 .string "Demo128_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
@@ -1074,44 +1075,44 @@ data_TableOfCutsceneEventsSettings:
 .string "Demo137_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
 .string "Demo138_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
 .string "Demo139_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo140_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo141_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo141_1,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo141_2,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo141_3,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo141_4,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo142_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
+.string "Demo140_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
+.string "Demo141_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
+.string "Demo141_1,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
+.string "Demo141_2,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
+.string "Demo141_3,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
+.string "Demo141_4,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
+.string "Demo142_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
 .string "Demo143_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
 .string "Demo143_1,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
 .string "Demo143_2,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
 .string "Demo143_3,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo143_4,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo145_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo146_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo146_1,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
+.string "Demo143_4,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
+.string "Demo145_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
+.string "Demo146_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
+.string "Demo146_1,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
 .string "Demo147_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo148_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo149_1,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
+.string "Demo148_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
+.string "Demo149_1,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
 .string "Demo150_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
 .string "Demo151_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
 .string "Demo152_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
 .string "Demo153_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
 .string "Demo154_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo154_1,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; custom
-.string "Demo154_2,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo155_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo156_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; custom | Revalis gift scene
-.string "Demo158_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo159_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom | Urbosas gift
-.string "Demo160_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo161_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo162_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo163_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo164_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; custom
-.string "Demo165_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo165_1,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
+.string "Demo154_1,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
+.string "Demo154_2,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
+.string "Demo155_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
+.string "Demo156_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom | Revalis gift scene
+.string "Demo158_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
+.string "Demo159_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom | Urbosas gift
+.string "Demo160_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
+.string "Demo161_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
+.string "Demo162_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
+.string "Demo163_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
+.string "Demo164_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
+.string "Demo165_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
+.string "Demo165_1,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
 .string "Demo165_2,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo165_3,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
+.string "Demo165_3,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
 .string "Demo165_4,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
 .string "Demo165_5,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
 .string "Demo166_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
@@ -1121,22 +1122,22 @@ data_TableOfCutsceneEventsSettings:
 .string "Demo173_1,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
 .string "Demo173_2,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
 .string "Demo173_3,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo173_4,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo173_5,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
+.string "Demo173_4,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
+.string "Demo173_5,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
 .string "Demo173_6,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
 .string "Demo173_7,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
 .string "Demo173_8,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
 .string "Demo173_9,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo174_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo175_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; custom
-.string "Demo176_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo177_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo177_1,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo800_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
+.string "Demo174_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
+.string "Demo175_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
+.string "Demo176_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
+.string "Demo177_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
+.string "Demo177_1,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
+.string "Demo800_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
 .string "Demo801_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
 .string "Demo802_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
 .string "Demo803_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo804_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
+.string "Demo804_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
 .string "Demo805_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
 .string "Demo806_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
 .string "Demo807_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
@@ -1151,7 +1152,7 @@ data_TableOfCutsceneEventsSettings:
 .string "Demo815_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
 .string "Demo816_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
 .string "Demo817_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo818_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
+.string "Demo818_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
 .string "Demo819_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
 .string "Demo820_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
 .string "Demo821_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
@@ -1167,22 +1168,22 @@ data_TableOfCutsceneEventsSettings:
 .string "Demo831_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
 .string "Demo832_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
 .string "Demo865_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo866_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
+.string "Demo866_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
 .string "Demo867_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo868_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
+.string "Demo868_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
 .string "Demo869_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
 .string "Demo870_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo871_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
+.string "Demo871_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
 .string "Demo872_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
 .string "Demo873_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
 .string "Demo874_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
 .string "Demo875_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo876_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
+.string "Demo876_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
 .string "Demo877_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
 .string "Demo878_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo879_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
+.string "Demo879_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
 .string "Demo880_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo881_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
+.string "Demo881_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
 .string "Demo882_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
 .string "Demo883_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
 .string "Demo884_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
@@ -1191,8 +1192,8 @@ data_TableOfCutsceneEventsSettings:
 .string "Demo887_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
 .string "Demo888_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
 .string "Demo889_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo890_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo891_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
+.string "Demo890_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
+.string "Demo891_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
 .string "Demo892_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
 .string "Demo893_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
 .string "Demo894_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
@@ -1216,43 +1217,43 @@ data_TableOfCutsceneEventsSettings:
 .string "Demo970_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
 .string "Demo981_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
 .string "Demo982_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo982_1,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
+.string "Demo982_1,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
 .string "Demo982_2,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo982_3,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo982_4,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
+.string "Demo982_3,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
+.string "Demo982_4,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
 .string "Demo982_5,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo983_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
+.string "Demo983_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
 .string "Demo983_1,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo983_2,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo983_3,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo983_4,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
+.string "Demo983_2,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
+.string "Demo983_3,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
+.string "Demo983_4,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
 .string "Demo983_5,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
 .string "Demo983_6,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
 .string "Demo983_7,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo983_8,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
+.string "Demo983_8,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
 .string "Demo983_9,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo984_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo984_1,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
+.string "Demo984_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
+.string "Demo984_1,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
 .string "Demo984_3,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo984_4,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo984_6,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
+.string "Demo984_4,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
+.string "Demo984_6,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
 .string "Demo984_7,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo984_8,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo984_9,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo986_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
+.string "Demo984_8,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
+.string "Demo984_9,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
+.string "Demo986_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
 .string "Demo987_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
 .string "Demo988_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
 .string "Demo988_1,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
 .string "Demo989_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
 .string "Demo989_1,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo990_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
+.string "Demo990_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
 .string "Demo990_1,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo991_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
+.string "Demo991_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
 .string "Demo992_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
 .string "Demo992_1,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
 .string "Demo992_2,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
 .string "Demo992_3,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo994_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
+.string "Demo994_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
 .string "Demo994_1,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
 .string "Demo994_2,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
 .string "Demo994_3,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
@@ -1260,9 +1261,9 @@ data_TableOfCutsceneEventsSettings:
 .string "Demo994_5,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
 .string "Demo994_6,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
 .string "Demo994_7,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo994_8,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
+.string "Demo994_8,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
 .string "Demo994_9,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
-.string "Demo995_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
+.string "Demo995_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; custom
 .string "Demo996_1,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
 .string "Demo996_2,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom
 .string "Demo998_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; custom

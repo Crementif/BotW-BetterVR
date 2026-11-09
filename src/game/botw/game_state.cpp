@@ -11,6 +11,7 @@
 static std::atomic_bool s_eventActive = false;
 // the camera picked with the cutscene button, kept across events the game chains together
 static std::atomic<EventMode> s_eventModeOverride = EventMode::NO_EVENT;
+static std::atomic_uint32_t s_cameraToggles = 0;
 static constexpr std::chrono::seconds ChainedEventGap = std::chrono::seconds(3);
 static std::atomic<Events::Settings> s_currentEventSettings = Events::Settings{};
 static std::unordered_map<std::string, Events::Settings> s_eventSettings;
@@ -78,6 +79,7 @@ void Events::ToggleCameraMode() {
 
     const EventMode mode = GameState::IsFirstPerson() ? EventMode::ALWAYS_THIRD_PERSON : EventMode::ALWAYS_FIRST_PERSON;
     s_eventModeOverride = mode;
+    s_cameraToggles.fetch_add(1, std::memory_order_relaxed);
     Log::print<INFO>("Switched this cutscene to {} person", mode == EventMode::ALWAYS_FIRST_PERSON ? "first" : "third");
 }
 
@@ -107,6 +109,7 @@ static void ApplyEventSetting(Events::Settings& entry, std::string_view setting)
     else if (setting == "PAN_OFF") entry.ignoreCameraRotation = true;
     else if (setting == "CTRL_ON") entry.demoEnableCameraInput = false;
     else if (setting == "CTRL_OFF") entry.demoEnableCameraInput = true;
+    else if (setting == "PROMPT_ON") entry.showCameraPrompt = true;
     else Log::print<WARNING>("Unknown cutscene default setting: {}", setting);
 }
 
@@ -269,8 +272,12 @@ static void PublishPresentation() {
     presentation.blackBars = GameState::UseBlackBarsDuringEvents();
     presentation.loadingScreenVisible = Screens::IsLoadingVisible();
     presentation.aimingItemHeld = Weapons::IsAimingItemHeld();
+    presentation.cutsceneActive = Events::IsActive();
     presentation.cutsceneCameraSwitchable = Events::IsActive() && !GameState::IsShowingMenu();
     presentation.cutsceneFirstPerson = GameState::IsFirstPerson();
+    presentation.cutsceneShowsCameraPrompt = Events::IsActive() && s_currentEventSettings.load(std::memory_order_relaxed).showCameraPrompt;
+    presentation.dialogVisible = Screens::HasInstance(ScreenId::MessageDialog) || Screens::IsVisible(ScreenId::DemoMessage) || Screens::IsVisible(ScreenId::MessageSp_00);
+    presentation.cutsceneCameraToggles = s_cameraToggles.load(std::memory_order_relaxed);
     presentation.recordingOutputMode = GameState::GetRecordingOutputMode();
     s_presentation.store(presentation, std::memory_order_relaxed);
 }
