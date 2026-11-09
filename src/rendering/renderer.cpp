@@ -339,6 +339,7 @@ void RND_Renderer::EndFrame() {
             if (shouldRender3D) {
                 m_layer3D->StartRendering();
                 m_layer3D->PrepareDebugDraw(debugDrawData);
+                m_layer3D->PrepareWorldGuide(*presented3DViews);
             }
 
             VulkanTexture* fadeTexture = shouldRender2D ? m_layer2D->GetTarget(hudFrameIdx).texture.get() : nullptr;
@@ -559,6 +560,7 @@ RND_Renderer::Layer3D::Layer3D(VkExtent2D inputRes, VkExtent2D outputRes) {
     this->m_presentPipelines[OpenXR::EyeSide::LEFT] = std::make_unique<RND_VkBackend::PresentPipeline<true>>(backend, VRManager::instance().XR->GetRenderer());
     this->m_presentPipelines[OpenXR::EyeSide::RIGHT] = std::make_unique<RND_VkBackend::PresentPipeline<true>>(backend, VRManager::instance().XR->GetRenderer());
     this->m_debugDrawPipeline = std::make_unique<RND_VkBackend::DebugDrawPipeline>(backend);
+    this->m_worldGuide = std::make_unique<WorldGuide>(backend);
 
     this->m_swapchains[OpenXR::EyeSide::LEFT] = std::make_unique<Swapchain>(Swapchain::Kind::Color, outputRes.width, outputRes.height, viewConfs[0].recommendedSwapchainSampleCount);
     this->m_swapchains[OpenXR::EyeSide::RIGHT] = std::make_unique<Swapchain>(Swapchain::Kind::Color, outputRes.width, outputRes.height, viewConfs[1].recommendedSwapchainSampleCount);
@@ -589,6 +591,7 @@ void RND_Renderer::Layer3D::InitTextures(VkCommandBuffer cmdBuffer) {
             target.texture->vkTransitionLayout(cmdBuffer, VK_IMAGE_LAYOUT_GENERAL);
         }
     }
+    m_worldGuide->InitTextures(cmdBuffer);
 }
 
 RND_Renderer::Layer3D::~Layer3D() {
@@ -665,6 +668,10 @@ void RND_Renderer::Layer3D::PrepareDebugDraw(const DebugDrawRenderData& debugDra
     m_debugDrawPipeline->UploadRenderData(debugDrawData);
 }
 
+void RND_Renderer::Layer3D::PrepareWorldGuide(const std::array<XrView, 2>& views) {
+    m_drawWorldGuide = m_worldGuide->Prepare(views);
+}
+
 void RND_Renderer::Layer3D::RecordRender(RND_VkBackend::CommandContext<false>* context, OpenXR::EyeSide side, long frameIdx, const std::array<XrView, 2>& views, VulkanTexture* fadeTexture, const DebugDrawRenderData& debugDrawData) {
     BetterVRProfiler::Scope profile(BetterVRProfiler::Section::Layer3DRender);
 
@@ -706,6 +713,10 @@ void RND_Renderer::Layer3D::RecordRender(RND_VkBackend::CommandContext<false>* c
             debugDrawData,
             debugDrawData.viewProjections[side]
         );
+    }
+
+    if (m_drawWorldGuide) {
+        m_worldGuide->Render(context->GetCommandBuffer(), target, views[side]);
     }
 
     // no transition needed here as OpenXR requires the swapchain to be returned in its attachment layout too

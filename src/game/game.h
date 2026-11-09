@@ -41,6 +41,26 @@ namespace Game {
     void QueueWorldOverlays(long presentedFrameIdx);
     void DrawDebugWindows();
 
+    struct GuideRow {
+        const char* input;
+        const char* action;
+    };
+    struct GuideCard {
+        const char* icon;
+        const char* title;
+        std::array<GuideRow, 3> rows;
+        glm::fvec3 position;
+        glm::fvec3 zone;
+        float zoneRadius;
+    };
+    inline constexpr size_t MaxGuideCards = 6;
+    struct Guide {
+        std::array<GuideCard, MaxGuideCards> cards;
+        size_t count;
+        uint64_t generation;
+    };
+    Guide GetGuide();
+
     bool IsCapturingMono();
     bool UsesBlackBars();
     uint32_t GetSharedMemoryAddress();

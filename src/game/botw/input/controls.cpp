@@ -11,6 +11,7 @@
 #include "rendering/haptics.h"
 #include "rendering/imgui_menus.h"
 #include "rendering/tracking.h"
+#include "font_material_symbols.h"
 
 static ButtonState s_inventoryMapButton;
 static ButtonState s_modMenuButton;
@@ -885,6 +886,91 @@ static void ProcessModMenuInput(std::atomic_bool& isMenuOpen, OpenXR::InputState
     }
 }
 
+enum class GuideContext { None, OnFoot };
+
+struct GuideState {
+    std::mutex mutex;
+    Game::Guide guide = {};
+    GuideContext context = GuideContext::None;
+    XrTime shownAt = 0;
+};
+static GuideState s_guide;
+
+static GuideContext CurrentGuideContext() {
+    if (Player::IsRiding() || Player::IsGliding())
+        return GuideContext::None;
+    return GuideContext::OnFoot;
+}
+
+static void SetGuide(const Game::Guide& guide, GuideContext context, XrTime shownAt) {
+    std::scoped_lock lock(s_guide.mutex);
+    if (guide.count == 0 && s_guide.guide.count == 0)
+        return;
+    const uint64_t generation = s_guide.guide.generation + 1;
+    s_guide.guide = guide;
+    s_guide.guide.generation = generation;
+    s_guide.context = context;
+    s_guide.shownAt = shownAt;
+}
+
+static Game::Guide BuildGuide(GuideContext context, const glm::fmat4& headsetMtx) {
+    const glm::fvec3 headPos(headsetMtx[3]);
+    glm::fvec3 forward = -glm::fvec3(headsetMtx[2]);
+    forward.y = 0.0f;
+    forward = glm::length2(forward) < 0.0001f ? glm::fvec3(0.0f, 0.0f, -1.0f) : glm::normalize(forward);
+    const glm::fvec3 right = glm::normalize(glm::cross(forward, glm::fvec3(0.0f, 1.0f, 0.0f)));
+    const float leftSide = -1.0f;
+
+    auto place = [&](float sideways, float up, float ahead) {
+        return headPos + right * sideways + glm::fvec3(0.0f, up, 0.0f) + forward * ahead;
+    };
+
+    Game::Guide guide = {};
+    auto& cards = guide.cards;
+    if (context == GuideContext::OnFoot) {
+        cards[0] = { ICON_MS_BOW_ARC, "Bow & Shield", { { { "Grip", "Equip Bow" }, { "Hold Grip", "Bow / Shield Menu" }, {} } }, place(0.42f * leftSide, 0.02f, 0.34f), place(0.17f * leftSide, -0.12f, -0.10f), 0.09f };
+        cards[1] = { ICON_MS_SWORDS, "Weapons", { { { "Grip", "Equip Weapon" }, { "Hold Grip", "Weapon / Arrow Menu" }, { "Trigger", "Throw Weapon" } } }, place(-0.42f * leftSide, 0.02f, 0.34f), place(-0.17f * leftSide, -0.12f, -0.10f), 0.09f };
+        cards[2] = { ICON_MS_TABLET_ANDROID, "Runes", { { { "Grip", "Equip Rune" }, { "Hold Grip", "Rune Menu" }, {} } }, place(0.40f * leftSide, -0.40f, 0.40f), place(0.24f * leftSide, -0.62f, -0.02f), 0.10f };
+        cards[3] = { ICON_MS_DOWNLOAD, "Drop", { { { "Hold Grip", "Drop Held Item" }, {}, {} } }, place(-0.40f * leftSide, -0.40f, 0.40f), place(-0.24f * leftSide, -0.62f, -0.02f), 0.10f };
+        cards[4] = { ICON_MS_SPORTS, "Whistle", { { { "Both Grips", "Whistle" }, {}, {} } }, place(0.0f, 0.17f, 0.48f), place(0.0f, -0.10f, 0.09f), 0.06f };
+        guide.count = 5;
+    }
+    return guide;
+}
+
+static void UpdateGuide(const std::optional<glm::fmat4>& headsetPose, const OpenXR::InputState& inputs, bool menuOpen) {
+    constexpr XrTime GuideDuration = 12'000'000'000;
+    const XrTime now = inputs.shared.inputTime;
+    const bool allowed = inputs.shared.in_game && !menuOpen && !ImGuiMenus::BlocksGameInput() && !Events::IsActive();
+    const GuideContext context = allowed ? CurrentGuideContext() : GuideContext::None;
+
+    bool visible;
+    GuideContext shownContext;
+    XrTime shownAt;
+    {
+        std::scoped_lock lock(s_guide.mutex);
+        visible = s_guide.guide.count > 0;
+        shownContext = s_guide.context;
+        shownAt = s_guide.shownAt;
+    }
+
+    if (visible && (context != shownContext || now - shownAt >= GuideDuration)) {
+        SetGuide({}, GuideContext::None, 0);
+        visible = false;
+    }
+    if (context == GuideContext::None || s_modMenuButton.lastEvent != ButtonState::Event::ShortPress)
+        return;
+    if (visible)
+        SetGuide({}, GuideContext::None, 0);
+    else if (headsetPose.has_value())
+        SetGuide(BuildGuide(context, headsetPose.value()), context, now);
+}
+
+Game::Guide Controls::GetGuide() {
+    std::scoped_lock lock(s_guide.mutex);
+    return s_guide.guide;
+}
+
 static void ProcessHandGesture(const std::optional<glm::fmat4>& headsetPose, OpenXR::InputState& inputs, HandGestureState& leftGesture, HandGestureState& rightGesture, ControlState& state)
 {
     if (headsetPose.has_value()) {
@@ -1231,6 +1317,7 @@ static void hook_InjectXRInput(PPCInterpreter_t* hCPU) {
 
     auto& isMenuOpen = ImGuiMenus::g_isOpen;
     ProcessModMenuInput(isMenuOpen, inputs, vpadStatus, leftStickSource, rightStickSource);
+    UpdateGuide(headsetPose, inputs, isMenuOpen);
     HandGestureState leftGesture = {};
     HandGestureState rightGesture = {};
     ProcessHandGesture(headsetPose, inputs, leftGesture, rightGesture, state);

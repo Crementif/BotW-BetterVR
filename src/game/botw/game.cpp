@@ -80,6 +80,10 @@ bool Game::UsesBlackBars() {
     return GameState::UseBlackBarsDuringEvents();
 }
 
+Game::Guide Game::GetGuide() {
+    return Controls::GetGuide();
+}
+
 uint32_t Game::GetSharedMemoryAddress() {
     return StereoView::GetSharedMemoryAddress();
 }

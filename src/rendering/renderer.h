@@ -6,6 +6,7 @@
 #include "texture.h"
 #include "vk_backend.h"
 #include "utils/debug_draw.h"
+#include "world_guide.h"
 
 class RND_Renderer {
 public:
@@ -202,6 +203,7 @@ public:
         void PrepareRendering(OpenXR::EyeSide side);
         void StartRendering();
         void PrepareDebugDraw(const DebugDrawRenderData& debugDrawData);
+        void PrepareWorldGuide(const std::array<XrView, 2>& views);
         void RecordRender(RND_VkBackend::CommandContext<false>* context, OpenXR::EyeSide side, long frameIdx, const std::array<XrView, 2>& views, VulkanTexture* fadeTexture, const DebugDrawRenderData& debugDrawData);
         const std::array<XrCompositionLayerProjectionView, 2>& FinishRendering(const std::array<XrView, 2>& views);
 
@@ -217,6 +219,8 @@ public:
         std::array<std::array<LayerTarget, 2>, 2> m_depthTargets;
         std::array<RenderUtils::UvTransform, 2> m_presentUvTransforms = {};
         std::unique_ptr<RND_VkBackend::DebugDrawPipeline> m_debugDrawPipeline;
+        std::unique_ptr<WorldGuide> m_worldGuide;
+        bool m_drawWorldGuide = false;
 
         std::array<XrCompositionLayerProjectionView, 2> m_projectionViews = {};
         std::array<XrCompositionLayerDepthInfoKHR, 2> m_projectionViewsDepthInfo = {};

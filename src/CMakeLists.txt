@@ -99,6 +99,8 @@ add_library(BetterVR STATIC
     rendering/vk_backend.h
     rendering/renderer.cpp
     rendering/renderer.h
+    rendering/world_guide.cpp
+    rendering/world_guide.h
     rendering/openxr.cpp
     rendering/openxr.h
     rendering/rumble.h
@@ -173,7 +175,7 @@ if (NOT BETTERVR_GLSLC)
     message(STATUS "glslc not found, using the SPIR-V binaries checked in under ${BETTERVR_SHADER_DIR}/prebuilt")
 endif ()
 set(BETTERVR_SHADER_SPIRV "")
-foreach (shader present.vert present.frag present_depth.frag debug_draw.vert debug_draw.frag)
+foreach (shader present.vert present.frag present_depth.frag debug_draw.vert debug_draw.frag world_guide.vert world_guide.frag)
     set(shaderBinary "${BETTERVR_SHADER_DIR}/prebuilt/${shader}.spv")
     list(APPEND BETTERVR_SHADER_SPIRV "${shaderBinary}")
     if (BETTERVR_GLSLC)
