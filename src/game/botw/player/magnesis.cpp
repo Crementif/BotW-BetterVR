@@ -28,10 +28,14 @@ static constexpr float MagneFallbackCancelHeight = 2.0f;
 static constexpr float MagneReachGain = 2.0f;
 static constexpr float MagneMinReach = 0.15f;
 static constexpr float MagneGripThreshold = 0.51f;
+static constexpr float MagneMaxSwingPitch = 1.4f;
+static constexpr float MagneMinYawHorizontal = 0.2f;
 
 static bool s_aimGripHeld = false;
 static float s_gripReach = 0.0f;
-static glm::vec3 s_gripHandForward = glm::vec3(0.0f, 0.0f, -1.0f);
+static float s_gripHandYaw = 0.0f;
+static float s_gripHandPitch = 0.0f;
+static float s_lastHandYaw = 0.0f;
 static glm::vec3 s_gripHandToObject = glm::vec3(0.0f);
 
 // angular velocity per radian the object is behind the hand, and its cap in radians per second
@@ -108,6 +112,14 @@ static bool DriveMagnesisAimFromController(uint32_t action) {
     if (!HandAim::TryGetControllerWorldPose(inputs, OpenXR::EyeSide::RIGHT, false, handPos, handForward)) {
         return false;
     }
+    glm::vec3 aimPos = glm::vec3(0.0f);
+    glm::vec3 aimForward = handForward;
+    HandAim::TryGetControllerWorldPose(inputs, OpenXR::EyeSide::RIGHT, true, aimPos, aimForward);
+    if (glm::length(glm::vec2(aimForward.x, aimForward.z)) > MagneMinYawHorizontal) {
+        s_lastHandYaw = std::atan2(aimForward.x, aimForward.z);
+    }
+    const float handYaw = s_lastHandYaw;
+    const float handPitch = std::asin(glm::clamp(aimForward.y, -1.0f, 1.0f));
 
     const auto headPose = Tracking::HeadPose();
     if (!headPose.has_value()) {
@@ -128,12 +140,16 @@ static bool DriveMagnesisAimFromController(uint32_t action) {
 
     if (gripStarted) {
         s_gripReach = reach;
-        s_gripHandForward = handForward;
+        s_gripHandYaw = handYaw;
+        s_gripHandPitch = handPitch;
         s_gripHandToObject = objectPos - handPos;
     }
 
-    // the object hangs on a stick from the hand that swings with where the hand points
-    const glm::vec3 handToObject = glm::rotation(s_gripHandForward, handForward) * s_gripHandToObject * std::pow(reach / s_gripReach, MagneReachGain);
+    // the object hangs on a stick from the hand that turns and tilts with where the hand points, twisting the wrist only spins it
+    const float stickLength = glm::length(s_gripHandToObject) * std::pow(reach / s_gripReach, MagneReachGain);
+    const float stickYaw = std::atan2(s_gripHandToObject.x, s_gripHandToObject.z) + handYaw - s_gripHandYaw;
+    const float stickPitch = glm::clamp(std::atan2(s_gripHandToObject.y, glm::length(glm::vec2(s_gripHandToObject.x, s_gripHandToObject.z))) + handPitch - s_gripHandPitch, -MagneMaxSwingPitch, MagneMaxSwingPitch);
+    const glm::vec3 handToObject = stickLength * glm::vec3(std::cos(stickPitch) * std::sin(stickYaw), std::sin(stickPitch), std::cos(stickPitch) * std::cos(stickYaw));
     const glm::vec3 targetOffset = handPos + handToObject - playerPos;
     const glm::vec3 aimOffset = FlattenHorizontally(targetOffset);
     const float distance = glm::length(aimOffset);
