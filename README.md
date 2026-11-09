@@ -44,8 +44,9 @@ It currently supports the following features:
 4. It'll show a big popup telling you to hold `(X)` (or the equivalent on your controller) to open the BetterVR menu. In this menu you'll find all the BetterVR settings and the controls guide.
 
 5. Most settings in the BetterVR menu are perfectly fine by default. If you don't want to fiddle, the most important things are basically:
-   - Whether you're playing standing or seated, and in 1st or 3rd person.
-   - On the System page, use `Edit Graphics & Mods` to open Cemu's Graphic Packs window outside VR. This is where you'll also find a good number of tweaks, quality settings and mods to customize your game. Here's some that you might want to change:
+   - On the Play Style page, whether you're playing in first or third person, and standing or seated.
+   - On the Comfort page, pick Gentle if you're new to VR, Balanced for most people, or Immersive if you're used to VR. Open its Advanced section to change things one by one.
+   - On the System page, use `Open On Desktop` next to Graphic Packs to open Cemu's Graphic Packs window outside VR. This is where you'll also find a good number of tweaks, quality settings and mods to customize your game. Here's some that you might want to change:
      - `Graphics`: Set the VR Resolution Multiplier to increase/decrease the resolution of the game. You can usually also change this in SteamVR, Virtual Desktop, Oculus Link etc.
      - `Enhancements`: Set anisotropic filtering to 8x or 16x, and optionally set a Clarity preset to make the colors less washed out.
      - Any other setting of your choosing, like stamina, durability etc.
