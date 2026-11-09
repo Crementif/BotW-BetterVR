@@ -1050,6 +1050,31 @@ static void ToggleModMenuOnLongStartPress(uint32_t physicalHold) {
     }
 }
 
+static float ControllerWalkYaw(const glm::fquat& controllerQuat) {
+    static float s_lastYaw = 0.0f;
+    static bool s_tippedOver = false;
+
+    const glm::fvec3 forward = controllerQuat * glm::fvec3(0.0f, 0.0f, -1.0f);
+    const glm::fvec3 up = controllerQuat * glm::fvec3(0.0f, 1.0f, 0.0f);
+    const glm::fvec3 flatForward = glm::fvec3(forward.x, 0.0f, forward.z);
+    if (glm::length(flatForward) < 0.2f) {
+        return s_lastYaw;
+    }
+
+    const glm::fvec3 uprightUp = glm::normalize(glm::fvec3(0.0f, 1.0f, 0.0f) - forward * forward.y);
+    const float upAlignment = glm::dot(up, uprightUp);
+    if (std::abs(forward.y) < 0.5f || upAlignment > 0.3f) {
+        s_tippedOver = false;
+    }
+    else if (upAlignment < -0.3f) {
+        s_tippedOver = true;
+    }
+
+    const glm::fvec3 heading = s_tippedOver ? -flatForward : flatForward;
+    s_lastYaw = std::atan2(heading.x, heading.z);
+    return s_lastYaw;
+}
+
 static void ApplyControllerWalkingDirection(const ControlState& state, const OpenXR::InputState& inputs, const std::optional<glm::fmat4>& headsetPose, XrActionStateVector2f& leftStickSource) {
     if (!state.inGame || !GameState::IsFirstPerson() || GetSettings().GetWalkingDirection() != WalkingDirection::CONTROLLER || Player::IsClimbingLadder())
         return;
@@ -1059,9 +1084,8 @@ static void ApplyControllerWalkingDirection(const ControlState& state, const Ope
         const glm::fquat headsetQuat = glm::quat_cast(glm::fmat3(*headsetPose));
         const glm::fquat controllerQuat = ToGLM(leftPoseLoc.pose.orientation);
         const glm::fvec3 headsetFwd = headsetQuat * glm::fvec3(0.0f, 0.0f, -1.0f);
-        const glm::fvec3 controllerFwd = controllerQuat * glm::fvec3(0.0f, 0.0f, -1.0f);
         const float headsetAngle = std::atan2(headsetFwd.x, headsetFwd.z);
-        const float controllerAngle = std::atan2(controllerFwd.x, controllerFwd.z);
+        const float controllerAngle = ControllerWalkYaw(controllerQuat);
         const float rotationAngle = controllerAngle - headsetAngle;
         const float cosA = std::cos(rotationAngle);
         const float sinA = std::sin(rotationAngle);
