@@ -75,7 +75,7 @@ data_TableOfCutsceneEventsSettings:
 .string "Demo010_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Using the scope for the first time
 .string "Demo010_1,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Exiting the scope for the first time
 .string "Demo011_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Blood Moon
-.string "Demo012_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Horse equipment change demo
+.string "Demo012_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Horse equipment change demo
 .string "Demo013_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Cucco angry demo
 .string "Demo014_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Yiga assassin calling others demo
 .string "Demo016_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Dungeon appearing demo on pedestal activation
@@ -94,15 +94,15 @@ data_TableOfCutsceneEventsSettings:
 .string "Demo025_2,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Title Scene Start Demo
 .string "Demo026_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Combat shrine: enemy appearing demo
 .string "Demo027_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Old Man Appears Demo (Common)
-.string "Demo027_2,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Old Man Camera Demo (under the tower)
+.string "Demo027_2,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Old Man Camera Demo (under the tower)
 .string "Demo028_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Great Fairy: Unlock Fountain Demo
 .string "Demo029_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Great Fairy: Upgrade Armor Demo
 .string "Demo030_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Malanya: Horse Resurrection Demo
 .string "Demo032_0,FP_ON,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Sheikah Slate repair demo
 .string "Demo033_0,FP_ON,PAN_OFF,HND_ON,CTRL_OFF,PROMPT_ON" ; name: CDungeon Monk Demo
 .string "Demo033_1,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: CDungeon Monk Demo (cleared)
-.string "Demo034_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Goddess Statue exchanging demo
-.string "Demo035_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Horned Statue demo
+.string "Demo034_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Goddess Statue exchanging demo
+.string "Demo035_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Horned Statue demo
 .string "Demo037_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Lost Woods ZoneOut
 .string "Demo038_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Lost Woods: For lost stray safety position
 .string "Demo039_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Divine Beast: Map Download
@@ -113,7 +113,7 @@ data_TableOfCutsceneEventsSettings:
 .string "Demo043_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Gyro terminal operation
 .string "Demo044_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Relics terminal operation
 .string "Demo045_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Great Fairy: Initial Encounter
-.string "Demo046_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Dyeing Demo
+.string "Demo046_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Dyeing Demo
 .string "Demo047_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Marlon flowering demo
 .string "Demo048_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Respawn demo
 .string "Demo048_1,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Respawn demo (for Vah Ruta battle)
@@ -123,65 +123,65 @@ data_TableOfCutsceneEventsSettings:
 .string "Demo200_0,FP_ON,PAN_OFF,HND_OFF,CTRL_ON" ; name: Monk guidance ~ CASE 1
 .string "Demo201_0,FP_ON,PAN_OFF,HND_OFF,CTRL_ON" ; name: Monk guidance ~ CASE 2
 .string "Demo202_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Placing the Master Sword to enter the Trials
-.string "Demo202_1,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Trial of the Sword - Entering Room 1 (Beginning) | seems to just be a lot of panning shots that don't really highlight anything: https://www.youtube.com/watch?v=fNRVxCWbM8E
-.string "Demo202_2,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Trial of the Sword - Entering Room 1 (Middle)
-.string "Demo202_3,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Trial of the Sword - Entering Room 1 (Final)
+.string "Demo202_1,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Trial of the Sword - Entering Room 1 (Beginning) | seems to just be a lot of panning shots that don't really highlight anything: https://www.youtube.com/watch?v=fNRVxCWbM8E
+.string "Demo202_2,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Trial of the Sword - Entering Room 1 (Middle)
+.string "Demo202_3,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Trial of the Sword - Entering Room 1 (Final)
 .string "Demo203_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Appearance of sword trial movement point appearance (now room)
 .string "Demo204_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Trial of the Sword - transfer between rooms
 .string "Demo205_1,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Return from Trial of the Sword to Korok Forest
 .string "Demo206_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Drunken cave - escape from the last room (except the first time in the extreme)
-.string "Demo207_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Trial of the Sword - Break the barrier of the last room guardian | Link talks to the monks at the end of the master trials before they disappear https://youtu.be/fNRVxCWbM8E?t=3397
-.string "Demo208_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Trial of the Sword - escape from the last room (first time in final trial)
+.string "Demo207_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Trial of the Sword - Break the barrier of the last room guardian | Link talks to the monks at the end of the master trials before they disappear https://youtu.be/fNRVxCWbM8E?t=3397
+.string "Demo208_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Trial of the Sword - escape from the last room (first time in final trial)
 .string "Demo209_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Korok Forest ~ Explanation by the Great Deku Tree | cinematic that explains how the master sword trial will work: https://youtu.be/-FK13qE4Dkc?t=25
-.string "Demo210_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Korok Forest ~ Praise by the Great Deku Tree | cutscene you get after beating the master trials
-.string "Demo211_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Trial of the Sword - Arriving in last room | link speaks to monks at the end of the master trial https://youtu.be/fNRVxCWbM8E?t=3397
+.string "Demo210_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Korok Forest ~ Praise by the Great Deku Tree | cutscene you get after beating the master trials
+.string "Demo211_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Trial of the Sword - Arriving in last room | link speaks to monks at the end of the master trial https://youtu.be/fNRVxCWbM8E?t=3397
 .string "Demo299_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: "Hero's Path" Demo
-.string "Demo300_0,FP_ON,PAN_OFF,HND_ON,CTRL_OFF" ; name: Master Sword Pulling demo
-.string "Demo305_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: [Rito kids] Five sisters fly away | rito kids discover the just unlocked shrine, and fly away: https://youtu.be/LeM4bfJ3Ecg?t=633
-.string "Demo309_0,FP_ON,PAN_ON,HND_OFF,CTRL_OFF" ; name: Impa shows the 13th memory picture | https://youtu.be/Za2yRAMcGCc?t=1027
-.string "Demo309_1,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Zelda's voice after seeing the last memory
+.string "Demo300_0,FP_ON,PAN_OFF,HND_ON,CTRL_OFF,PROMPT_ON" ; name: Master Sword Pulling demo
+.string "Demo305_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: [Rito kids] Five sisters fly away | rito kids discover the just unlocked shrine, and fly away: https://youtu.be/LeM4bfJ3Ecg?t=633
+.string "Demo309_0,FP_ON,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Impa shows the 13th memory picture | https://youtu.be/Za2yRAMcGCc?t=1027
+.string "Demo309_1,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Zelda's voice after seeing the last memory
 .string "Demo309_2,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Memory demo | Memories seem to start with a little panning: https://youtu.be/ROcgrugcbOk?t=1141
 .string "Demo318_0,FP_ON,PAN_OFF,HND_OFF,CTRL_ON" ; name: Zelda's voice after leaving the Shrine of Resurrection
-.string "Demo327_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: [Goron's Rock Carrying] Demonstration of cooking roast rock and son's eating and destroying the rock | There's like a whole cooking scene with multiple cuts. Probably not fit for VR: https://youtu.be/vSbd99LkE9o?t=508
-.string "Demo330_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: [Snaarathi Race] Demo at the start of the race
-.string "Demo330_1,FP_ON,PAN_OFF,HND_OFF,CTRL_ON" ; name: [Snaarathi Race] Demo when I gave a new record
+.string "Demo327_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: [Goron's Rock Carrying] Demonstration of cooking roast rock and son's eating and destroying the rock | There's like a whole cooking scene with multiple cuts. Probably not fit for VR: https://youtu.be/vSbd99LkE9o?t=508
+.string "Demo330_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: [Snaarathi Race] Demo at the start of the race
+.string "Demo330_1,FP_ON,PAN_OFF,HND_OFF,CTRL_ON,PROMPT_ON" ; name: [Snaarathi Race] Demo when I gave a new record
 .string "Demo331_0,FP_OFF,PAN_OFF,HND_OFF,CTRL_OFF" ; name: [Do not step on flowers] Flower lady getting angry | https://www.youtube.com/watch?v=Tx0sx6M-nLI
 .string "Demo333_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Stationary Guardian activation demo | Zoom-ins on stationary guardians on the great plateau https://www.youtube.com/watch?v=FeGfQ5zN5ZM  By default, this makes the camera go absolutely crazy, often spinning rapidly and flying up into the sky. Both in first and third person mode.
-.string "Demo344_0,FP_ON,PAN_OFF,HND_OFF,CTRL_ON" ; name: Vah Ruta before scream demo | TODO: Could check out whether calling the demo of the beast rising from the ground switches the demo id that the mod receives, or whether it's separate.  You talk to the king of the Zora domain, and a bunch of advisors. Link stays put in one place. It calls another Demo that shows the elephant rising from the water and roaring: https://www.youtube.com/watch?v=nQkO5UeoJm0
-.string "Demo344_1,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Vah Ruta last attack demo
-.string "Demo344_2,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: [Vah Ruta] Sidon joins
-.string "Demo344_4,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: [Vah Ruta] Thanks
-.string "Demo346_0,FP_ON,PAN_ON,HND_OFF,CTRL_OFF" ; name: Destroying rocks with bombs
-.string "Demo346_1,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Yunobo heads to Death Mountain
-.string "Demo346_3,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Bridge falls to enter Death Mountain
-.string "Demo346_4,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Sentries come out from Vah Rudania
-.string "Demo346_5,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Detected by sentry demo | detection sentries when you try to run up the mountain to the divine beast in the mountain area https://youtu.be/UH2mAfvC2HI?t=8955
-.string "Demo346_6,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Cannon hitting Vah Rudania demo
+.string "Demo344_0,FP_ON,PAN_OFF,HND_OFF,CTRL_ON,PROMPT_ON" ; name: Vah Ruta before scream demo | TODO: Could check out whether calling the demo of the beast rising from the ground switches the demo id that the mod receives, or whether it's separate.  You talk to the king of the Zora domain, and a bunch of advisors. Link stays put in one place. It calls another Demo that shows the elephant rising from the water and roaring: https://www.youtube.com/watch?v=nQkO5UeoJm0
+.string "Demo344_1,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Vah Ruta last attack demo
+.string "Demo344_2,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: [Vah Ruta] Sidon joins
+.string "Demo344_4,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: [Vah Ruta] Thanks
+.string "Demo346_0,FP_ON,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Destroying rocks with bombs
+.string "Demo346_1,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Yunobo heads to Death Mountain
+.string "Demo346_3,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Bridge falls to enter Death Mountain
+.string "Demo346_4,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Sentries come out from Vah Rudania
+.string "Demo346_5,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Detected by sentry demo | detection sentries when you try to run up the mountain to the divine beast in the mountain area https://youtu.be/UH2mAfvC2HI?t=8955
+.string "Demo346_6,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Cannon hitting Vah Rudania demo
 .string "Demo346_9,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Vah Rudania before scream demo
 .string "Demo347_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Assassin Boss · confrontation
 .string "Demo347_1,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Assassin Boss · Kill
 .string "Demo347_2,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: [Vah Naboris Challenge] Generating barrier with Thunder Helm demo
-.string "Demo347_3,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: [Vah Naboris Challenge] Last attack on Vah Naboris demo | https://youtu.be/UH2mAfvC2HI?t=11649
+.string "Demo347_3,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: [Vah Naboris Challenge] Last attack on Vah Naboris demo | https://youtu.be/UH2mAfvC2HI?t=11649
 .string "Demo347_4,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Introducing the gods of thunder The demonstrating animals before demo
-.string "Demo347_5,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: First meeting with Riju
-.string "Demo347_6,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: The Vah Naboris rouge suffers a thunderous helmet
-.string "Demo348_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Demonstration of breaking the last battery of Vah Medohs
+.string "Demo347_5,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: First meeting with Riju
+.string "Demo347_6,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: The Vah Naboris rouge suffers a thunderous helmet
+.string "Demo348_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Demonstration of breaking the last battery of Vah Medohs
 .string "Demo348_1,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Before Vah Medoh's cry
 .string "Demo363_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: The guide of Zelda
-.string "Demo370_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Wedding demo
+.string "Demo370_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Wedding demo
 .string "Demo378_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: [Sneak | Sneaking into the voe-forbidden area
-.string "Demo378_1,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: [Sneak | Link gets the Voe-cloak clothing at the bazaar
-.string "Demo380_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: First meeting with Impa
-.string "Demo401_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: [Go to Zora Village] Encounter with Prince Sidon Demo
-.string "Demo401_1,FP_ON,PAN_ON,HND_OFF,CTRL_OFF" ; name: [Go to Zora Village] Prince Sidon's support
-.string "Demo480_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Silver piece (freeing dragon from Malice demo)
-.string "Demo480_1,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Dragon first encounter demo | meeting the mallice dragon in the ice region. Moves the player slightly forwards at the start.
+.string "Demo378_1,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: [Sneak | Link gets the Voe-cloak clothing at the bazaar
+.string "Demo380_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: First meeting with Impa
+.string "Demo401_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: [Go to Zora Village] Encounter with Prince Sidon Demo
+.string "Demo401_1,FP_ON,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: [Go to Zora Village] Prince Sidon's support
+.string "Demo480_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Silver piece (freeing dragon from Malice demo)
+.string "Demo480_1,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Dragon first encounter demo | meeting the mallice dragon in the ice region. Moves the player slightly forwards at the start.
 .string "Demo480_2,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Casting dragon material into fountain demo
 .string "Demo480_3,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Ice Dragon First Fall Demo
 .string "Demo600_0,FP_ON,PAN_OFF,HND_OFF,CTRL_ON" ; name: Zelda's voice (sky) CASE 1
 .string "Demo600_1,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Zelda's voice (sky) CASE 2
 .string "Demo601_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Challenge explanation ~ One-Hit Obliterator appears
-.string "Demo601_1,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: One-Hit Obliterator Get
+.string "Demo601_1,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: One-Hit Obliterator Get
 .string "Demo602_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: CDungeon Appearance | Used for when the master trial DLC dungeons appear
 .string "Demo602_1,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: CDungeon Appearance (Yiga?)
 .string "Demo603_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Shrine entry prohibition
@@ -190,68 +190,68 @@ data_TableOfCutsceneEventsSettings:
 .string "Demo606_0,FP_OFF,PAN_ON,HND_OFF,CTRL_ON" ; name: Restart of One-Hit Obliterator challenge
 .string "Demo607_0,FP_OFF,PAN_ON,HND_OFF,CTRL_ON,PROMPT_ON" ; name: Kass's Songs - Swordsman's Song
 .string "Demo609_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Clear One-Hit Obliterator challenge
-.string "Demo610_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Kass's Songs - Champion's Song (Goron City)
-.string "Demo610_1,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Kass's Songs - Champion's Song (Rito Village)
+.string "Demo610_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Kass's Songs - Champion's Song (Goron City)
+.string "Demo610_1,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Kass's Songs - Champion's Song (Rito Village)
 .string "Demo610_2,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Kass's Songs - Champion's Song (Zora Village)
-.string "Demo610_3,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Kass's Songs - Champion's Song (city of Geld)
+.string "Demo610_3,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Kass's Songs - Champion's Song (city of Geld)
 .string "Demo611_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Champion shrine clear
 .string "Demo612_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Kass's Songs ~ Daruk's Song
 .string "Demo612_1,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Kass's Songs ~ Revali's Song
 .string "Demo612_2,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Kass's Songs ~ Mipha's Song
 .string "Demo612_3,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Kass's Songs ~ Urbosa's Song
-.string "Demo614_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Enter Rudania
-.string "Demo614_1,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Enter Medoh
+.string "Demo614_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Enter Rudania
+.string "Demo614_1,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Enter Medoh
 .string "Demo614_2,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Enter Ruta
-.string "Demo614_3,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Enter Naboris
+.string "Demo614_3,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Enter Naboris
 .string "Demo616_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Escape from the divine beast
 .string "Demo617_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Return to the outside of the beast
-.string "Demo620_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Fireblight Ganon R - Second half of the battle
-.string "Demo620_1,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Windblight Ganon R - Second half of the battle
-.string "Demo620_2,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Waterblight Ganon R - Second half of the battle
-.string "Demo620_3,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Thunderblight Ganon R - Second half of the battle
+.string "Demo620_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Fireblight Ganon R - Second half of the battle
+.string "Demo620_1,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Windblight Ganon R - Second half of the battle
+.string "Demo620_2,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Waterblight Ganon R - Second half of the battle
+.string "Demo620_3,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Thunderblight Ganon R - Second half of the battle
 .string "Demo622_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Returning outside of the beast - Daruk's voice
 .string "Demo622_1,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Returning outside of the beast - Revali's voice
 .string "Demo622_2,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Returning outside of the beast - Mipha's voice
 .string "Demo622_3,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Returning outside of the beast - Urbosa's voice
 .string "Demo623_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Monk guidance (back to the Shrine of Resurrection)
-.string "Demo640_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Entering the Final Trial
-.string "Demo641_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Entering the Final Trial from the Shrine of Resurrection
+.string "Demo640_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Entering the Final Trial
+.string "Demo641_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Entering the Final Trial from the Shrine of Resurrection
 .string "Demo641_1,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Arriving in the Final Trial
 .string "Demo642_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Escaping from the Final Trial
 .string "Demo642_1,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Returning from the Final Trial to the Shrine of Resurrection
-.string "Demo643_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Final Trial explanation
+.string "Demo643_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Final Trial explanation
 .string "Demo643_2,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Examine control terminal
 .string "Demo643_3,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Examine the deepest door
 .string "Demo644_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Final Trial boss: to the second form
 .string "Demo644_1,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Final Trial boss: to the third form
 .string "Demo645_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Final Trial Clear
-.string "Demo646_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Kass's Songs - A song to glorify the champions
-.string "Demo647_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Decorate photos
+.string "Demo646_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Kass's Songs - A song to glorify the champions
+.string "Demo647_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Decorate photos
 .string "Demo648_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Final Trial boss appears
 .string "Demo649_0,FP_ON,PAN_ON,HND_OFF,CTRL_ON" ; name: Motorcycle fuel filling demo
 .string "Demo650_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Gyro terminal operation for DLC dungeon
 .string "Demo650_1,FP_ON,PAN_ON,HND_OFF,CTRL_OFF" ; name: Door open demo (AoC 2)
 .string "Demo650_2,FP_ON,PAN_ON,HND_OFF,CTRL_OFF" ; name: Door open demo (AoC 2) (actors not stopped)
-.string "Demo700_0,FP_ON,PAN_OFF,HND_ON,CTRL_OFF" ; name: Sheikah Slate get demo
+.string "Demo700_0,FP_ON,PAN_OFF,HND_ON,CTRL_OFF,PROMPT_ON" ; name: Sheikah Slate get demo
 .string "Demo701_0,FP_ON,PAN_OFF,HND_ON,CTRL_OFF,PROMPT_ON" ; name: Open the second door that leads to the ground | should we prevent hands from all cutscenes or just these?  Camera flips back to look at Link, but maybe we don't want that.  Note: Nah we don't want that - mako  Alright, tested it without panning and it looks great! -Tim
 .string "Demo702_0,FP_ON,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Teba flies to Flight Range with Tulin
-.string "Demo704_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Vah Medoh - Explanation by the champion on first time enter
-.string "Demo705_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Vah Rudania - Explanation by the champion on first time enter
-.string "Demo706_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Vah Naboris - Explanation by the champion on first time enter
+.string "Demo704_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Vah Medoh - Explanation by the champion on first time enter
+.string "Demo705_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Vah Rudania - Explanation by the champion on first time enter
+.string "Demo706_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Vah Naboris - Explanation by the champion on first time enter
 .string "Demo707_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Inventory increase by Hestu | Dance animation from hestu
-.string "Demo708_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Vah Ruta - Explanation by the champion on first time enter
+.string "Demo708_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Vah Ruta - Explanation by the champion on first time enter
 .string "Demo709_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Vah Naboris - Attack point demo | I think this is cooler in 3rd person
 .string "Demo710_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Leaving the plateau for the first time
-.string "Demo712_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Vah Medoh - Transition to second half of Blight Ganon battle
-.string "Demo712_1,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Vah Rudania - Transition to second half of Blight Ganon battle
-.string "Demo712_2,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Vah Naboris - Transition to second half of Blight Ganon battle
-.string "Demo712_3,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Vah Ruta - Transition to second half of Blight Ganon battle
-.string "Demo717_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Ganon (incomplete form) - Transition to final stage | Link falls through the floor together with ganon. Maybe really cool, but extremely scare?
+.string "Demo712_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Vah Medoh - Transition to second half of Blight Ganon battle
+.string "Demo712_1,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Vah Rudania - Transition to second half of Blight Ganon battle
+.string "Demo712_2,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Vah Naboris - Transition to second half of Blight Ganon battle
+.string "Demo712_3,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Vah Ruta - Transition to second half of Blight Ganon battle
+.string "Demo717_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Ganon (incomplete form) - Transition to final stage | Link falls through the floor together with ganon. Maybe really cool, but extremely scare?
 .string "Demo718_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Ganon (incomplete form) - Guardian launch
 .string "Demo719_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Tutorial dungeon
 .string "Demo720_0,FP_ON,PAN_ON,HND_OFF,CTRL_OFF" ; name: Ganon (incomplete form) - Setup
 .string "Demo721_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Vah Naboris's Attack demo | Unsure what this is?
-.string "Demo799_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Field
+.string "Demo799_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Field
 .string "Demo985_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: 2016_E3 Thankyou screen demo
 .string "Desert_Maze,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF"
 .string "DgnObj_DLC_Weapon_Sword_502,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF"
