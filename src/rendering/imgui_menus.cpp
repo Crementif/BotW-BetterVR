@@ -966,7 +966,7 @@ struct ComfortPreset {
 static constexpr ComfortPreset kComfortPresets[] = {
     { ICON_MS_ECO, "Gentle", "New to VR", TurnMode::SNAP_45, true, EventMode::FOLLOW_DEFAULT_EVENT_SETTINGS, true, true, 0.7f, false },
     { ICON_MS_BALANCE, "Balanced", "Recommended", TurnMode::SMOOTH_NORMAL, true, EventMode::FOLLOW_DEFAULT_EVENT_SETTINGS, false, false, 0.7f, true },
-    { ICON_MS_LOCAL_FIRE_DEPARTMENT, "Immersive", "VR veterans", TurnMode::SMOOTH_NORMAL, false, EventMode::ALWAYS_FIRST_PERSON, false, false, ModSettings::BOW_ARC_DOT_ONLY, true },
+    { ICON_MS_LOCAL_FIRE_DEPARTMENT, "Immersive", "VR veterans", TurnMode::SMOOTH_NORMAL, false, EventMode::FOLLOW_DEFAULT_EVENT_SETTINGS, false, false, ModSettings::BOW_ARC_DOT_ONLY, true },
 };
 
 static int FindComfortPreset(const ModSettings& settings) {
