@@ -1725,6 +1725,7 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
             }
         }
         ImGui::EndChild();
+        const float panesBottom = ImGui::GetItemRectMax().y;
         ImGui::PopID();
         ImGui::PopStyleVar();
 
@@ -1737,14 +1738,13 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
             ImGui::SaveIniSettingsToDisk(ImGui::GetIO().IniFilename);
         }
 
+        // the divider sits right under the panes so no window background shows above it
+        ImGui::SetCursorScreenPos(ImVec2(ImGui::GetWindowPos().x, panesBottom));
         ImGui::Separator();
-        ImGui::Spacing();
         const char* navText = GetControllerMenuNavPrompt();
-        float textWidth = ImGui::CalcTextSize(navText).x;
-        float availW = ImGui::GetContentRegionAvail().x;
-        if (availW > textWidth) {
-            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (availW - textWidth) * 0.5f);
-        }
+        const ImVec2 textSize = ImGui::CalcTextSize(navText);
+        const ImVec2 footerAvail = ImGui::GetContentRegionAvail();
+        ImGui::SetCursorPos(ImVec2(ImGui::GetCursorPosX() + std::max(0.0f, (footerAvail.x - textSize.x) * 0.5f), ImGui::GetCursorPosY() + std::max(0.0f, (footerAvail.y - textSize.y) * 0.5f)));
         ImGui::TextUnformatted(navText);
 
         ApplyPaneNavFallback(sidebarWindow, contentWindow, sidebarNavTarget);
