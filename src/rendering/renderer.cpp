@@ -924,9 +924,12 @@ std::vector<XrCompositionLayerQuad> RND_Renderer::Layer2D::FinishRendering(long 
     const Game::Presentation game = Game::GetPresentation();
     const bool isBowAiming = game.aimingItemHeld && inputState.shared.in_game;
 
+    // full screens like menus, the map, the scope and the title screen open level in front of you and stay there
+    const bool isScreenShown = !game.inGame || game.pauseMenuOpen || game.flatCamera || game.blackBars || ImGuiMenus::g_isOpen;
+
     // the pause menu blanks briefly between tabs, so only unlock after it stays closed
     constexpr uint32_t GAZE_UNLOCK_FRAMES = 5;
-    if (game.pauseMenuOpen) {
+    if (isScreenShown) {
         m_gazeUnlockCounter = 0;
         if (!m_isGazeLocked) {
             m_isGazeLocked = true;
@@ -938,7 +941,7 @@ std::vector<XrCompositionLayerQuad> RND_Renderer::Layer2D::FinishRendering(long 
         m_gazeUnlockCounter = 0;
     }
 
-    if (GetSettings().DoesUIFollowGaze() || isBowAiming) {
+    if (m_isGazeLocked || GetSettings().DoesUIFollowGaze() || isBowAiming) {
         m_currentOrientation = glm::slerp(m_currentOrientation, headOrientation, LERP_SPEED);
         glm::vec3 forwardDirection = m_isGazeLocked ? m_lockedGazeForward : headOrientation * glm::vec3(0.0f, 0.0f, -1.0f);
 
