@@ -1217,8 +1217,13 @@ void RND_Renderer::ImGuiOverlay::DrawDisplayPage(bool* changed) {
     DrawPageHeader(ICON_MS_DESKTOP_WINDOWS, "Display");
 
     if (BeginCard("##Hud", "HUD & Menus")) {
-        DrawSetting(settings.uiFollowsGaze ? ICON_MS_HEAD_MOUNTED_DEVICE : ICON_MS_PUSH_PIN, "Follows Your Head", [&]() {
-            DrawToggle(settings.uiFollowsGaze, changed);
+        DrawSetting(settings.uiFollowsGaze ? ICON_MS_HEAD_MOUNTED_DEVICE : ICON_MS_PUSH_PIN, "HUD Position", "Menus always open level in front of you.", [&]() {
+            static constexpr const char* hudLabels[] = { "Follows Your View", "Stays In Place" };
+            int selected = settings.uiFollowsGaze ? 0 : 1;
+            if (Segmented("##hudPosition", hudLabels, &selected)) {
+                settings.uiFollowsGaze = selected == 0;
+                *changed = true;
+            }
         });
         DrawSetting(ICON_MS_OPEN_IN_FULL, "Distance & Size", [&]() {
             DrawFloatSlider(settings.hudDistance, settings.hudDistance.min, settings.hudDistance.max, FormatDistance, changed);
