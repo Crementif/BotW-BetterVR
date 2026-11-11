@@ -23,6 +23,8 @@ namespace ImGuiMenus {
     inline std::atomic_uint8_t g_currentPage = PLAYSTYLE_PAGE;
 
     bool IsPageAvailable(uint8_t page);
+    // the next or previous page that's available, wrapping around
+    void StepPage(bool forward);
 
     // false until the overlay exists
     bool ProcessInputs(OpenXR::InputState& inputs, const VPADStatus& vpadStatus);

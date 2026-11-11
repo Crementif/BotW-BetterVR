@@ -874,6 +874,14 @@ namespace ImGuiMenus {
         return page < PAGE_COUNT;
     }
 
+    void StepPage(bool forward) {
+        uint8_t page = g_currentPage;
+        do {
+            page = (uint8_t)(forward ? (page + 1) % PAGE_COUNT : (page == 0 ? PAGE_COUNT - 1 : page - 1));
+        } while (!IsPageAvailable(page));
+        g_currentPage = page;
+    }
+
     void DrawFPSOverlay(RND_Renderer* renderer) {
         ImGui::SetNextWindowBgAlpha(0.4f);
 
@@ -1447,7 +1455,15 @@ static const char* GetControllerModMenuPrompt() {
     }
 }
 
-static const char* GetControllerMenuNavPrompt() {
+struct MenuNavGlyphs {
+    const char* stick;
+    const char* select;
+    const char* exit;
+    const char* pageLeft;
+    const char* pageRight;
+};
+
+static MenuNavGlyphs GetControllerMenuNavGlyphs() {
     auto& caps = VRManager::instance().XR->m_capabilities;
     switch (caps.activeControllerType) {
         case ControllerType::OculusTouch:
@@ -1455,10 +1471,36 @@ static const char* GetControllerMenuNavPrompt() {
         case ControllerType::HPReverbG2:
         case ControllerType::ViveCosmos:
         case ControllerType::ValveIndex:
-            return ICON_KI_STICK_LEFT_TOP " Navigate      " ICON_KI_BUTTON_A " Select      " ICON_KI_BUTTON_B " Exit      " ICON_KI_BUTTON_LT " " ICON_KI_BUTTON_RT " Switch Page";
+            return { ICON_KI_STICK_LEFT_TOP, ICON_KI_BUTTON_A, ICON_KI_BUTTON_B, ICON_KI_BUTTON_LT, ICON_KI_BUTTON_RT };
         default:
-            return ICON_KI_STICK_LEFT_TOP " Navigate      " ICON_KI_BUTTON_A " Select      " ICON_KI_BUTTON_B " Exit      " ICON_KI_BUTTON_L " " ICON_KI_BUTTON_R " Switch Page";
+            return { ICON_KI_STICK_LEFT_TOP, ICON_KI_BUTTON_A, ICON_KI_BUTTON_B, ICON_KI_BUTTON_L, ICON_KI_BUTTON_R };
     }
+}
+
+static constexpr ImVec2 kFooterItemPadding = ImVec2(10.0f, 4.0f);
+
+static float FooterItemWidth(const std::string& label) {
+    return ImGui::CalcTextSize(label.c_str()).x + kFooterItemPadding.x * 2.0f;
+}
+
+// a footer hint, the clickable ones light up under the pointer or mouse
+static bool FooterItem(const std::string& label, bool clickable) {
+    ImGuiWindow* window = ImGui::GetCurrentWindow();
+    const ImVec2 pos = ImGui::GetCursorScreenPos();
+    const ImRect bb(pos, pos + ImGui::CalcTextSize(label.c_str()) + kFooterItemPadding * 2.0f);
+    const ImGuiID itemId = window->GetID(label.c_str());
+    ImGui::ItemSize(bb);
+    if (!ImGui::ItemAdd(bb, itemId)) {
+        return false;
+    }
+    bool hovered = false;
+    bool held = false;
+    const bool pressed = clickable && ImGui::ButtonBehavior(bb, itemId, &hovered, &held);
+    if (hovered) {
+        window->DrawList->AddRectFilled(bb.Min, bb.Max, ImGui::GetColorU32(held ? kControlHoveredColor : kControlColor), kCardRounding);
+    }
+    window->DrawList->AddText(bb.Min + kFooterItemPadding, ImGui::GetColorU32(ImGuiCol_Text), label.c_str());
+    return pressed;
 }
 
 static void DrawTutorialPromptAndControllerVerification(bool isMenuOpen) {
@@ -1741,11 +1783,40 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
         // the divider sits right under the panes so no window background shows above it
         ImGui::SetCursorScreenPos(ImVec2(ImGui::GetWindowPos().x, panesBottom));
         ImGui::Separator();
-        const char* navText = GetControllerMenuNavPrompt();
-        const ImVec2 textSize = ImGui::CalcTextSize(navText);
+        const MenuNavGlyphs glyphs = GetControllerMenuNavGlyphs();
+        const std::array<std::string, 5> footerLabels = {
+            fmt::format("{} Navigate", glyphs.stick),
+            fmt::format("{} Select", glyphs.select),
+            fmt::format("{} Exit", glyphs.exit),
+            fmt::format("{} Previous Page", glyphs.pageLeft),
+            fmt::format("{} Next Page", glyphs.pageRight),
+        };
+        const float footerSpacing = 18.0f;
+        float footerWidth = footerSpacing * (float)(footerLabels.size() - 1);
+        for (const std::string& label : footerLabels) {
+            footerWidth += FooterItemWidth(label);
+        }
+        const float footerItemHeight = ImGui::GetTextLineHeight() + kFooterItemPadding.y * 2.0f;
         const ImVec2 footerAvail = ImGui::GetContentRegionAvail();
-        ImGui::SetCursorPos(ImVec2(ImGui::GetCursorPosX() + std::max(0.0f, (footerAvail.x - textSize.x) * 0.5f), ImGui::GetCursorPosY() + std::max(0.0f, (footerAvail.y - textSize.y) * 0.5f)));
-        ImGui::TextUnformatted(navText);
+        ImGui::SetCursorPos(ImVec2(ImGui::GetCursorPosX() + std::max(0.0f, (footerAvail.x - footerWidth) * 0.5f), ImGui::GetCursorPosY() + std::max(0.0f, (footerAvail.y - footerItemHeight) * 0.5f)));
+        // the footer stays out of the controller's navigation, the buttons already do these
+        ImGui::PushItemFlag(ImGuiItemFlags_NoNav, true);
+        FooterItem(footerLabels[0], false);
+        ImGui::SameLine(0.0f, footerSpacing);
+        FooterItem(footerLabels[1], false);
+        ImGui::SameLine(0.0f, footerSpacing);
+        if (FooterItem(footerLabels[2], true)) {
+            shouldStayOpen = false;
+        }
+        ImGui::SameLine(0.0f, footerSpacing);
+        if (FooterItem(footerLabels[3], true)) {
+            ImGuiMenus::StepPage(false);
+        }
+        ImGui::SameLine(0.0f, footerSpacing);
+        if (FooterItem(footerLabels[4], true)) {
+            ImGuiMenus::StepPage(true);
+        }
+        ImGui::PopItemFlag();
 
         ApplyPaneNavFallback(sidebarWindow, contentWindow, sidebarNavTarget);
         DrawRestartNotice();

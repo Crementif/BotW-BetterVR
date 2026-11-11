@@ -685,16 +685,7 @@ void RND_Renderer::ImGuiOverlay::ProcessInputs(OpenXR::InputState& inputs, const
     }
 
     if (l1 || r1) {
-        uint8_t nextPage = currPage;
-        do {
-            if (l1) {
-                nextPage = (nextPage == 0) ? (ImGuiMenus::PAGE_COUNT - 1) : (nextPage - 1);
-            }
-            else {
-                nextPage = (nextPage + 1) % ImGuiMenus::PAGE_COUNT;
-            }
-        } while (!ImGuiMenus::IsPageAvailable(nextPage));
-        currPage = nextPage;
+        ImGuiMenus::StepPage(!l1);
     }
 
     // prevent exiting menu if a popup or field is being edited
