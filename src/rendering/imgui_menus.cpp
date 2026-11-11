@@ -960,18 +960,19 @@ struct ComfortPreset {
     bool theatre;
     bool stillCamera;
     float bowArc;
+    bool oneHitPerSwing;
 };
 
 static constexpr ComfortPreset kComfortPresets[] = {
-    { ICON_MS_ECO, "Gentle", "New to VR", TurnMode::SNAP_45, true, EventMode::FOLLOW_DEFAULT_EVENT_SETTINGS, true, true, 0.7f },
-    { ICON_MS_BALANCE, "Balanced", "Recommended", TurnMode::SMOOTH_NORMAL, true, EventMode::FOLLOW_DEFAULT_EVENT_SETTINGS, false, false, 0.7f },
-    { ICON_MS_LOCAL_FIRE_DEPARTMENT, "Immersive", "VR veterans", TurnMode::SMOOTH_NORMAL, false, EventMode::ALWAYS_FIRST_PERSON, false, false, ModSettings::BOW_ARC_DOT_ONLY },
+    { ICON_MS_ECO, "Gentle", "New to VR", TurnMode::SNAP_45, true, EventMode::FOLLOW_DEFAULT_EVENT_SETTINGS, true, true, 0.7f, false },
+    { ICON_MS_BALANCE, "Balanced", "Recommended", TurnMode::SMOOTH_NORMAL, true, EventMode::FOLLOW_DEFAULT_EVENT_SETTINGS, false, false, 0.7f, true },
+    { ICON_MS_LOCAL_FIRE_DEPARTMENT, "Immersive", "VR veterans", TurnMode::SMOOTH_NORMAL, false, EventMode::ALWAYS_FIRST_PERSON, false, false, ModSettings::BOW_ARC_DOT_ONLY, true },
 };
 
 static int FindComfortPreset(const ModSettings& settings) {
     for (int i = 0; i < (int)std::size(kComfortPresets); i++) {
         const ComfortPreset& preset = kComfortPresets[i];
-        if (settings.turnMode == preset.turnMode && settings.preventFirstPersonRagdoll == preset.preventFalling && settings.cutsceneCameraMode == preset.cutscenes && settings.useBlackBarsForCutscenes == preset.theatre && settings.alwaysPreventFirstPersonCutsceneCameraMovement == preset.stillCamera && std::fabs(settings.bowArcOpacity - preset.bowArc) < 0.005f) {
+        if (settings.turnMode == preset.turnMode && settings.preventFirstPersonRagdoll == preset.preventFalling && settings.cutsceneCameraMode == preset.cutscenes && settings.useBlackBarsForCutscenes == preset.theatre && settings.alwaysPreventFirstPersonCutsceneCameraMovement == preset.stillCamera && std::fabs(settings.bowArcOpacity - preset.bowArc) < 0.005f && settings.oneHitPerSwing == preset.oneHitPerSwing) {
             return i;
         }
     }
@@ -985,6 +986,7 @@ static void ApplyComfortPreset(ModSettings& settings, const ComfortPreset& prese
     settings.useBlackBarsForCutscenes = preset.theatre;
     settings.alwaysPreventFirstPersonCutsceneCameraMovement = preset.stillCamera;
     settings.bowArcOpacity = preset.bowArc;
+    settings.oneHitPerSwing = preset.oneHitPerSwing;
 }
 
 static bool DrawPresetCard(const ComfortPreset& preset, bool selected, float width) {
@@ -1067,6 +1069,9 @@ void RND_Renderer::ImGuiOverlay::DrawComfortPage(bool* changed) {
         DrawSummaryRow(settings.preventFirstPersonRagdoll ? ICON_MS_SHIELD : ICON_MS_FALLING, settings.preventFirstPersonRagdoll ? "Link never falls over" : "Link can fall over");
         DrawSummaryRow(settings.useBlackBarsForCutscenes ? ICON_MS_TV : ICON_MS_MOVIE, DescribeCutscenes(settings));
         DrawSummaryRow(ICON_MS_BOW_ARC, settings.IsBowArcDotOnly() ? "Show only the aiming dot" : settings.bowArcOpacity > 0.0f ? "Show arrow arc while aiming" : "No arrow arc or aiming dot");
+        if (firstPerson) {
+            DrawSummaryRow(ICON_MS_SWORDS, settings.oneHitPerSwing ? "Each swing hits once" : "A swing can hit again, for less damage");
+        }
         EndCard();
     }
 
@@ -1090,6 +1095,9 @@ void RND_Renderer::ImGuiOverlay::DrawComfortPage(bool* changed) {
                 static constexpr EnumChoice<EventMode> cutsceneChoices[] = { { EventMode::ALWAYS_FIRST_PERSON, "First" }, { EventMode::FOLLOW_DEFAULT_EVENT_SETTINGS, "Mixed" }, { EventMode::ALWAYS_THIRD_PERSON, "Third" } };
                 DrawSetting(nullptr, "Cutscene Camera", [&]() {
                     DrawEnumSegments(settings.cutsceneCameraMode, cutsceneChoices, changed);
+                });
+                DrawSetting(nullptr, "One Hit Per Swing", "Off lets a swing hit again, for less damage each time.", [&]() {
+                    DrawToggle(settings.oneHitPerSwing, changed);
                 });
             }
             DrawSetting(nullptr, "2D Cutscene Screen", "For third-person cutscenes.", [&]() {
@@ -1145,17 +1153,10 @@ void RND_Renderer::ImGuiOverlay::DrawControlsPage(bool* changed) {
             EndCard();
         }
 
-        if (BeginCard("##Combat", "Combat", false)) {
-            if (firstPerson) {
-                DrawSetting(nullptr, "One Hit Per Swing", "Off lets a swing hit again, for less damage each time.", [&]() {
-                    DrawToggle(settings.oneHitPerSwing, changed);
-                });
-            }
-            else {
-                DrawSetting(nullptr, "Camera Bow Aiming", [&]() {
-                    DrawToggle(settings.thirdPersonBowCameraAim, changed);
-                });
-            }
+        if (!firstPerson && BeginCard("##Combat", "Combat", false)) {
+            DrawSetting(nullptr, "Camera Bow Aiming", [&]() {
+                DrawToggle(settings.thirdPersonBowCameraAim, changed);
+            });
             EndCard();
         }
 
