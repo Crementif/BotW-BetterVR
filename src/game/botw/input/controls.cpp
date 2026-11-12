@@ -247,6 +247,15 @@ static bool IsHandOverLeftWaistSlot(const HandGestureState& gesture) {
     return gesture.isBehindHeadWithWaistOffset && gesture.isCloseToWaist && gesture.isOnLeftSide;
 }
 
+// a hand swinging past the hip shouldn't take the slate out
+static bool IsHandSettledAtWaist(const OpenXR::InputState& inputs, size_t side) {
+    constexpr float MAX_WAIST_SLOT_SPEED = 1.2f;
+    const XrSpaceVelocity& velocity = inputs.shared.poseVelocity[side];
+    if ((velocity.velocityFlags & XR_SPACE_VELOCITY_LINEAR_VALID_BIT) == 0)
+        return true;
+    return glm::length(ToGLM(velocity.linearVelocity)) < MAX_WAIST_SLOT_SPEED;
+}
+
 static bool IsHandOverRightWaistSlot(const HandGestureState& gesture) {
     return gesture.isBehindHeadWithWaistOffset && gesture.isCloseToWaist && !gesture.isOnLeftSide;
 }
@@ -269,13 +278,15 @@ static PullSlot GetBodySlotUnderHand(const HandGestureState& gesture) {
     return PullSlot::None;
 }
 
-static void UpdatePullSlots(const HandGestureState& left, const HandGestureState& right) {
+static void UpdatePullSlots(const OpenXR::InputState& inputs, const HandGestureState& left, const HandGestureState& right) {
     const std::array<const HandGestureState*, 2> hands = { &left, &right };
     for (size_t side = 0; side < hands.size(); ++side) {
         if (!s_grabButtons[side].IsDown() && s_grabButtons[side].lastEvent != ButtonState::Event::ShortPress)
             s_pullSlots[side] = PullSlot::None;
-        else if (s_grabButtons[side].lastEvent == ButtonState::Event::Pressed)
-            s_pullSlots[side] = GetBodySlotUnderHand(*hands[side]);
+        else if (s_grabButtons[side].lastEvent == ButtonState::Event::Pressed) {
+            const PullSlot slot = GetBodySlotUnderHand(*hands[side]);
+            s_pullSlots[side] = slot == PullSlot::LeftWaist && !IsHandSettledAtWaist(inputs, side) ? PullSlot::None : slot;
+        }
     }
 }
 
@@ -506,7 +517,7 @@ static void ProcessLeftHandInGameInput(
         return;  // Don't process normal input when over slots
     }
     
-    if (IsHandOverLeftWaistSlot(leftGesture)) {    
+    if (IsHandOverLeftWaistSlot(leftGesture) && IsHandSettledAtWaist(inputs, 0)) {    
         if (OpenDpadMenuBodySlots(grabEvent, leftGesture, buttonHold, state)) {
             s_pullSlots[0] = PullSlot::None;
             s_grabButtons[0].Cancel();
@@ -621,7 +632,7 @@ static void ProcessRightHandInGameInput(
         Haptics::Stop(1, RumbleType::Raising);
     }
 
-    if (IsHandOverLeftWaistSlot(rightGesture)) {   
+    if (IsHandOverLeftWaistSlot(rightGesture) && IsHandSettledAtWaist(inputs, 1)) {   
         if (OpenDpadMenuBodySlots(grabEvent, rightGesture, buttonHold, state)) {
             s_pullSlots[1] = PullSlot::None;
             s_grabButtons[1].Cancel();
@@ -1325,7 +1336,7 @@ static void hook_InjectXRInput(PPCInterpreter_t* hCPU) {
     HandGestureState leftGesture = {};
     HandGestureState rightGesture = {};
     ProcessHandGesture(headsetPose, inputs, leftGesture, rightGesture, state);
-    UpdatePullSlots(leftGesture, rightGesture);
+    UpdatePullSlots(inputs, leftGesture, rightGesture);
 
     KeepDpadMenuOpen(newXRBtnHold, state);
 
