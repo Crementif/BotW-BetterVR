@@ -138,8 +138,14 @@ static float YawDegreesFromRotation(const glm::fquat& rot) {
     return NormalizeDegrees(glm::degrees(2.0f * std::atan2(twist.y, twist.w)));
 }
 
+// arrival events after a warp ignore the camera, so the view keeps the facing it took instead of following the chase camera around
+static bool IsEventTurningCamera() {
+    const auto eventSettings = Events::GetFirstPersonSettings();
+    return Events::IsActive() && !(eventSettings.has_value() && eventSettings->ignoreCameraRotation);
+}
+
 static bool ShouldAdoptGameCameraYaw() {
-    return !s_hasBaseYaw || !GameState::IsFirstPerson() || Events::IsActive();
+    return !s_hasBaseYaw || !GameState::IsFirstPerson() || IsEventTurningCamera();
 }
 
 static float ConsumePendingCameraYawDelta() {
