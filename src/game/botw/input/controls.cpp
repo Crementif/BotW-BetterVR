@@ -217,8 +217,12 @@ static HandGestureState CalculateHandGesture(
     constexpr float SHOULDER_RADIUS_SQ = SHOULDER_RADIUS * SHOULDER_RADIUS;
     gesture.isCloseToHead = (glm::length2(headToHand) < SHOULDER_RADIUS_SQ);
 
+    // the mouth sits below and in front of the eyes, where the controllers end up when you cup your hands to whistle
+    constexpr float MOUTH_FORWARD = 0.08f;
+    constexpr float MOUTH_BELOW_EYES = 0.10f;
     constexpr float MOUTH_RADIUS_SQ = MOUTH_RADIUS * MOUTH_RADIUS;
-    gesture.isCloseToMouth = (glm::length2(headToHand) < MOUTH_RADIUS_SQ);
+    const glm::fvec3 mouthPos = headsetPos + headsetForward * MOUTH_FORWARD - glm::fvec3(0.0f, MOUTH_BELOW_EYES, 0.0f);
+    gesture.isCloseToMouth = (glm::length2(handPos - mouthPos) < MOUTH_RADIUS_SQ);
     
     glm::fvec3 waistPos = headsetPos - glm::fvec3(0.0f, WAIST_OFFSET_Y, 0.0f);
     gesture.isCloseToWaist = (handPos.y < waistPos.y);
