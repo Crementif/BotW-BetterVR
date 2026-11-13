@@ -553,7 +553,7 @@ struct ModSettings {
     // first-person settings
     FloatSetting playerHeightOffset{ "PlayerHeightOffset", 0.0f };
     BoolSetting leftHanded{ "LeftHanded", false };
-    BoolSetting uiFollowsGaze{ "UiFollowsGaze", true };
+    BoolSetting uiFollowsGaze{ "UiFollowsGaze", false };
     FloatSetting hudDistance{ "HudDistance", 1.85f, 0.5f, 2.5f };
     FloatSetting hudSize{ "HudSize", 0.85f, 0.4f, 1.75f };
     FloatSetting bowArcOpacity{ "BowArcTransparency", 0.7f, 0.0f, 1.0f };
@@ -598,7 +598,8 @@ struct ModSettings {
     CameraMode GetCameraMode() const { return cameraMode; }
 
     PlayMode GetPlayMode() const { return playMode; }
-    bool DoesUIFollowGaze() const { return uiFollowsGaze; }
+    // This build disables gaze following regardless of the saved setting.
+    bool DoesUIFollowGaze() const { return false; }
     bool IsLeftHanded() const { return leftHanded; }
     float GetPlayerHeightOffset() const {
         // disable height offset in third-person mode

@@ -1132,9 +1132,7 @@ void RND_Renderer::ImGuiOverlay::DrawInterfacePage(bool* changed) {
     DrawPageHeader(ICON_KI_UI, "Interface");
 
     if (BeginSettingsSection("##Hud", "HUD & Menus")) {
-        DrawSetting("UI Follows Where You Look", "When off, the HUD stays in one place instead of following your head.", [&]() {
-            settings.uiFollowsGaze.AddToGUI(changed);
-        });
+        ImGui::TextDisabled("UI gaze following is disabled in this build.");
         DrawSetting("Menu/HUD Distance & Size", [&]() {
             float distance = settings.hudDistance;
             if (ImGui::SliderFloat("##hudDistance", &distance, settings.hudDistance.min, settings.hudDistance.max, FormatDistance(distance).c_str())) {

@@ -885,10 +885,6 @@ std::vector<XrCompositionLayerQuad> RND_Renderer::Layer2D::FinishRendering(XrTim
 
     XrPosef layerPose = { { 0.0f, 0.0f, 0.0f, 1.0f }, { 0.0f, 0.0f, 0.0f } };
 
-    auto inputState = VRManager::instance().XR->m_input.load();
-    const bool wasBowAimingSet = IsBowAimingActive();
-    const bool isBowAiming = wasBowAimingSet && inputState.shared.in_game;
-
     // the pause menu blanks briefly between tabs, so only unlock after it stays closed
     constexpr uint32_t GAZE_UNLOCK_FRAMES = 5;
     if (CemuHooks::IsScreenOpen(ScreenId::PauseMenuInfo_00)) {
@@ -903,7 +899,7 @@ std::vector<XrCompositionLayerQuad> RND_Renderer::Layer2D::FinishRendering(XrTim
         m_gazeUnlockCounter = 0;
     }
 
-    if (GetSettings().DoesUIFollowGaze() || isBowAiming) {
+    if (GetSettings().DoesUIFollowGaze()) {
         m_currentOrientation = glm::slerp(m_currentOrientation, headOrientation, LERP_SPEED);
         glm::vec3 forwardDirection = m_isGazeLocked ? m_lockedGazeForward : headOrientation * glm::vec3(0.0f, 0.0f, -1.0f);
 

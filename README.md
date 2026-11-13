@@ -11,6 +11,10 @@ It currently supports the following features:
 * Large mod compatibility. BetterVR only modifies the code and no game data. Most other mods should be compatible.
 * Optional third-person mode.
 
+In this build, the UI never follows head/gaze rotation, including while aiming a bow.
+The saved `UiFollowsGaze` setting is ignored; HUD distance and size remain adjustable.
+Right-trigger object throwing detects throwable objects in either hand, including near the right shoulder.
+
 ### Requirements
 
 * It supports all OpenXR headsets, as long as the VR controllers have enough buttons.
