@@ -148,6 +148,8 @@ endif ()
 set(BETTERVR_VERSION_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated/version")
 file(STRINGS "${BETTERVR_ROOT}/CMakeLists.txt" bettervrProjectLine REGEX "^project\\(BetterVR VERSION ")
 string(REGEX MATCH "VERSION ([0-9.]+)" bettervrVersionMatch "${bettervrProjectLine}")
+set(BETTERVR_VERSION_SUFFIX "" CACHE STRING "Pre-release suffix such as -rc1, which ranks below the plain version in the update check")
+set(bettervrVersion "${CMAKE_MATCH_1}${BETTERVR_VERSION_SUFFIX}")
 if (DEFINED ENV{GITHUB_ACTIONS} OR DEFINED ENV{CI})
     set(BETTERVR_CI_BUILD_DEFAULT ON)
 else ()
@@ -158,7 +160,7 @@ if (NOT BETTERVR_CI_BUILD)
     target_compile_definitions(BetterVR PRIVATE BETTERVR_PACKS_DIR="${BETTERVR_ROOT}/resources")
 endif ()
 add_custom_target(BetterVR_Version
-    COMMAND ${CMAKE_COMMAND} -DSOURCE_DIR=${BETTERVR_ROOT} -DOUTPUT_HEADER=${BETTERVR_VERSION_DIR}/bettervr_version.h -DVERSION=${CMAKE_MATCH_1} -DCI_BUILD=${BETTERVR_CI_BUILD} -P "${BETTERVR_ROOT}/cmake/generate_version_header.cmake"
+    COMMAND ${CMAKE_COMMAND} -DSOURCE_DIR=${BETTERVR_ROOT} -DOUTPUT_HEADER=${BETTERVR_VERSION_DIR}/bettervr_version.h -DVERSION=${bettervrVersion} -DCI_BUILD=${BETTERVR_CI_BUILD} -P "${BETTERVR_ROOT}/cmake/generate_version_header.cmake"
     BYPRODUCTS "${BETTERVR_VERSION_DIR}/bettervr_version.h"
     COMMENT "Resolving BetterVR build version"
     VERBATIM

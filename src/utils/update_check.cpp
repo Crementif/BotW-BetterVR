@@ -9,13 +9,15 @@ static constexpr const char* kLatestReleaseUrl = "https://api.github.com/repos/C
 static std::mutex s_mutex;
 static std::optional<std::string> s_newerRelease;
 
-static std::array<uint32_t, 3> ParseVersion(std::string_view version) {
+// the last part is 1 for a release and 0 for a pre-release like 1.1.0-rc1, so 1.1.0 ranks above it
+static std::array<uint32_t, 4> ParseVersion(std::string_view version) {
     if (!version.empty() && (version.front() == 'v' || version.front() == 'V')) {
         version.remove_prefix(1);
     }
-    std::array<uint32_t, 3> parts = {};
-    for (uint32_t& part : parts) {
-        const auto [end, error] = std::from_chars(version.data(), version.data() + version.size(), part);
+    std::array<uint32_t, 4> parts = {};
+    parts[3] = version.find('-') == std::string_view::npos ? 1 : 0;
+    for (size_t i = 0; i < 3; i++) {
+        const auto [end, error] = std::from_chars(version.data(), version.data() + version.size(), parts[i]);
         if (error != std::errc() || end == version.data() + version.size() || *end != '.') {
             break;
         }
