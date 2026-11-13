@@ -45,16 +45,12 @@ namespace Game {
     void QueueWorldOverlays(long presentedFrameIdx);
     void DrawDebugWindows();
 
-    struct GuideRow {
-        const char* input;
-        const char* action;
-    };
     struct GuideCard {
         const char* icon;
         const char* title;
-        std::array<GuideRow, 3> rows;
-        glm::fvec3 position;
-        glm::fvec3 zone;
+        const char* hint;
+        glm::fvec3 cardOffset;
+        glm::fvec3 zoneOffset;
         float zoneRadius;
     };
     inline constexpr size_t MaxGuideCards = 6;

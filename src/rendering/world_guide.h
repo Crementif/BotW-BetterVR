@@ -43,11 +43,14 @@ private:
     float MeasureText(const char* text, float scale) const;
 
     void AddQuad(const Billboard& frame, glm::fvec2 min, glm::fvec2 max, glm::fvec2 uvMin, glm::fvec2 uvMax, uint32_t color, const glm::fvec4& shape, float kind);
-    void AddBox(const Billboard& frame, glm::fvec2 center, glm::fvec2 halfSize, float radius, float outline, uint32_t color);
+    void AddSoftBox(const Billboard& frame, glm::fvec2 halfSize, float radius, float feather, uint32_t color, float kind);
     void AddText(const Billboard& frame, glm::fvec2 baseline, const char* text, float scale, uint32_t color, float weight);
     void AddIcon(const Billboard& frame, glm::fvec2 center, const char* icon, float scale, uint32_t color);
     void AddRibbon(std::span<const glm::fvec3> points, std::span<const float> halfWidths, std::span<const uint32_t> colors, const glm::fvec3& headPos);
-    void AddZone(const glm::fvec3& zone, float radius, const glm::fvec3& headPos, float fade, float pulse);
+    void AddZone(const glm::fvec3& zone, float radius, const glm::fvec3& headPos, float alpha, float proximity);
+    void FollowHead(const std::array<XrView, 2>& views, float dt, bool snap);
+    void UpdateProximity(float dt);
+    glm::fvec3 BodyPoint(const glm::fvec3& offset) const;
 
     RND_VkBackend* m_backend = nullptr;
 
@@ -72,8 +75,15 @@ private:
 
     Game::Guide m_guide = {};
     std::array<glm::fvec2, Game::MaxGuideCards> m_halfSizes = {};
-    std::array<float, Game::MaxGuideCards> m_inputColumns = {};
+    std::array<float, Game::MaxGuideCards> m_titleWidths = {};
+    std::array<float, Game::MaxGuideCards> m_hintWidths = {};
     uint64_t m_generation = 0;
     bool m_visible = false;
     std::chrono::steady_clock::time_point m_fadeStart = {};
+    std::chrono::steady_clock::time_point m_lastPrepare = {};
+
+    glm::fvec3 m_anchorPos = {};
+    float m_anchorYaw = 0.0f;
+    bool m_turning = false;
+    std::array<float, Game::MaxGuideCards> m_proximity = {};
 };

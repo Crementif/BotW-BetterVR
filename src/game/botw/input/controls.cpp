@@ -928,32 +928,28 @@ static void SetGuide(const Game::Guide& guide, GuideContext context, XrTime show
     s_guide.shownAt = shownAt;
 }
 
-static Game::Guide BuildGuide(GuideContext context, const glm::fmat4& headsetMtx) {
-    const glm::fvec3 headPos(headsetMtx[3]);
-    glm::fvec3 forward = -glm::fvec3(headsetMtx[2]);
-    forward.y = 0.0f;
-    forward = glm::length2(forward) < 0.0001f ? glm::fvec3(0.0f, 0.0f, -1.0f) : glm::normalize(forward);
-    const glm::fvec3 right = glm::normalize(glm::cross(forward, glm::fvec3(0.0f, 1.0f, 0.0f)));
+static Game::Guide BuildGuide(GuideContext context) {
     const float leftSide = -1.0f;
 
     auto place = [&](float sideways, float up, float ahead) {
-        return headPos + right * sideways + glm::fvec3(0.0f, up, 0.0f) + forward * ahead;
+        return glm::fvec3(sideways, up, ahead);
     };
 
     Game::Guide guide = {};
     auto& cards = guide.cards;
     if (context == GuideContext::OnFoot) {
-        cards[0] = { ICON_MS_BOW_ARC, "Bow & Shield", { { { "Grip", "Equip Bow" }, { "Hold Grip", "Bow / Shield Menu" }, {} } }, place(0.42f * leftSide, 0.02f, 0.34f), place(0.17f * leftSide, -0.12f, -0.10f), 0.09f };
-        cards[1] = { ICON_MS_SWORDS, "Weapons", { { { "Grip", "Equip Weapon" }, { "Hold Grip", "Weapon / Arrow Menu" }, { "Trigger", "Throw Weapon" } } }, place(-0.42f * leftSide, 0.02f, 0.34f), place(-0.17f * leftSide, -0.12f, -0.10f), 0.09f };
-        cards[2] = { ICON_MS_TABLET_ANDROID, "Runes", { { { "Grip", "Equip Rune" }, { "Hold Grip", "Rune Menu" }, {} } }, place(0.40f * leftSide, -0.40f, 0.40f), place(0.24f * leftSide, -0.62f, -0.02f), 0.10f };
-        cards[3] = { ICON_MS_DOWNLOAD, "Drop", { { { "Hold Grip", "Drop Held Item" }, {}, {} } }, place(-0.40f * leftSide, -0.40f, 0.40f), place(-0.24f * leftSide, -0.62f, -0.02f), 0.10f };
-        cards[4] = { ICON_MS_SPORTS, "Whistle", { { { "Both Grips", "Whistle" }, {}, {} } }, place(0.0f, 0.17f, 0.48f), place(0.0f, -0.10f, 0.09f), 0.06f };
-        guide.count = 5;
+        cards[0] = { ICON_MS_BOW_ARC, "Bow", nullptr, place(0.40f * leftSide, 0.02f, 0.36f), place(0.17f * leftSide, -0.12f, -0.10f), 0.09f };
+        cards[1] = { ICON_MS_SWORDS, "Weapon", nullptr, place(-0.40f * leftSide, 0.02f, 0.36f), place(-0.17f * leftSide, -0.12f, -0.10f), 0.09f };
+        cards[2] = { ICON_MS_TABLET_ANDROID, "Runes", nullptr, place(0.36f * leftSide, -0.36f, 0.42f), place(0.24f * leftSide, -0.62f, -0.02f), 0.10f };
+        cards[3] = { ICON_MS_DOWNLOAD, "Drop", "Hold grip", place(-0.36f * leftSide, -0.36f, 0.42f), place(-0.24f * leftSide, -0.62f, -0.02f), 0.10f };
+        cards[4] = { ICON_MS_SPORTS, "Whistle", "Both grips", place(0.0f, -0.24f, 0.44f), place(0.0f, -0.10f, 0.09f), 0.06f };
+        cards[5] = { nullptr, nullptr, "Grip to equip, hold for menu", place(0.0f, 0.14f, 0.50f), {}, 0.0f };
+        guide.count = 6;
     }
     return guide;
 }
 
-static void UpdateGuide(const std::optional<glm::fmat4>& headsetPose, const OpenXR::InputState& inputs, bool menuOpen) {
+static void UpdateGuide(const OpenXR::InputState& inputs, bool menuOpen) {
     constexpr XrTime GuideDuration = 12'000'000'000;
     const XrTime now = inputs.shared.inputTime;
     const bool allowed = inputs.shared.in_game && !menuOpen && !ImGuiMenus::BlocksGameInput() && !Events::IsActive();
@@ -977,8 +973,8 @@ static void UpdateGuide(const std::optional<glm::fmat4>& headsetPose, const Open
         return;
     if (visible)
         SetGuide({}, GuideContext::None, 0);
-    else if (headsetPose.has_value())
-        SetGuide(BuildGuide(context, headsetPose.value()), context, now);
+    else
+        SetGuide(BuildGuide(context), context, now);
 }
 
 Game::Guide Controls::GetGuide() {
@@ -1332,7 +1328,7 @@ static void hook_InjectXRInput(PPCInterpreter_t* hCPU) {
 
     auto& isMenuOpen = ImGuiMenus::g_isOpen;
     ProcessModMenuInput(isMenuOpen, inputs, vpadStatus, leftStickSource, rightStickSource);
-    UpdateGuide(headsetPose, inputs, isMenuOpen);
+    UpdateGuide(inputs, isMenuOpen);
     HandGestureState leftGesture = {};
     HandGestureState rightGesture = {};
     ProcessHandGesture(headsetPose, inputs, leftGesture, rightGesture, state);

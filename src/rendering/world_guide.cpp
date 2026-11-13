@@ -1,6 +1,7 @@
 #include "pch.h"
 
 #include "world_guide.h"
+#include "instance.h"
 #include "shaders_spirv.h"
 #include "font_roboto.h"
 #include "font_material_symbols.h"
@@ -14,19 +15,18 @@ static constexpr int GlyphPadding = 7;
 static constexpr uint32_t AtlasWidth = 1024;
 static constexpr uint32_t AtlasHeight = 1024;
 
-static constexpr float TitleHeight = 0.024f;
-static constexpr float BodyHeight = 0.0175f;
-static constexpr float IconHeight = 0.030f;
-static constexpr float CardPadding = 0.016f;
-static constexpr float TitleRowHeight = 0.034f;
-static constexpr float TitleGap = 0.012f;
-static constexpr float RowHeight = 0.027f;
-static constexpr float ColumnGap = 0.018f;
-static constexpr float CardRadius = 0.012f;
+static constexpr float TitleHeight = 0.022f;
+static constexpr float HintHeight = 0.015f;
+static constexpr float IconHeight = 0.026f;
+static constexpr float IconGap = 0.008f;
+static constexpr float LineGap = 0.009f;
+static constexpr float LabelPadding = 0.014f;
 
 static constexpr float KindGlyph = 0.0f;
-static constexpr float KindBox = 1.0f;
 static constexpr float KindRibbon = 2.0f;
+static constexpr float KindGlow = 3.0f;
+static constexpr float KindSoftBox = 4.0f;
+static constexpr float KindGlowBox = 5.0f;
 
 static uint32_t Rgba(uint8_t r, uint8_t g, uint8_t b, float alpha) {
     const uint32_t a = (uint32_t)std::lround(glm::clamp(alpha, 0.0f, 1.0f) * 255.0f);
@@ -300,7 +300,7 @@ void WorldGuide::CreatePipeline() {
     };
     const VkPipelineColorBlendAttachmentState blendAttachment = {
         .blendEnable = VK_TRUE,
-        .srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA,
+        .srcColorBlendFactor = VK_BLEND_FACTOR_ONE,
         .dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
         .colorBlendOp = VK_BLEND_OP_ADD,
         .srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE,
@@ -370,9 +370,9 @@ void WorldGuide::AddQuad(const Billboard& frame, glm::fvec2 min, glm::fvec2 max,
     m_vertices.push_back(bottomRight);
 }
 
-void WorldGuide::AddBox(const Billboard& frame, glm::fvec2 center, glm::fvec2 halfSize, float radius, float outline, uint32_t color) {
-    const glm::fvec2 extent = halfSize + glm::fvec2(0.003f);
-    AddQuad(frame, center - extent, center + extent, glm::fvec2(-extent.x, extent.y), glm::fvec2(extent.x, -extent.y), color, glm::fvec4(halfSize, radius, outline), KindBox);
+void WorldGuide::AddSoftBox(const Billboard& frame, glm::fvec2 halfSize, float radius, float feather, uint32_t color, float kind) {
+    const glm::fvec2 extent = halfSize + glm::fvec2(feather);
+    AddQuad(frame, -extent, extent, glm::fvec2(-extent.x, extent.y), glm::fvec2(extent.x, -extent.y), color, glm::fvec4(halfSize, radius, feather), kind);
 }
 
 void WorldGuide::AddText(const Billboard& frame, glm::fvec2 baseline, const char* text, float scale, uint32_t color, float weight) {
@@ -426,42 +426,82 @@ void WorldGuide::AddRibbon(std::span<const glm::fvec3> points, std::span<const f
 
 static WorldGuide::Billboard FacingHead(const glm::fvec3& center, const glm::fvec3& headPos);
 
-void WorldGuide::AddZone(const glm::fvec3& zone, float radius, const glm::fvec3& headPos, float fade, float pulse) {
+void WorldGuide::AddZone(const glm::fvec3& zone, float radius, const glm::fvec3& headPos, float alpha, float proximity) {
     const Billboard frame = FacingHead(zone, headPos);
 
-    const glm::fvec2 origin(0.0f);
-    AddBox(frame, origin, glm::fvec2(radius), radius, 0.0f, Rgba(110, 215, 255, 0.16f * fade));
-    const float pulseRadius = radius * (1.0f + 0.4f * pulse);
-    AddBox(frame, origin, glm::fvec2(pulseRadius), pulseRadius, 0.0025f, Rgba(110, 215, 255, (1.0f - pulse) * 0.55f * fade));
-    AddBox(frame, origin, glm::fvec2(radius), radius, 0.0035f, Rgba(110, 215, 255, 0.9f * fade));
-    AddBox(frame, origin, glm::fvec2(radius * 0.16f), radius * 0.16f, 0.0f, Rgba(235, 248, 255, 0.95f * fade));
-}
-
-static glm::fvec2 CardHalfSize(float titleWidth, float inputWidth, float actionWidth, uint32_t rowCount) {
-    const float titleRow = IconHeight + 0.010f + titleWidth;
-    const float rows = inputWidth + ColumnGap + actionWidth;
-    const float width = std::max(titleRow, rows) + CardPadding * 2.0f;
-    const float height = CardPadding * 2.0f + TitleRowHeight + (rowCount > 0 ? TitleGap + RowHeight * (float)rowCount : 0.0f);
-    return glm::fvec2(width, height) * 0.5f;
+    const float maxRadius = glm::distance(zone, headPos) * 0.35f;
+    const float glowRadius = std::min(radius * glm::mix(1.5f, 2.0f, proximity), maxRadius);
+    AddQuad(frame, glm::fvec2(-glowRadius), glm::fvec2(glowRadius), glm::fvec2(-1.0f, 1.0f), glm::fvec2(1.0f, -1.0f), Rgba(110, 215, 255, glm::mix(0.3f, 1.0f, proximity) * alpha), glm::fvec4(0.0f), KindGlow);
+    const float coreRadius = std::min(radius * 0.8f, maxRadius * 0.5f);
+    AddQuad(frame, glm::fvec2(-coreRadius), glm::fvec2(coreRadius), glm::fvec2(-1.0f, 1.0f), glm::fvec2(1.0f, -1.0f), Rgba(235, 248, 255, 0.7f * proximity * alpha), glm::fvec4(0.0f), KindGlow);
 }
 
 void WorldGuide::LayoutCards() {
     const float titleScale = TitleHeight / GlyphPixels;
-    const float bodyScale = BodyHeight / GlyphPixels;
+    const float hintScale = HintHeight / GlyphPixels;
     for (size_t i = 0; i < m_guide.count; i++) {
         const Game::GuideCard& card = m_guide.cards[i];
-        float inputWidth = 0.0f;
-        float actionWidth = 0.0f;
-        uint32_t rowCount = 0;
-        for (const Game::GuideRow& row : card.rows) {
-            if (row.input == nullptr)
-                continue;
-            inputWidth = std::max(inputWidth, MeasureText(row.input, bodyScale));
-            actionWidth = std::max(actionWidth, MeasureText(row.action, bodyScale));
-            rowCount++;
+        const bool hasTitle = card.title != nullptr;
+        const bool hasHint = card.hint != nullptr;
+        m_titleWidths[i] = hasTitle ? (card.icon != nullptr ? IconHeight + IconGap : 0.0f) + MeasureText(card.title, titleScale) : 0.0f;
+        m_hintWidths[i] = hasHint ? MeasureText(card.hint, hintScale) : 0.0f;
+        const float width = std::max(m_titleWidths[i], m_hintWidths[i]) + LabelPadding * 2.0f;
+        const float height = (hasTitle ? IconHeight : 0.0f) + (hasTitle && hasHint ? LineGap : 0.0f) + (hasHint ? HintHeight : 0.0f) + LabelPadding * 2.0f;
+        m_halfSizes[i] = glm::fvec2(width, height) * 0.5f;
+    }
+}
+
+void WorldGuide::FollowHead(const std::array<XrView, 2>& views, float dt, bool snap) {
+    constexpr float StartTurning = glm::radians(65.0f);
+    constexpr float StopTurning = glm::radians(8.0f);
+
+    const glm::fvec3 headPos = HeadPositionOf(views);
+    const glm::fvec3 forward = ToGLM(views[0].pose.orientation) * glm::fvec3(0.0f, 0.0f, -1.0f);
+    const float headYaw = forward.x * forward.x + forward.z * forward.z > 0.01f ? std::atan2(-forward.x, -forward.z) : m_anchorYaw;
+    if (snap) {
+        m_anchorPos = headPos;
+        m_anchorYaw = headYaw;
+        m_turning = false;
+        return;
+    }
+
+    m_anchorPos = glm::mix(m_anchorPos, headPos, 1.0f - std::exp(-dt * 12.0f));
+    const float yawDelta = std::remainder(headYaw - m_anchorYaw, glm::two_pi<float>());
+    if (std::abs(yawDelta) > StartTurning)
+        m_turning = true;
+    else if (std::abs(yawDelta) < StopTurning)
+        m_turning = false;
+    if (m_turning)
+        m_anchorYaw += yawDelta * (1.0f - std::exp(-dt * 4.0f));
+}
+
+glm::fvec3 WorldGuide::BodyPoint(const glm::fvec3& offset) const {
+    const glm::fvec3 forward(-std::sin(m_anchorYaw), 0.0f, -std::cos(m_anchorYaw));
+    const glm::fvec3 right(-forward.z, 0.0f, forward.x);
+    return m_anchorPos + right * offset.x + glm::fvec3(0.0f, offset.y, 0.0f) + forward * offset.z;
+}
+
+void WorldGuide::UpdateProximity(float dt) {
+    const OpenXR::InputState input = VRManager::instance().XR->m_input.load();
+    std::array<std::optional<glm::fvec3>, 2> hands = {};
+    for (size_t side = 0; side < hands.size(); side++) {
+        const XrSpaceLocation& location = input.shared.poseLocation[side];
+        if ((location.locationFlags & XR_SPACE_LOCATION_POSITION_VALID_BIT) != 0)
+            hands[side] = ToGLM(location.pose.position);
+    }
+
+    const float blend = 1.0f - std::exp(-dt * 10.0f);
+    for (size_t i = 0; i < m_guide.count; i++) {
+        const Game::GuideCard& card = m_guide.cards[i];
+        float target = 0.0f;
+        if (card.zoneRadius > 0.0f) {
+            const glm::fvec3 zone = BodyPoint(card.zoneOffset);
+            for (const std::optional<glm::fvec3>& hand : hands) {
+                if (hand.has_value())
+                    target = std::max(target, 1.0f - glm::smoothstep(card.zoneRadius, card.zoneRadius * 2.0f, glm::distance(hand.value(), zone)));
+            }
         }
-        m_inputColumns[i] = inputWidth;
-        m_halfSizes[i] = CardHalfSize(MeasureText(card.title, titleScale), inputWidth, actionWidth, rowCount);
+        m_proximity[i] += (target - m_proximity[i]) * blend;
     }
 }
 
@@ -469,12 +509,18 @@ bool WorldGuide::Prepare(const std::array<XrView, 2>& views) {
     m_vertexCount = 0;
     const Game::Guide guide = Game::GetGuide();
     const auto now = std::chrono::steady_clock::now();
+    const float dt = glm::clamp(std::chrono::duration<float>(now - m_lastPrepare).count(), 0.0f, 0.1f);
+    m_lastPrepare = now;
+
+    bool snap = false;
     if (guide.generation != m_generation) {
         m_generation = guide.generation;
         if (guide.count > 0) {
+            snap = !m_visible;
             m_guide = guide;
             m_visible = true;
             m_fadeStart = now;
+            m_proximity = {};
             LayoutCards();
         }
         else if (m_visible) {
@@ -484,88 +530,85 @@ bool WorldGuide::Prepare(const std::array<XrView, 2>& views) {
     }
 
     const float elapsed = std::chrono::duration<float>(now - m_fadeStart).count();
-    const float fade = glm::smoothstep(0.0f, 1.0f, m_visible ? elapsed / 0.25f : 1.0f - elapsed / 0.3f);
+    const float fade = glm::smoothstep(0.0f, 1.0f, m_visible ? elapsed / 0.35f : 1.0f - elapsed / 0.4f);
     if (fade <= 0.0f || m_guide.count == 0)
         return false;
 
-    const float pulse = std::fmod(elapsed, 1.6f) / 1.6f;
+    FollowHead(views, dt, snap);
+    UpdateProximity(dt);
+
     const glm::fvec3 headPos = HeadPositionOf(views);
     const float titleScale = TitleHeight / GlyphPixels;
-    const float bodyScale = BodyHeight / GlyphPixels;
+    const float hintScale = HintHeight / GlyphPixels;
     const float iconScale = IconHeight / GlyphPixels;
 
     m_vertices.clear();
     const std::array<glm::fvec2, Game::MaxGuideCards>& halfSizes = m_halfSizes;
-    const std::array<float, Game::MaxGuideCards>& inputColumns = m_inputColumns;
-    const glm::fvec3 rise(0.0f, m_visible ? (fade - 1.0f) * 0.025f : 0.0f, 0.0f);
+
+    const float focus = glm::smoothstep(0.6f, 1.0f, *std::max_element(m_proximity.begin(), m_proximity.begin() + m_guide.count));
+    std::array<float, Game::MaxGuideCards> cardAlphas = {};
+    for (size_t i = 0; i < m_guide.count; i++)
+        cardAlphas[i] = fade * glm::mix(1.0f, glm::mix(0.6f, 1.0f, m_proximity[i]), focus);
 
     for (size_t i = 0; i < m_guide.count; i++) {
         const Game::GuideCard& card = m_guide.cards[i];
         if (card.zoneRadius <= 0.0f)
             continue;
-        AddZone(card.zone, card.zoneRadius, headPos, fade, pulse);
+        const glm::fvec3 zone = BodyPoint(card.zoneOffset);
+        AddZone(zone, card.zoneRadius, headPos, cardAlphas[i], m_proximity[i]);
 
-        const Billboard frame = FacingHead(card.position + rise, headPos);
-        const glm::fvec3 toZone = card.zone - frame.center;
+        const Billboard frame = FacingHead(BodyPoint(card.cardOffset), headPos);
+        const glm::fvec3 toZone = zone - frame.center;
         const glm::fvec2 planar(glm::dot(toZone, frame.right), glm::dot(toZone, frame.up));
         const float reach = std::min(std::abs(planar.x) > 1e-5f ? halfSizes[i].x / std::abs(planar.x) : std::numeric_limits<float>::max(), std::abs(planar.y) > 1e-5f ? halfSizes[i].y / std::abs(planar.y) : std::numeric_limits<float>::max());
         if (reach >= 1.0f || reach == std::numeric_limits<float>::max())
             continue;
 
         const glm::fvec3 start = frame.center + (frame.right * planar.x + frame.up * planar.y) * reach;
-        const glm::fvec3 end = card.zone - glm::normalize(card.zone - start) * card.zoneRadius * 1.2f;
+        const glm::fvec3 end = zone - glm::normalize(zone - start) * card.zoneRadius * 0.5f;
         const glm::fvec3 middle = (start + end) * 0.5f;
         const glm::fvec3 bulge = glm::normalize(middle - headPos) * glm::length(end - start) * 0.22f;
         const glm::fvec3 control = middle + bulge;
-        constexpr float HeadLength = 0.03f;
-        const glm::fvec3 endDirection = glm::normalize(end - control);
-        const glm::fvec3 shaftEnd = end - endDirection * HeadLength;
 
         constexpr size_t SegmentCount = 24;
         std::array<glm::fvec3, SegmentCount + 1> points = {};
         std::array<float, SegmentCount + 1> widths = {};
         std::array<uint32_t, SegmentCount + 1> colors = {};
+        const float lineAlpha = glm::mix(0.3f, 0.85f, m_proximity[i]) * cardAlphas[i];
         for (size_t s = 0; s <= SegmentCount; s++) {
             const float t = (float)s / (float)SegmentCount;
-            points[s] = (1.0f - t) * (1.0f - t) * start + 2.0f * (1.0f - t) * t * control + t * t * shaftEnd;
-            widths[s] = 0.0028f;
-            colors[s] = Rgba(110, 215, 255, glm::mix(0.3f, 0.95f, t) * fade);
+            points[s] = (1.0f - t) * (1.0f - t) * start + 2.0f * (1.0f - t) * t * control + t * t * end;
+            widths[s] = 0.0035f;
+            colors[s] = Rgba(110, 215, 255, glm::smoothstep(0.0f, 1.0f, t) * (1.0f - glm::smoothstep(0.85f, 1.0f, t) * 0.6f) * lineAlpha);
         }
         AddRibbon(points, widths, colors, headPos);
-
-        const std::array<glm::fvec3, 2> headPoints = { shaftEnd, end };
-        const std::array<float, 2> headWidths = { 0.011f, 0.0f };
-        const std::array<uint32_t, 2> headColors = { Rgba(110, 215, 255, 0.95f * fade), Rgba(110, 215, 255, 0.95f * fade) };
-        AddRibbon(headPoints, headWidths, headColors, headPos);
     }
 
     for (size_t i = 0; i < m_guide.count; i++) {
         const Game::GuideCard& card = m_guide.cards[i];
-        const Billboard frame = FacingHead(card.position + rise, headPos);
+        const Billboard frame = FacingHead(BodyPoint(card.cardOffset), headPos);
         const glm::fvec2 half = halfSizes[i];
+        const float radius = std::min(half.x, half.y);
+        const float cardAlpha = cardAlphas[i];
 
-        AddBox(frame, glm::fvec2(0.0f), half, CardRadius, 0.0f, Rgba(14, 18, 26, 0.92f * fade));
-        AddBox(frame, glm::fvec2(0.0f), half, CardRadius, 0.0016f, Rgba(110, 215, 255, 0.55f * fade));
+        if (m_proximity[i] > 0.01f)
+            AddSoftBox(frame, half, radius, 0.02f, Rgba(110, 215, 255, 0.35f * m_proximity[i] * cardAlpha), KindGlowBox);
+        AddSoftBox(frame, half, radius, 0.012f, Rgba(6, 10, 16, 0.5f * cardAlpha), KindSoftBox);
 
-        const float left = -half.x + CardPadding;
-        const float titleCenterY = half.y - CardPadding - TitleRowHeight * 0.5f;
-        AddIcon(frame, glm::fvec2(left + IconHeight * 0.5f, titleCenterY), card.icon, iconScale, Rgba(110, 215, 255, fade));
-        AddText(frame, glm::fvec2(left + IconHeight + 0.010f, titleCenterY - m_capHeight * titleScale * 0.5f), card.title, titleScale, Rgba(255, 255, 255, fade), 0.06f);
-
-        float rowCenterY = half.y - CardPadding - TitleRowHeight - TitleGap - RowHeight * 0.5f;
-        bool hasRows = false;
-        for (const Game::GuideRow& row : card.rows) {
-            if (row.input == nullptr)
-                continue;
-            hasRows = true;
-            const float baselineY = rowCenterY - m_capHeight * bodyScale * 0.5f;
-            AddText(frame, glm::fvec2(left, baselineY), row.input, bodyScale, Rgba(110, 215, 255, fade), 0.03f);
-            AddText(frame, glm::fvec2(left + inputColumns[i] + ColumnGap, baselineY), row.action, bodyScale, Rgba(226, 232, 240, fade), 0.0f);
-            rowCenterY -= RowHeight;
+        float top = half.y - LabelPadding;
+        if (card.title != nullptr) {
+            const float rowY = top - IconHeight * 0.5f;
+            float penX = -m_titleWidths[i] * 0.5f;
+            if (card.icon != nullptr) {
+                AddIcon(frame, glm::fvec2(penX + IconHeight * 0.5f, rowY), card.icon, iconScale, Rgba(110, 215, 255, cardAlpha));
+                penX += IconHeight + IconGap;
+            }
+            AddText(frame, glm::fvec2(penX, rowY - m_capHeight * titleScale * 0.5f), card.title, titleScale, Rgba(255, 255, 255, cardAlpha), 0.05f);
+            top -= IconHeight + LineGap;
         }
-        if (hasRows) {
-            const float dividerY = half.y - CardPadding - TitleRowHeight - TitleGap * 0.5f;
-            AddBox(frame, glm::fvec2(0.0f, dividerY), glm::fvec2(half.x - CardPadding, 0.0006f), 0.0f, 0.0f, Rgba(255, 255, 255, 0.14f * fade));
+        if (card.hint != nullptr) {
+            const float rowY = top - HintHeight * 0.5f;
+            AddText(frame, glm::fvec2(-m_hintWidths[i] * 0.5f, rowY - m_capHeight * hintScale * 0.5f), card.hint, hintScale, Rgba(196, 210, 224, 0.85f * cardAlpha), 0.0f);
         }
     }
 
