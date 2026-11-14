@@ -137,7 +137,10 @@ target_include_directories(BetterVR PRIVATE "${BETTERVR_ROOT}/include" "${BETTER
 # only the host module interface, so Cemu's source tree can't shadow the mod's own headers
 set_source_files_properties(cemu/host_module.cpp PROPERTIES INCLUDE_DIRECTORIES "${Cemu_SOURCE_DIR}/src")
 
-find_package(glm CONFIG REQUIRED)
+# Cemu already found glm, and Ubuntu 22.04's glm config can't be loaded twice
+if (NOT TARGET glm::glm)
+    find_package(glm CONFIG REQUIRED)
+endif ()
 target_link_libraries(BetterVR PRIVATE BetterVR_ImPlot BetterVR_ImGuiVulkan OpenXR::openxr_loader glm::glm fmt::fmt pugixml::pugixml CURL::libcurl)
 # std::atomic of structs wider than 8 bytes calls into libatomic outside of MSVC
 if (NOT MSVC)
