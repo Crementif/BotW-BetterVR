@@ -68,6 +68,7 @@ If none of these steps helped, check the BotW support channel on the [Flat2VR Di
 
 **You can view the controls in-game by opening the BetterVR menu by holding the X button on your left VR controller.**
 With Valve Index Controllers you can use the A button.
+With Steam Frame Controllers you can use the View button on the left controller. The Frame's D-pad, bumpers and lettered buttons also work like a Wii U gamepad's, while swinging, drawing the bow and grabbing stay motion controls.
 For Xbox/Playstation etc. controllers, long press the Start button and use the mouse for changing settings.
 
 You can find the controller image here (click to enlarge):  

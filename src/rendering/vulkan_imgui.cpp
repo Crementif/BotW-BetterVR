@@ -587,6 +587,8 @@ void RND_Renderer::ImGuiOverlay::ProcessInputs(OpenXR::InputState& inputs, const
 
     ImGuiIO& io = m_context->IO;
     bool inGame = inputs.shared.in_game;
+    // jump doubles as back in gameplay, unless the controller has its own B button
+    XrActionStateBoolean& gameplayBack = inputs.inGame.cancel.isActive ? inputs.inGame.cancel : inputs.inGame.jump_cancel;
 
     bool backDown;
     bool confirmDown;
@@ -595,7 +597,7 @@ void RND_Renderer::ImGuiOverlay::ProcessInputs(OpenXR::InputState& inputs, const
     XrActionStateVector2f stick;
     if (inputs.shared.in_game) {
         stick = inputs.inGame.move;
-        backDown = inputs.inGame.jump_cancel.currentState;
+        backDown = gameplayBack.currentState;
         confirmDown = inputs.inGame.run_interact.currentState;
         pageLeft = inputs.inGame.useLeftItem.currentState && inputs.inGame.useLeftItem.changedSinceLastSync;
         pageRight = inputs.inGame.useRightItem.currentState && inputs.inGame.useRightItem.changedSinceLastSync;
@@ -668,10 +670,11 @@ void RND_Renderer::ImGuiOverlay::ProcessInputs(OpenXR::InputState& inputs, const
         }
     };
 
-    applyInput(ImGuiKey_GamepadDpadUp, updateDpadState(0, stickY, !horizontalDominates, true) || ((hold & VPAD_BUTTON_UP) != 0), VERTICAL_REFIRE_DELAY, 0);
-    applyInput(ImGuiKey_GamepadDpadDown, updateDpadState(1, stickY, !horizontalDominates, false) || ((hold & VPAD_BUTTON_DOWN) != 0), VERTICAL_REFIRE_DELAY, 1);
-    applyInput(ImGuiKey_GamepadDpadLeft, updateDpadState(2, stickX, horizontalDominates, false) || ((hold & VPAD_BUTTON_LEFT) != 0), HORIZONTAL_REFIRE_DELAY, 2);
-    applyInput(ImGuiKey_GamepadDpadRight, updateDpadState(3, stickX, horizontalDominates, true) || ((hold & VPAD_BUTTON_RIGHT) != 0), HORIZONTAL_REFIRE_DELAY, 3);
+    const auto& dpad = inputs.shared.dpad;
+    applyInput(ImGuiKey_GamepadDpadUp, updateDpadState(0, stickY, !horizontalDominates, true) || ((hold & VPAD_BUTTON_UP) != 0) || dpad[0].currentState, VERTICAL_REFIRE_DELAY, 0);
+    applyInput(ImGuiKey_GamepadDpadDown, updateDpadState(1, stickY, !horizontalDominates, false) || ((hold & VPAD_BUTTON_DOWN) != 0) || dpad[2].currentState, VERTICAL_REFIRE_DELAY, 1);
+    applyInput(ImGuiKey_GamepadDpadLeft, updateDpadState(2, stickX, horizontalDominates, false) || ((hold & VPAD_BUTTON_LEFT) != 0) || dpad[3].currentState, HORIZONTAL_REFIRE_DELAY, 2);
+    applyInput(ImGuiKey_GamepadDpadRight, updateDpadState(3, stickX, horizontalDominates, true) || ((hold & VPAD_BUTTON_RIGHT) != 0) || dpad[1].currentState, HORIZONTAL_REFIRE_DELAY, 3);
 
     applyInput(ImGuiKey_GamepadFaceRight, backDown, VERTICAL_REFIRE_DELAY, 4);
     applyInput(ImGuiKey_GamepadFaceDown, confirmDown, VERTICAL_REFIRE_DELAY, 5);
@@ -697,9 +700,9 @@ void RND_Renderer::ImGuiOverlay::ProcessInputs(OpenXR::InputState& inputs, const
     // if no inputs or popup is open, allow closing the menu using the cancel/back button
     bool shouldClose = false;
     if (inGame) {
-        if (inputs.inGame.jump_cancel.changedSinceLastSync && inputs.inGame.jump_cancel.currentState) {
+        if (gameplayBack.changedSinceLastSync && gameplayBack.currentState) {
             shouldClose = true;
-            inputs.inGame.jump_cancel.currentState = XR_FALSE;
+            gameplayBack.currentState = XR_FALSE;
         }
     }
     else {

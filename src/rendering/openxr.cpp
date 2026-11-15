@@ -10,6 +10,10 @@
 #define XR_BD_ULTRA_CONTROLLER_INTERACTION_EXTENSION_NAME "XR_BD_ultra_controller_interaction"
 #endif
 
+#ifndef XR_VALVE_FRAME_CONTROLLER_INTERACTION_EXTENSION_NAME
+#define XR_VALVE_FRAME_CONTROLLER_INTERACTION_EXTENSION_NAME "XR_VALVE_frame_controller_interaction"
+#endif
+
 #if defined(_WIN32)
 static constexpr const char* kTimeBridgeExtensionName = XR_KHR_WIN32_CONVERT_PERFORMANCE_COUNTER_TIME_EXTENSION_NAME;
 static constexpr const char* kTimeBridgeToXrTimeName = "xrConvertWin32PerformanceCounterToTimeKHR";
@@ -121,6 +125,9 @@ OpenXR::OpenXR() {
         else if (strcmp(extensionProperties.extensionName, XR_EXT_HP_MIXED_REALITY_CONTROLLER_EXTENSION_NAME) == 0) {
             m_capabilities.supportsHPMixedRealityController = true;
         }
+        else if (strcmp(extensionProperties.extensionName, XR_VALVE_FRAME_CONTROLLER_INTERACTION_EXTENSION_NAME) == 0) {
+            m_capabilities.supportsFrameController = true;
+        }
         else if (strcmp(extensionProperties.extensionName, XR_FB_DISPLAY_REFRESH_RATE_EXTENSION_NAME) == 0) {
             m_capabilities.supportsDisplayRefreshRate = true;
         }
@@ -155,6 +162,7 @@ OpenXR::OpenXR() {
     if (m_capabilities.supportsPicoUltraController) enabledExtensions.emplace_back(XR_BD_ULTRA_CONTROLLER_INTERACTION_EXTENSION_NAME);
     if (m_capabilities.supportsCosmosController) enabledExtensions.emplace_back(XR_HTC_VIVE_COSMOS_CONTROLLER_INTERACTION_EXTENSION_NAME);
     if (m_capabilities.supportsHPMixedRealityController) enabledExtensions.emplace_back(XR_EXT_HP_MIXED_REALITY_CONTROLLER_EXTENSION_NAME);
+    if (m_capabilities.supportsFrameController) enabledExtensions.emplace_back(XR_VALVE_FRAME_CONTROLLER_INTERACTION_EXTENSION_NAME);
     if (m_capabilities.supportsDisplayRefreshRate) enabledExtensions.emplace_back(XR_FB_DISPLAY_REFRESH_RATE_EXTENSION_NAME);
     if (m_capabilities.supportsEyeGaze) enabledExtensions.emplace_back(XR_EXT_EYE_GAZE_INTERACTION_EXTENSION_NAME);
 
@@ -588,6 +596,14 @@ void OpenXR::CreateActions() {
         createAction(m_gameplayActionSet, "crouch_scope", "Crouch (Quick press) - Open Scope (Long press)", XR_ACTION_TYPE_BOOLEAN_INPUT, m_crouch_scopeAction);
         createAction(m_gameplayActionSet, "ingame_inventory_map", "Open Inventory (Quick press) - Open Map (Long press)", XR_ACTION_TYPE_BOOLEAN_INPUT, m_inGame_inventory_mapAction);
 
+        createAction(m_gameplayActionSet, "cancel", "Cancel / Run / Put away (B Button)", XR_ACTION_TYPE_BOOLEAN_INPUT, m_cancelAction);
+        createAction(m_gameplayActionSet, "sprint", "Run (Hold)", XR_ACTION_TYPE_BOOLEAN_INPUT, m_sprintAction);
+        createAction(m_gameplayActionSet, "scope", "Open Scope", XR_ACTION_TYPE_BOOLEAN_INPUT, m_scopeAction);
+        createAction(m_gameplayActionSet, "dpad_up", "D-pad Up (Rune menu)", XR_ACTION_TYPE_BOOLEAN_INPUT, m_inGameDpadActions[0]);
+        createAction(m_gameplayActionSet, "dpad_right", "D-pad Right (Weapon or bow menu)", XR_ACTION_TYPE_BOOLEAN_INPUT, m_inGameDpadActions[1]);
+        createAction(m_gameplayActionSet, "dpad_down", "D-pad Down (Whistle)", XR_ACTION_TYPE_BOOLEAN_INPUT, m_inGameDpadActions[2]);
+        createAction(m_gameplayActionSet, "dpad_left", "D-pad Left (Shield or arrow menu)", XR_ACTION_TYPE_BOOLEAN_INPUT, m_inGameDpadActions[3]);
+
         createAction(m_gameplayActionSet, "rumble", "Rumble", XR_ACTION_TYPE_VIBRATION_OUTPUT, m_rumbleAction);
     }
 
@@ -614,6 +630,10 @@ void OpenXR::CreateActions() {
 
         createAction(m_menuActionSet, "inmenu_inventory_map", "Close Inventory (Wii U - Start Button) - Close Map (Wii U - Select Button)", XR_ACTION_TYPE_BOOLEAN_INPUT, m_inMenu_inventory_mapAction);
         createAction(m_menuActionSet, "inmenu_modmenu", "Mod Menu", XR_ACTION_TYPE_BOOLEAN_INPUT, m_inMenu_modMenuAction);
+        createAction(m_menuActionSet, "dpad_up", "D-pad Up", XR_ACTION_TYPE_BOOLEAN_INPUT, m_inMenuDpadActions[0]);
+        createAction(m_menuActionSet, "dpad_right", "D-pad Right", XR_ACTION_TYPE_BOOLEAN_INPUT, m_inMenuDpadActions[1]);
+        createAction(m_menuActionSet, "dpad_down", "D-pad Down", XR_ACTION_TYPE_BOOLEAN_INPUT, m_inMenuDpadActions[2]);
+        createAction(m_menuActionSet, "dpad_left", "D-pad Left", XR_ACTION_TYPE_BOOLEAN_INPUT, m_inMenuDpadActions[3]);
     }
 
     {
@@ -646,8 +666,13 @@ void OpenXR::CreateActions() {
         bindings.rightTriggerAction = m_rightTriggerAction;
         bindings.inMenu_modMenuAction = m_inMenu_modMenuAction;
         bindings.inMenu_inventory_mapAction = m_inMenu_inventory_mapAction;
+        bindings.cancelAction = m_cancelAction;
+        bindings.sprintAction = m_sprintAction;
+        bindings.scopeAction = m_scopeAction;
+        bindings.inGameDpadActions = m_inGameDpadActions;
+        bindings.inMenuDpadActions = m_inMenuDpadActions;
 
-        SuggestControllerBindings(m_instance, bindings, m_capabilities.supportsPicoController, m_capabilities.supportsPicoUltraController, m_capabilities.supportsCosmosController, m_capabilities.supportsHPMixedRealityController);
+        SuggestControllerBindings(m_instance, bindings, m_capabilities.supportsPicoController, m_capabilities.supportsPicoUltraController, m_capabilities.supportsCosmosController, m_capabilities.supportsHPMixedRealityController, m_capabilities.supportsFrameController);
     }
 
     std::vector actionSets = { m_gameplayActionSet, m_menuActionSet };
@@ -809,6 +834,8 @@ std::optional<OpenXR::InputState> OpenXR::UpdateActions(XrTime predictedFrameTim
 
     readBoolean(newState.shared.in_game ? m_inGame_inventory_mapAction : m_inMenu_inventory_mapAction, EyeSide::RIGHT, newState.shared.inventory_map, "Failed to get inventory_help action value!");
     readBoolean(newState.shared.in_game ? m_inGame_modMenuAction : m_inMenu_modMenuAction, EyeSide::LEFT, newState.shared.modMenu, "Failed to get mod menu action value!");
+    for (size_t i = 0; i < newState.shared.dpad.size(); ++i)
+        readBoolean(newState.shared.in_game ? m_inGameDpadActions[i] : m_inMenuDpadActions[i], EyeSide::LEFT, newState.shared.dpad[i], "Failed to get dpad action value!");
 
     if (inMenu) {
         readVector2f(m_scrollAction, EyeSide::RIGHT, newState.inMenu.scroll, "Failed to get navigate action value!");
@@ -839,6 +866,9 @@ std::optional<OpenXR::InputState> OpenXR::UpdateActions(XrTime predictedFrameTim
         readBoolean(m_useRune_dpadMenu_Action, EyeSide::LEFT, newState.inGame.useRune_dpadMenu, "Failed to get use rune action value!");
         readBoolean(m_useRightItemAction, EyeSide::RIGHT, newState.inGame.useRightItem, "Failed to get useRightItem action value!");
         readBoolean(m_useLeftItemAction, EyeSide::LEFT, newState.inGame.useLeftItem, "Failed to get useLeftItem action value!");
+        readBoolean(m_cancelAction, EyeSide::RIGHT, newState.inGame.cancel, "Failed to get cancel action value!");
+        readBoolean(m_sprintAction, EyeSide::RIGHT, newState.inGame.sprint, "Failed to get sprint action value!");
+        readBoolean(m_scopeAction, EyeSide::RIGHT, newState.inGame.scope, "Failed to get scope action value!");
     }
     this->m_input.store(newState);
     return newState;

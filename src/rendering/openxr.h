@@ -34,6 +34,7 @@ public:
         bool supportsPicoUltraController;
         bool supportsCosmosController;
         bool supportsHPMixedRealityController;
+        bool supportsFrameController;
         bool supportsDisplayRefreshRate;
         bool supportsEyeGaze;
         ControllerType activeControllerType = ControllerType::Unknown;
@@ -53,6 +54,8 @@ public:
 
             XrActionStateBoolean inventory_map;
             XrActionStateBoolean modMenu;
+            // up, right, down, left
+            std::array<XrActionStateBoolean, 4> dpad;
         } shared;
 
         struct InGame {
@@ -69,7 +72,9 @@ public:
             XrActionStateBoolean useLeftItem;
             XrActionStateBoolean useRightItem;
 
-
+            XrActionStateBoolean cancel;
+            XrActionStateBoolean sprint;
+            XrActionStateBoolean scope;
         } inGame;
         struct InMenu {
             XrActionStateVector2f scroll;
@@ -163,6 +168,11 @@ private:
     XrAction m_crouch_scopeAction = XR_NULL_HANDLE;
     XrAction m_inGame_inventory_mapAction = XR_NULL_HANDLE;
 
+    XrAction m_cancelAction = XR_NULL_HANDLE;
+    XrAction m_sprintAction = XR_NULL_HANDLE;
+    XrAction m_scopeAction = XR_NULL_HANDLE;
+    std::array<XrAction, 4> m_inGameDpadActions = {};
+
     XrAction m_rumbleAction = XR_NULL_HANDLE;
 
     // synced with both the gameplay and menu sets since the eyes are tracked in menus too
@@ -184,7 +194,8 @@ private:
     XrAction m_rightTriggerAction = XR_NULL_HANDLE;
 
     XrAction m_inMenu_modMenuAction = XR_NULL_HANDLE; //imgui mod menu
-    XrAction m_inMenu_inventory_mapAction = XR_NULL_HANDLE; 
+    XrAction m_inMenu_inventory_mapAction = XR_NULL_HANDLE;
+    std::array<XrAction, 4> m_inMenuDpadActions = {};
 
     std::unique_ptr<RND_Renderer> m_renderer;
     std::unique_ptr<RumbleManager> m_rumbleManager;

@@ -8,6 +8,7 @@ enum class ControllerType : uint8_t {
     Pico4,
     HPReverbG2,
     ViveCosmos,
+    SteamFrame,
 };
 
 struct ControllerActionBindings {
@@ -39,6 +40,11 @@ struct ControllerActionBindings {
     XrAction rightTriggerAction = XR_NULL_HANDLE;
     XrAction inMenu_modMenuAction = XR_NULL_HANDLE;
     XrAction inMenu_inventory_mapAction = XR_NULL_HANDLE;
+    XrAction cancelAction = XR_NULL_HANDLE;
+    XrAction sprintAction = XR_NULL_HANDLE;
+    XrAction scopeAction = XR_NULL_HANDLE;
+    std::array<XrAction, 4> inGameDpadActions = {};
+    std::array<XrAction, 4> inMenuDpadActions = {};
 };
 
 static XrPath GetPath(XrInstance instance, const char* str) {
@@ -61,7 +67,7 @@ static void SuggestProfileBindings(XrInstance instance, const char* interactionP
     checkXRResult(result, fmt::format("Failed to suggest bindings for the {} interaction profile!", interactionProfile).c_str());
 }
 
-inline void SuggestControllerBindings(XrInstance instance, const ControllerActionBindings& a, bool enablePicoBindings = true, bool enablePicoUltraBindings = true, bool enableCosmosBindings = true, bool enableHPMixedRealityBindings = true) {
+inline void SuggestControllerBindings(XrInstance instance, const ControllerActionBindings& a, bool enablePicoBindings = true, bool enablePicoUltraBindings = true, bool enableCosmosBindings = true, bool enableHPMixedRealityBindings = true, bool enableFrameBindings = true) {
     {
         std::array suggestedBindings = {
             // === gameplay suggestions ===
@@ -322,6 +328,69 @@ inline void SuggestControllerBindings(XrInstance instance, const ControllerActio
         };
         SuggestProfileBindings(instance, "/interaction_profiles/htc/vive_cosmos_controller", suggestedBindings.data(), (uint32_t)suggestedBindings.size(), true);
     }
+
+    if (enableFrameBindings) {
+        std::array suggestedBindings = {
+            // === gameplay suggestions ===
+            XrActionSuggestedBinding{ .action = a.inGameGripPoseAction, .binding = GetPath(instance, "/user/hand/left/input/grip/pose") },
+            XrActionSuggestedBinding{ .action = a.inGameGripPoseAction, .binding = GetPath(instance, "/user/hand/right/input/grip/pose") },
+            XrActionSuggestedBinding{ .action = a.inGameAimPoseAction, .binding = GetPath(instance, "/user/hand/left/input/aim/pose") },
+            XrActionSuggestedBinding{ .action = a.inGameAimPoseAction, .binding = GetPath(instance, "/user/hand/right/input/aim/pose") },
+            XrActionSuggestedBinding{ .action = a.moveAction, .binding = GetPath(instance, "/user/hand/left/input/thumbstick") },
+            XrActionSuggestedBinding{ .action = a.cameraAction, .binding = GetPath(instance, "/user/hand/right/input/thumbstick") },
+
+            XrActionSuggestedBinding{ .action = a.grab_interactAction, .binding = GetPath(instance, "/user/hand/left/input/squeeze/value") },
+            XrActionSuggestedBinding{ .action = a.grab_interactAction, .binding = GetPath(instance, "/user/hand/right/input/squeeze/value") },
+            XrActionSuggestedBinding{ .action = a.run_interactAction, .binding = GetPath(instance, "/user/hand/right/input/a/click") },
+            XrActionSuggestedBinding{ .action = a.cancelAction, .binding = GetPath(instance, "/user/hand/right/input/b/click") },
+            XrActionSuggestedBinding{ .action = a.jumpAction, .binding = GetPath(instance, "/user/hand/right/input/x/click") },
+            XrActionSuggestedBinding{ .action = a.useRune_dpadMenu_Action, .binding = GetPath(instance, "/user/hand/left/input/bumper/click") },
+            XrActionSuggestedBinding{ .action = a.sprintAction, .binding = GetPath(instance, "/user/hand/right/input/bumper/click") },
+            XrActionSuggestedBinding{ .action = a.inGame_modMenuAction, .binding = GetPath(instance, "/user/hand/left/input/view/click") },
+
+            XrActionSuggestedBinding{ .action = a.useLeftItemAction, .binding = GetPath(instance, "/user/hand/left/input/trigger/value") },
+            XrActionSuggestedBinding{ .action = a.useRightItemAction, .binding = GetPath(instance, "/user/hand/right/input/trigger/value") },
+
+            XrActionSuggestedBinding{ .action = a.crouch_scopeAction, .binding = GetPath(instance, "/user/hand/left/input/thumbstick/click") },
+            XrActionSuggestedBinding{ .action = a.scopeAction, .binding = GetPath(instance, "/user/hand/right/input/thumbstick/click") },
+            XrActionSuggestedBinding{ .action = a.inGame_inventory_mapAction, .binding = GetPath(instance, "/user/hand/right/input/menu/click") },
+
+            XrActionSuggestedBinding{ .action = a.inGameDpadActions[0], .binding = GetPath(instance, "/user/hand/left/input/dpad_up/click") },
+            XrActionSuggestedBinding{ .action = a.inGameDpadActions[1], .binding = GetPath(instance, "/user/hand/left/input/dpad_right/click") },
+            XrActionSuggestedBinding{ .action = a.inGameDpadActions[2], .binding = GetPath(instance, "/user/hand/left/input/dpad_down/click") },
+            XrActionSuggestedBinding{ .action = a.inGameDpadActions[3], .binding = GetPath(instance, "/user/hand/left/input/dpad_left/click") },
+
+            XrActionSuggestedBinding{ .action = a.rumbleAction, .binding = GetPath(instance, "/user/hand/left/output/haptic") },
+            XrActionSuggestedBinding{ .action = a.rumbleAction, .binding = GetPath(instance, "/user/hand/right/output/haptic") },
+
+            // === menu suggestions ===
+            XrActionSuggestedBinding{ .action = a.inMenuGripPoseAction, .binding = GetPath(instance, "/user/hand/left/input/grip/pose") },
+            XrActionSuggestedBinding{ .action = a.inMenuGripPoseAction, .binding = GetPath(instance, "/user/hand/right/input/grip/pose") },
+            XrActionSuggestedBinding{ .action = a.inMenuAimPoseAction, .binding = GetPath(instance, "/user/hand/left/input/aim/pose") },
+            XrActionSuggestedBinding{ .action = a.inMenuAimPoseAction, .binding = GetPath(instance, "/user/hand/right/input/aim/pose") },
+            XrActionSuggestedBinding{ .action = a.scrollAction, .binding = GetPath(instance, "/user/hand/right/input/thumbstick") },
+            XrActionSuggestedBinding{ .action = a.navigateAction, .binding = GetPath(instance, "/user/hand/left/input/thumbstick") },
+            XrActionSuggestedBinding{ .action = a.selectAction, .binding = GetPath(instance, "/user/hand/right/input/a/click") },
+            XrActionSuggestedBinding{ .action = a.backAction, .binding = GetPath(instance, "/user/hand/right/input/b/click") },
+            XrActionSuggestedBinding{ .action = a.holdAction, .binding = GetPath(instance, "/user/hand/right/input/x/click") },
+            XrActionSuggestedBinding{ .action = a.sortAction, .binding = GetPath(instance, "/user/hand/right/input/y/click") },
+            XrActionSuggestedBinding{ .action = a.leftGripAction, .binding = GetPath(instance, "/user/hand/left/input/squeeze/value") },
+            XrActionSuggestedBinding{ .action = a.leftGripAction, .binding = GetPath(instance, "/user/hand/left/input/bumper/click") },
+            XrActionSuggestedBinding{ .action = a.rightGripAction, .binding = GetPath(instance, "/user/hand/right/input/squeeze/value") },
+            XrActionSuggestedBinding{ .action = a.leftTriggerAction, .binding = GetPath(instance, "/user/hand/left/input/trigger/value") },
+            XrActionSuggestedBinding{ .action = a.leftTriggerAction, .binding = GetPath(instance, "/user/hand/left/input/bumper/click") },
+            XrActionSuggestedBinding{ .action = a.rightTriggerAction, .binding = GetPath(instance, "/user/hand/right/input/trigger/value") },
+            XrActionSuggestedBinding{ .action = a.rightTriggerAction, .binding = GetPath(instance, "/user/hand/right/input/bumper/click") },
+            XrActionSuggestedBinding{ .action = a.inMenu_inventory_mapAction, .binding = GetPath(instance, "/user/hand/right/input/menu/click") },
+            XrActionSuggestedBinding{ .action = a.inMenu_modMenuAction, .binding = GetPath(instance, "/user/hand/left/input/view/click") },
+
+            XrActionSuggestedBinding{ .action = a.inMenuDpadActions[0], .binding = GetPath(instance, "/user/hand/left/input/dpad_up/click") },
+            XrActionSuggestedBinding{ .action = a.inMenuDpadActions[1], .binding = GetPath(instance, "/user/hand/left/input/dpad_right/click") },
+            XrActionSuggestedBinding{ .action = a.inMenuDpadActions[2], .binding = GetPath(instance, "/user/hand/left/input/dpad_down/click") },
+            XrActionSuggestedBinding{ .action = a.inMenuDpadActions[3], .binding = GetPath(instance, "/user/hand/left/input/dpad_left/click") },
+        };
+        SuggestProfileBindings(instance, "/interaction_profiles/valve/frame_controller_valve", suggestedBindings.data(), (uint32_t)suggestedBindings.size(), false);
+    }
 }
 
 inline ControllerType DetectActiveControllerType(XrInstance instance, XrSession session) {
@@ -348,6 +417,8 @@ inline ControllerType DetectActiveControllerType(XrInstance instance, XrSession 
 
     if (pathStr.find("oculus") != std::string::npos)
         result = ControllerType::OculusTouch;
+    else if (pathStr.find("frame_controller") != std::string::npos)
+        result = ControllerType::SteamFrame;
     else if (pathStr.find("valve") != std::string::npos)
         result = ControllerType::ValveIndex;
     else if (pathStr.find("bytedance") != std::string::npos)

@@ -20,6 +20,10 @@ static ButtonState s_runButton;
 static ButtonState s_runeButton;
 static ButtonState s_menuHoldButton;
 static std::array<ButtonState, 2> s_grabButtons;
+static std::array<ButtonState, 4> s_dpadButtons;
+
+enum DpadDirection : size_t { DpadUp, DpadRight, DpadDown, DpadLeft };
+static constexpr std::array<VPADButtons, 4> DpadVpadButtons = { VPAD_BUTTON_UP, VPAD_BUTTON_RIGHT, VPAD_BUTTON_DOWN, VPAD_BUTTON_LEFT };
 
 enum class PullSlot { None, LeftShoulder, RightShoulder, LeftWaist };
 static std::array<PullSlot, 2> s_pullSlots = {};
@@ -45,6 +49,8 @@ struct ControlState {
     std::chrono::steady_clock::time_point preventGrabTime;
 
     bool dpadMenuOpenRequested = false;
+    bool dpadMenuFromDpad = false;
+    XrTime dpadMenuRequestTime = 0;
     bool wasDpadMenuOpen = false;
     EquipType lastDpadMenuOpen = EquipType::None;
     bool dpadMenuSelectionAlreadyEquipped = false;
@@ -95,6 +101,13 @@ static void UpdateControlButtons(const OpenXR::InputState& inputs, bool overlayO
     s_menuHoldButton.Update(!inputs.shared.in_game && !overlayOpen && inputs.inMenu.hold.isActive, inputs.inMenu.hold.currentState, time);
     for (size_t side = 0; side < s_grabButtons.size(); ++side)
         s_grabButtons[side].Update(gameplay && inputs.inGame.grab[side].isActive, inputs.inGame.grab[side].currentState > 0.51f, time);
+    // a held direction keeps the quick menu it opened, so these carry over into the menu
+    for (size_t i = 0; i < s_dpadButtons.size(); ++i)
+        s_dpadButtons[i].Update(!overlayOpen && inputs.shared.dpad[i].isActive, inputs.shared.dpad[i].currentState, time);
+}
+
+static bool IsAnyDpadButtonDown() {
+    return std::ranges::any_of(s_dpadButtons, [](const ButtonState& button) { return button.IsDown(); });
 }
 
 static uint32_t ButtonIfHeld(const XrActionStateBoolean& action, VPADButtons button) {
@@ -405,12 +418,73 @@ static void KeepDpadMenuOpen(uint32_t& buttonHold, ControlState& state) {
     }
 }
 
+static void OpenDpadMenuFromDpad(size_t direction, uint32_t& buttonHold, ControlState& state, XrTime time) {
+    const bool bowOut = state.leftHandEquipType == EquipType::Bow;
+    switch (direction) {
+        case DpadUp:
+            if (state.leftHandEquipType == EquipType::SheikahSlate) {
+                state.dpadMenuSelectionAlreadyEquipped = true;
+                state.runeNeedsReequip = true;
+            }
+            state.lastDpadMenuOpen = EquipType::SheikahSlate;
+            break;
+        case DpadRight:
+            state.lastDpadMenuOpen = bowOut ? EquipType::Bow : EquipType::Melee;
+            state.dpadMenuSelectionAlreadyEquipped = bowOut || state.rightHandEquipType == EquipType::Melee;
+            break;
+        default:
+            state.lastDpadMenuOpen = bowOut ? EquipType::Arrow : EquipType::Shield;
+            break;
+    }
+    buttonHold |= DpadVpadButtons[direction];
+    state.dpadMenuOpenRequested = true;
+    state.dpadMenuFromDpad = true;
+    state.dpadMenuRequestTime = time;
+}
+
+// tapping a direction equips from that quick menu, holding it keeps the menu open to pick with the right stick
+static void ProcessDpadButtons(uint32_t& buttonHold, ControlState& state, XrTime time) {
+    constexpr XrDuration UnopenedMenuTimeout = 500'000'000;
+    if (state.dpadMenuOpenRequested) {
+        if (state.dpadMenuFromDpad && state.inGame && !IsAnyDpadButtonDown() && time - state.dpadMenuRequestTime > UnopenedMenuTimeout) {
+            state.dpadMenuOpenRequested = false;
+            state.dpadMenuFromDpad = false;
+            state.dpadMenuSelectionAlreadyEquipped = false;
+            state.runeNeedsReequip = false;
+            state.lastDpadMenuOpen = EquipType::None;
+        }
+        return;
+    }
+
+    if (!state.inGame || Events::IsActive() || Screens::IsVisible(ScreenId::AppCamera_00)) {
+        for (size_t i = 0; i < s_dpadButtons.size(); ++i) {
+            if (s_dpadButtons[i].IsDown())
+                buttonHold |= DpadVpadButtons[i];
+        }
+        return;
+    }
+    if (state.preventInputs)
+        return;
+
+    if (s_dpadButtons[DpadDown].IsDown())
+        buttonHold |= VPAD_BUTTON_DOWN;
+    if (state.rightHandEquipType == EquipType::MagnetGlove)
+        return;
+    for (size_t direction : { DpadUp, DpadRight, DpadLeft }) {
+        if (s_dpadButtons[direction].lastEvent == ButtonState::Event::Pressed) {
+            OpenDpadMenuFromDpad(direction, buttonHold, state, time);
+            return;
+        }
+    }
+}
+
 static bool CloseDpadMenu(OpenXR::InputState& inputs, ControlState& state) {
     if (!state.dpadMenuOpenRequested)
         return false;
 
-    if (!inputs.inMenu.leftGrip.currentState && !inputs.inMenu.rightGrip.currentState && !inputs.inMenu.sort.currentState) {
+    if (!inputs.inMenu.leftGrip.currentState && !inputs.inMenu.rightGrip.currentState && !inputs.inMenu.sort.currentState && !IsAnyDpadButtonDown()) {
         state.dpadMenuOpenRequested = false;
+        state.dpadMenuFromDpad = false;
         state.wasDpadMenuOpen = true;
     }
     return true;
@@ -854,7 +928,9 @@ static void ProcessMenuInput(
     OpenXR::InputState& inputs,
     ControlState& state
 ) {
-    if (!CloseDpadMenu(inputs, state))
+    // the button holding a quick menu open can share its controls with L, R and Y
+    const bool holdingDpadMenu = CloseDpadMenu(inputs, state);
+    if (!holdingDpadMenu)
         buttonHold |= ButtonIfHeld(inputs.inMenu.sort, VPAD_BUTTON_Y);
 
     if (!state.preventInputs) {
@@ -865,8 +941,10 @@ static void ProcessMenuInput(
     }
 
     buttonHold |= ButtonIfHeld(inputs.inMenu.select, VPAD_BUTTON_A);
-    buttonHold |= ButtonIfHeld(inputs.inMenu.leftTrigger, VPAD_BUTTON_L);
-    buttonHold |= ButtonIfHeld(inputs.inMenu.rightTrigger, VPAD_BUTTON_R);
+    if (!holdingDpadMenu) {
+        buttonHold |= ButtonIfHeld(inputs.inMenu.leftTrigger, VPAD_BUTTON_L);
+        buttonHold |= ButtonIfHeld(inputs.inMenu.rightTrigger, VPAD_BUTTON_R);
+    }
 
     if (s_menuHoldButton.lastEvent == ButtonState::Event::ShortPress)
         buttonHold |= VPAD_BUTTON_X;
@@ -1198,9 +1276,17 @@ static void ProcessGameplayInput(uint32_t& buttonHold, OpenXR::InputState& input
 
     EquipWeaponOnDpadMenuExit(buttonHold, state, dt);
 
+    // controllers with their own B button leave A as a plain A
+    const bool hasCancelButton = inputs.inGame.cancel.isActive;
+
     if (!state.preventInputs) {
         // prevent jump when exiting menus with B button
         buttonHold |= ButtonIfHeld(inputs.inGame.jump_cancel, VPAD_BUTTON_X);
+        buttonHold |= ButtonIfHeld(inputs.inGame.cancel, VPAD_BUTTON_B);
+        buttonHold |= ButtonIfHeld(inputs.inGame.scope, VPAD_BUTTON_STICK_R);
+        // B also lets go of walls and the glider, so the run button only runs on foot
+        if (inputs.inGame.sprint.currentState && !Player::IsClimbing() && !Player::IsGliding() && !Player::IsRiding())
+            buttonHold |= VPAD_BUTTON_B;
 
         if (s_crouchScopeButton.IsLongHeld()) {
             buttonHold |= VPAD_BUTTON_STICK_R;
@@ -1232,7 +1318,7 @@ static void ProcessGameplayInput(uint32_t& buttonHold, OpenXR::InputState& input
     
     // If climbing or paragliding, make the B button cancel instantly the action instead of long press to run
     if (Player::IsClimbing() || Player::IsGliding()) {
-        buttonHold |= ButtonIfHeld(inputs.inGame.run_interact, VPAD_BUTTON_B);
+        buttonHold |= ButtonIfHeld(inputs.inGame.run_interact, hasCancelButton ? VPAD_BUTTON_A : VPAD_BUTTON_B);
     }
     else if (Player::IsRiding())
     {
@@ -1244,7 +1330,7 @@ static void ProcessGameplayInput(uint32_t& buttonHold, OpenXR::InputState& input
             buttonHold |= VPAD_BUTTON_B;
     }
     else {
-        if (s_runButton.IsLongHeld()) {
+        if (s_runButton.IsLongHeld() && !hasCancelButton) {
             buttonHold |= VPAD_BUTTON_B; // Run
         }
         else
@@ -1335,6 +1421,8 @@ static void hook_InjectXRInput(PPCInterpreter_t* hCPU) {
     UpdatePullSlots(inputs, leftGesture, rightGesture);
 
     KeepDpadMenuOpen(newXRBtnHold, state);
+    if (!isMenuOpen)
+        ProcessDpadButtons(newXRBtnHold, state, inputs.shared.inputTime);
 
     if (isMenuOpen) {
         Weapons::CancelDrops();

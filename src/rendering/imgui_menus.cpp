@@ -1388,6 +1388,50 @@ void RND_Renderer::ImGuiOverlay::DrawDebugPage(bool* changed) {
     DrawLogToggle("Process & Thread IDs", settings.logThreadIds, changed);
 }
 
+static void DrawControlRow(const char* glyph, const char* action, const char* detail) {
+    DrawSetting(glyph, action, [&]() {
+        ImGui::AlignTextToFramePadding();
+        ImGui::PushStyleColor(ImGuiCol_Text, kDescriptionColor);
+        ImGui::TextWrapped("%s", detail);
+        ImGui::PopStyleColor();
+    });
+}
+
+static void DrawSteamFrameControlsPage() {
+    DrawPageHeader(ICON_MS_STADIA_CONTROLLER, "Steam Frame Controls");
+
+    if (BeginCard("##FrameButtons", "Buttons")) {
+        DrawControlRow(ICON_KI_BUTTON_A, "Interact", "Talk, pick up and open");
+        DrawControlRow(ICON_KI_BUTTON_B, "Run / Cancel", "Hold to run, tap to put your weapon away");
+        DrawControlRow(ICON_KI_BUTTON_X, "Jump", "");
+        DrawControlRow(ICON_KI_BUTTON_RB, "Run", "Hold to run while you jump and turn");
+        DrawControlRow(ICON_KI_BUTTON_LB, "Use Rune", "Hold for the rune menu");
+        DrawControlRow(ICON_KI_BUTTON_START, "Inventory", "Menu button, hold for the map");
+        DrawControlRow(ICON_KI_BUTTON_SELECT, "BetterVR Menu", "View button, hold to open it and tap for hints");
+        DrawControlRow(ICON_KI_STICK_LEFT_TOP, "Crouch", "Click the left stick, hold for the scope");
+        DrawControlRow(ICON_KI_STICK_RIGHT_TOP, "Scope", "Click the right stick");
+        EndCard();
+    }
+
+    if (BeginCard("##FrameDpad", "D-pad: tap to equip, hold to choose with the right stick")) {
+        DrawControlRow(ICON_KI_DPAD_TOP, "Runes", "");
+        DrawControlRow(ICON_KI_DPAD_RIGHT, "Weapons", "Bows while your bow is out");
+        DrawControlRow(ICON_KI_DPAD_LEFT, "Shields", "Arrows while your bow is out");
+        DrawControlRow(ICON_KI_DPAD_BOTTOM, "Whistle", "");
+        EndCard();
+    }
+
+    if (BeginCard("##FrameHands", "Hands")) {
+        DrawControlRow(ICON_KI_BUTTON_RT, "Right Hand", "Use what you hold, like drawing the bow string");
+        DrawControlRow(ICON_KI_BUTTON_LT, "Left Hand", "Lock on and guard");
+        DrawControlRow(ICON_MS_BACK_HAND, "Grips", "Grab things and take your gear off your back and hip");
+        EndCard();
+    }
+
+    DrawPageNote("Swing to attack and raise your shield to guard. The next pages show where your gear sits on your body.");
+    DrawNavScrollStop("##FrameControlsBottom");
+}
+
 void RND_Renderer::ImGuiOverlay::DrawGuidePage(size_t helpImageIndex) {
     DrawNavScrollStop("##PageTop");
 
@@ -1450,6 +1494,8 @@ static const char* GetControllerModMenuPrompt() {
             return "Hold the " ICON_KI_BUTTON_X " button on your left controller for 1 second to open the mod menu.\nAlternatively, for regular gamepad controllers, use the " ICON_KI_BUTTON_START " button.";
         case ControllerType::ValveIndex:
             return "Hold the " ICON_KI_BUTTON_A " button on your left controller for 1 second to open the mod menu.\nAlternatively, for regular gamepad controllers, use the " ICON_KI_BUTTON_START " button.";
+        case ControllerType::SteamFrame:
+            return "Hold the View " ICON_KI_BUTTON_SELECT " button on your left controller for 1 second to open the mod menu.\nAlternatively, for regular gamepad controllers, use the " ICON_KI_BUTTON_START " button.";
         default:
             return "Hold the " ICON_KI_BUTTON_START " button on your gamepad from Cemu's input settings for 1 second to open the mod menu.";
     }
@@ -1471,6 +1517,7 @@ static MenuNavGlyphs GetControllerMenuNavGlyphs() {
         case ControllerType::HPReverbG2:
         case ControllerType::ViveCosmos:
         case ControllerType::ValveIndex:
+        case ControllerType::SteamFrame:
             return { ICON_KI_STICK_LEFT_TOP, ICON_KI_BUTTON_A, ICON_KI_BUTTON_B, ICON_KI_BUTTON_LT, ICON_KI_BUTTON_RT };
         default:
             return { ICON_KI_STICK_LEFT_TOP, ICON_KI_BUTTON_A, ICON_KI_BUTTON_B, ICON_KI_BUTTON_L, ICON_KI_BUTTON_R };
@@ -1757,7 +1804,12 @@ void RND_Renderer::ImGuiOverlay::DrawHelpMenu() {
                 case ImGuiMenus::CONTROLS_PAGE: DrawControlsPage(&changed); break;
                 case ImGuiMenus::DISPLAY_PAGE: DrawDisplayPage(&changed); break;
                 case ImGuiMenus::SYSTEM_PAGE: DrawSystemPage(&changed); break;
-                case ImGuiMenus::GUIDE_CONTROLS_PAGE: DrawGuidePage(0); break;
+                case ImGuiMenus::GUIDE_CONTROLS_PAGE:
+                    if (VRManager::instance().XR->m_capabilities.activeControllerType == ControllerType::SteamFrame)
+                        DrawSteamFrameControlsPage();
+                    else
+                        DrawGuidePage(0);
+                    break;
                 case ImGuiMenus::GUIDE_EQUIPMENT_PAGE: DrawGuidePage(1); break;
                 case ImGuiMenus::GUIDE_SWING_PAGE: DrawGuidePage(2); break;
                 case ImGuiMenus::GUIDE_WHISTLE_PAGE: DrawGuidePage(3); break;
