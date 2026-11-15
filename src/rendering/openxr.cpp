@@ -91,7 +91,6 @@ OpenXR::OpenXR() {
 
     bool vulkanEnable2Supported = false;
     bool vulkanEnableSupported = false;
-    bool depthSupported = false;
     bool timeBridgeSupported = false;
     bool debugUtilsSupported = false;
     for (XrExtensionProperties& extensionProperties : instanceExtensions) {
@@ -103,7 +102,7 @@ OpenXR::OpenXR() {
             vulkanEnableSupported = true;
         }
         if (strcmp(extensionProperties.extensionName, XR_KHR_COMPOSITION_LAYER_DEPTH_EXTENSION_NAME) == 0) {
-            depthSupported = true;
+            m_capabilities.supportsDepthComposition = true;
         }
         else if (strcmp(extensionProperties.extensionName, kTimeBridgeExtensionName) == 0) {
             timeBridgeSupported = true;
@@ -144,9 +143,8 @@ OpenXR::OpenXR() {
     if (!vulkanEnable2Supported) {
         Log::print<WARNING>("OpenXR runtime doesn't support XR_KHR_vulkan_enable2, falling back to XR_KHR_vulkan_enable.");
     }
-    if (!depthSupported) {
-        Log::print<ERROR>("OpenXR runtime doesn't support depth composition layers (XR_KHR_COMPOSITION_LAYER_DEPTH)!");
-        checkAssert(false, "Current OpenXR runtime doesn't support depth composition layers (XR_KHR_COMPOSITION_LAYER_DEPTH). See the Github page's troubleshooting section for a solution!");
+    if (!m_capabilities.supportsDepthComposition) {
+        Log::print<INFO>("OpenXR runtime doesn't support XR_KHR_composition_layer_depth; rendering without compositor depth submission.");
     }
     if (!timeBridgeSupported) {
         Log::print<WARNING>("OpenXR runtime doesn't support converting time from/to XrTime ({}). Not required, as of this version.", kTimeBridgeExtensionName);
@@ -155,7 +153,8 @@ OpenXR::OpenXR() {
         Log::print<INFO>("OpenXR runtime doesn't support debug utils (XR_EXT_DEBUG_UTILS)! Errors/debug information will no longer be able to be shown!");
     }
 
-    std::vector<const char*> enabledExtensions = { vulkanEnable2Supported ? XR_KHR_VULKAN_ENABLE2_EXTENSION_NAME : XR_KHR_VULKAN_ENABLE_EXTENSION_NAME, XR_KHR_COMPOSITION_LAYER_DEPTH_EXTENSION_NAME };
+    std::vector<const char*> enabledExtensions = { vulkanEnable2Supported ? XR_KHR_VULKAN_ENABLE2_EXTENSION_NAME : XR_KHR_VULKAN_ENABLE_EXTENSION_NAME };
+    if (m_capabilities.supportsDepthComposition) enabledExtensions.emplace_back(XR_KHR_COMPOSITION_LAYER_DEPTH_EXTENSION_NAME);
     if (timeBridgeSupported) enabledExtensions.emplace_back(kTimeBridgeExtensionName);
     if (debugUtilsSupported) enabledExtensions.emplace_back(XR_EXT_DEBUG_UTILS_EXTENSION_NAME);
     if (m_capabilities.supportsPicoController) enabledExtensions.emplace_back(XR_BD_CONTROLLER_INTERACTION_EXTENSION_NAME);

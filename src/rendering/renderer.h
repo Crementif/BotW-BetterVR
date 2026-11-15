@@ -215,6 +215,7 @@ public:
     private:
         std::array<std::unique_ptr<Swapchain>, 2> m_swapchains;
         std::array<std::unique_ptr<Swapchain>, 2> m_depthSwapchains;
+        std::array<std::unique_ptr<VulkanTexture>, 2> m_localDepthAttachments;
         std::array<std::unique_ptr<RND_VkBackend::PresentPipeline<true>>, 2> m_presentPipelines;
         std::array<std::array<LayerTarget, 2>, 2> m_colorTargets;
         std::array<std::array<LayerTarget, 2>, 2> m_depthTargets;

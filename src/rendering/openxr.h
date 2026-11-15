@@ -23,6 +23,7 @@ public:
         XrVersion minVulkanApiVersion;
         XrVersion maxVulkanApiVersion;
         bool usesVulkanEnable2;
+        bool supportsDepthComposition;
         VkInstance vulkanInstance;
         VkPhysicalDevice vulkanPhysicalDevice;
         bool supportsOrientational;

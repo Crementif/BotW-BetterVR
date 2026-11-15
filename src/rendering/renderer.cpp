@@ -579,8 +579,15 @@ RND_Renderer::Layer3D::Layer3D(VkExtent2D inputRes, VkExtent2D outputRes) {
 
     this->m_swapchains[OpenXR::EyeSide::LEFT] = std::make_unique<Swapchain>(Swapchain::Kind::Color, outputRes.width, outputRes.height, viewConfs[0].recommendedSwapchainSampleCount);
     this->m_swapchains[OpenXR::EyeSide::RIGHT] = std::make_unique<Swapchain>(Swapchain::Kind::Color, outputRes.width, outputRes.height, viewConfs[1].recommendedSwapchainSampleCount);
-    this->m_depthSwapchains[OpenXR::EyeSide::LEFT] = std::make_unique<Swapchain>(Swapchain::Kind::Depth, outputRes.width, outputRes.height, viewConfs[0].recommendedSwapchainSampleCount);
-    this->m_depthSwapchains[OpenXR::EyeSide::RIGHT] = std::make_unique<Swapchain>(Swapchain::Kind::Depth, outputRes.width, outputRes.height, viewConfs[1].recommendedSwapchainSampleCount);
+    if (VRManager::instance().XR->m_capabilities.supportsDepthComposition) {
+        this->m_depthSwapchains[OpenXR::EyeSide::LEFT] = std::make_unique<Swapchain>(Swapchain::Kind::Depth, outputRes.width, outputRes.height, viewConfs[0].recommendedSwapchainSampleCount);
+        this->m_depthSwapchains[OpenXR::EyeSide::RIGHT] = std::make_unique<Swapchain>(Swapchain::Kind::Depth, outputRes.width, outputRes.height, viewConfs[1].recommendedSwapchainSampleCount);
+    }
+    else {
+        for (auto& attachment : m_localDepthAttachments) {
+            attachment = std::make_unique<VulkanTexture>(outputRes.width, outputRes.height, VK_FORMAT_D32_SFLOAT, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
+        }
+    }
 
     this->m_presentPipelines[OpenXR::EyeSide::LEFT]->BindSettings((float)outputRes.width, (float)outputRes.height, m_presentUvTransforms[OpenXR::EyeSide::LEFT]);
     this->m_presentPipelines[OpenXR::EyeSide::RIGHT]->BindSettings((float)outputRes.width, (float)outputRes.height, m_presentUvTransforms[OpenXR::EyeSide::RIGHT]);
@@ -605,6 +612,9 @@ void RND_Renderer::Layer3D::InitTextures(VkCommandBuffer cmdBuffer) {
         for (auto& target : targets) {
             target.texture->vkTransitionLayout(cmdBuffer, VK_IMAGE_LAYOUT_GENERAL);
         }
+    }
+    for (auto& attachment : m_localDepthAttachments) {
+        if (attachment) attachment->vkTransitionLayout(cmdBuffer, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
     }
     m_worldGuide->InitTextures(cmdBuffer);
 }
@@ -646,7 +656,7 @@ FrameSync* RND_Renderer::Layer3D::CopyDepthToLayer(OpenXR::EyeSide side, VkComma
 
 void RND_Renderer::Layer3D::PrepareRendering(OpenXR::EyeSide side) {
     m_swapchains[side]->PrepareRendering();
-    m_depthSwapchains[side]->PrepareRendering();
+    if (m_depthSwapchains[side]) m_depthSwapchains[side]->PrepareRendering();
 }
 
 std::optional<std::array<XrView, 2>> RND_Renderer::UpdateViews(XrTime predictedDisplayTime) {
@@ -670,9 +680,9 @@ std::optional<std::array<XrView, 2>> RND_Renderer::UpdateViews(XrTime predictedD
 
 void RND_Renderer::Layer3D::StartRendering() {
     this->m_swapchains[OpenXR::EyeSide::LEFT]->StartRendering();
-    this->m_depthSwapchains[OpenXR::EyeSide::LEFT]->StartRendering();
+    if (m_depthSwapchains[OpenXR::EyeSide::LEFT]) this->m_depthSwapchains[OpenXR::EyeSide::LEFT]->StartRendering();
     this->m_swapchains[OpenXR::EyeSide::RIGHT]->StartRendering();
-    this->m_depthSwapchains[OpenXR::EyeSide::RIGHT]->StartRendering();
+    if (m_depthSwapchains[OpenXR::EyeSide::RIGHT]) this->m_depthSwapchains[OpenXR::EyeSide::RIGHT]->StartRendering();
 }
 
 void RND_Renderer::Layer3D::PrepareDebugDraw(const DebugDrawRenderData& debugDrawData) {
@@ -708,8 +718,8 @@ void RND_Renderer::Layer3D::RecordRender(RND_VkBackend::CommandContext<false>* c
     const RND_VkBackend::RenderTarget target = {
         .colorView = m_swapchains[side]->GetImageView(),
         .colorFormat = m_swapchains[side]->GetFormat(),
-        .depthView = m_depthSwapchains[side]->GetImageView(),
-        .depthFormat = m_depthSwapchains[side]->GetFormat(),
+        .depthView = m_depthSwapchains[side] ? m_depthSwapchains[side]->GetImageView() : m_localDepthAttachments[side]->GetImageView(),
+        .depthFormat = m_depthSwapchains[side] ? m_depthSwapchains[side]->GetFormat() : m_localDepthAttachments[side]->GetFormat(),
         .extent = m_swapchains[side]->GetExtent(),
         .srgbEncodeInShader = m_swapchains[side]->NeedsShaderSrgbEncode()
     };
@@ -741,14 +751,14 @@ void RND_Renderer::Layer3D::RecordRender(RND_VkBackend::CommandContext<false>* c
 
 const std::array<XrCompositionLayerProjectionView, 2>& RND_Renderer::Layer3D::FinishRendering(const std::array<XrView, 2>& views) {
     this->m_swapchains[EyeSide::LEFT]->FinishRendering();
-    this->m_depthSwapchains[EyeSide::LEFT]->FinishRendering();
+    if (m_depthSwapchains[EyeSide::LEFT]) this->m_depthSwapchains[EyeSide::LEFT]->FinishRendering();
     this->m_swapchains[EyeSide::RIGHT]->FinishRendering();
-    this->m_depthSwapchains[EyeSide::RIGHT]->FinishRendering();
+    if (m_depthSwapchains[EyeSide::RIGHT]) this->m_depthSwapchains[EyeSide::RIGHT]->FinishRendering();
 
     // clang-format off
     m_projectionViews[EyeSide::LEFT] = {
         .type = XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW,
-        .next = &m_projectionViewsDepthInfo[EyeSide::LEFT],
+        .next = m_depthSwapchains[EyeSide::LEFT] ? &m_projectionViewsDepthInfo[EyeSide::LEFT] : nullptr,
         .pose = views[EyeSide::LEFT].pose,
         .fov = views[EyeSide::LEFT].fov,
         .subImage = {
@@ -762,26 +772,28 @@ const std::array<XrCompositionLayerProjectionView, 2>& RND_Renderer::Layer3D::Fi
             }
         }
     };
-    m_projectionViewsDepthInfo[EyeSide::LEFT] = {
-        .type = XR_TYPE_COMPOSITION_LAYER_DEPTH_INFO_KHR,
-        .subImage = {
-            .swapchain = this->m_depthSwapchains[EyeSide::LEFT]->GetHandle(),
-            .imageRect = {
-                .offset = { 0, 0 },
-                .extent = {
-                    .width = (int32_t)this->m_depthSwapchains[EyeSide::LEFT]->GetWidth(),
-                    .height = (int32_t)this->m_depthSwapchains[EyeSide::LEFT]->GetHeight()
-                }
+    if (m_depthSwapchains[EyeSide::LEFT]) {
+        m_projectionViewsDepthInfo[EyeSide::LEFT] = {
+            .type = XR_TYPE_COMPOSITION_LAYER_DEPTH_INFO_KHR,
+            .subImage = {
+                .swapchain = this->m_depthSwapchains[EyeSide::LEFT]->GetHandle(),
+                .imageRect = {
+                    .offset = { 0, 0 },
+                    .extent = {
+                        .width = (int32_t)this->m_depthSwapchains[EyeSide::LEFT]->GetWidth(),
+                        .height = (int32_t)this->m_depthSwapchains[EyeSide::LEFT]->GetHeight()
+                    }
+                },
             },
-        },
-        .minDepth = 0.0f,
-        .maxDepth = 1.0f,
-        .nearZ = GetSettings().GetZNear(),
-        .farZ = GetSettings().GetZFar(),
-    };
+            .minDepth = 0.0f,
+            .maxDepth = 1.0f,
+            .nearZ = GetSettings().GetZNear(),
+            .farZ = GetSettings().GetZFar(),
+        };
+    }
     m_projectionViews[EyeSide::RIGHT] = {
         .type = XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW,
-        .next = &m_projectionViewsDepthInfo[EyeSide::RIGHT],
+        .next = m_depthSwapchains[EyeSide::RIGHT] ? &m_projectionViewsDepthInfo[EyeSide::RIGHT] : nullptr,
         .pose = views[EyeSide::RIGHT].pose,
         .fov = views[EyeSide::RIGHT].fov,
         .subImage = {
@@ -795,23 +807,25 @@ const std::array<XrCompositionLayerProjectionView, 2>& RND_Renderer::Layer3D::Fi
             }
         }
     };
-    m_projectionViewsDepthInfo[EyeSide::RIGHT] = {
-        .type = XR_TYPE_COMPOSITION_LAYER_DEPTH_INFO_KHR,
-        .subImage = {
-            .swapchain = this->m_depthSwapchains[EyeSide::RIGHT]->GetHandle(),
-            .imageRect = {
-                .offset = { 0, 0 },
-                .extent = {
-                    .width = (int32_t)this->m_depthSwapchains[EyeSide::RIGHT]->GetWidth(),
-                    .height = (int32_t)this->m_depthSwapchains[EyeSide::RIGHT]->GetHeight()
-                }
+    if (m_depthSwapchains[EyeSide::RIGHT]) {
+        m_projectionViewsDepthInfo[EyeSide::RIGHT] = {
+            .type = XR_TYPE_COMPOSITION_LAYER_DEPTH_INFO_KHR,
+            .subImage = {
+                .swapchain = this->m_depthSwapchains[EyeSide::RIGHT]->GetHandle(),
+                .imageRect = {
+                    .offset = { 0, 0 },
+                    .extent = {
+                        .width = (int32_t)this->m_depthSwapchains[EyeSide::RIGHT]->GetWidth(),
+                        .height = (int32_t)this->m_depthSwapchains[EyeSide::RIGHT]->GetHeight()
+                    }
+                },
             },
-        },
-        .minDepth = 0.0f,
-        .maxDepth = 1.0f,
-        .nearZ = GetSettings().GetZNear(),
-        .farZ = GetSettings().GetZFar(),
-    };
+            .minDepth = 0.0f,
+            .maxDepth = 1.0f,
+            .nearZ = GetSettings().GetZNear(),
+            .farZ = GetSettings().GetZFar(),
+        };
+    }
     // clang-format on
     return m_projectionViews;
 }
