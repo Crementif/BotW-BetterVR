@@ -80,7 +80,7 @@ jobs:
       - name: Upload the bundle
         uses: actions/upload-artifact@v7
         with:
-          name: Cemu-BetterVR-${{ steps.identity.outputs.version }}-${{ steps.identity.outputs.short_sha }}-windows-x64
+          name: BetterVR-${{ steps.identity.outputs.version }}-${{ steps.identity.outputs.short_sha }}-windows-x64
           path: bundle/
           if-no-files-found: error
 
@@ -165,11 +165,11 @@ jobs:
           dist/linux/appimage.sh ${{ runner.arch }}
 
       - name: Assemble the bundle
-        run: mv cemu-src/artifacts/*.AppImage bundle/
+        run: mv cemu-src/artifacts/*.AppImage "bundle/BetterVR-${{ steps.identity.outputs.version }}-linux-${{ matrix.arch }}.AppImage"
 
       - name: Upload the bundle
         uses: actions/upload-artifact@v7
         with:
-          name: Cemu-BetterVR-${{ steps.identity.outputs.version }}-${{ steps.identity.outputs.short_sha }}-linux-${{ matrix.arch }}
+          name: BetterVR-${{ steps.identity.outputs.version }}-${{ steps.identity.outputs.short_sha }}-linux-${{ matrix.arch }}
           path: bundle/
           if-no-files-found: error
