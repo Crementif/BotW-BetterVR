@@ -901,11 +901,13 @@ static void ProcessRightTriggerBindings(
         }
     }
     else {
-        if (state.lastEquipTypeHeld == EquipType::Melee) {
+        // a fist or thumbs up holds the grip too, so only a bare trigger pull draws
+        const bool makingFist = s_grabButtons[1].IsDown();
+        if (state.lastEquipTypeHeld == EquipType::Melee && !makingFist && Weapons::CanDrawFromBack(EquipType::Melee)) {
             buttonHold |= VPAD_BUTTON_Y;
             Haptics::Play(rightRumbleFixed);
         }
-        else if (state.lastEquipTypeHeld == EquipType::Bow) {
+        else if (state.lastEquipTypeHeld == EquipType::Bow && !makingFist && Weapons::CanDrawFromBack(EquipType::Bow)) {
             buttonHold |= VPAD_BUTTON_ZR;
             Haptics::Play(rightRumbleFixed);
         }

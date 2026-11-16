@@ -253,6 +253,40 @@ constexpr uint32_t ACTOR_WEAPONS_SLOT_COUNT = 6;
 constexpr uint32_t BASE_PROC_LINK_SIZE = 0x10;
 constexpr uint32_t NO_EQUIP_SLOT = 0xFFFFFFFF;
 
+// PlayerBase's equip state string, "None" while everything sits on the back
+constexpr uint32_t PLAYER_EQUIP_STATE_OFFSET = 0x91C;
+constexpr uint32_t MELEE_WEAPON_SLOT = 0;
+constexpr uint32_t BOW_WEAPON_SLOT = 2;
+
+static bool IsWeaponSlotFilled(uint32_t playerPtr, uint32_t slot) {
+    const uint32_t linkPtr = playerPtr + offsetof(PlayerOrEnemy, weapons) + slot * BASE_PROC_LINK_SIZE;
+    const uint32_t procSlotPtr = Guest::Get<uint32_t>(linkPtr).getLE();
+    const uint32_t linkId = Guest::Get<uint32_t>(linkPtr + 4).getLE();
+    if (procSlotPtr == 0 || linkId == 0xFFFFFFFF)
+        return false;
+    return Guest::Get<uint32_t>(procSlotPtr + 0x3C).getLE() == linkId && Guest::Get<uint32_t>(procSlotPtr + 0x40).getLE() != 0;
+}
+
+// the game plays its "no weapon" head shake and puts the rune away when Y or ZR finds nothing to draw
+bool Weapons::CanDrawFromBack(EquipType type) {
+    const uint32_t playerPtr = Player::GetAddress();
+    if (playerPtr == 0)
+        return false;
+
+    const uint32_t equipStatePtr = Guest::Get<uint32_t>(playerPtr + PLAYER_EQUIP_STATE_OFFSET).getLE();
+    if (equipStatePtr == 0)
+        return false;
+    const char* equipState = Guest::CString(equipStatePtr);
+    if (std::string_view(equipState, strnlen(equipState, 32)) != "None")
+        return false;
+
+    if (type == EquipType::Melee)
+        return IsWeaponSlotFilled(playerPtr, MELEE_WEAPON_SLOT);
+    if (type == EquipType::Bow)
+        return IsWeaponSlotFilled(playerPtr, BOW_WEAPON_SLOT);
+    return false;
+}
+
 constexpr uint32_t FLAG_THROWABLE = 0x00004000;
 bool ObjectCanBeThrown(uint32_t flags)
 {

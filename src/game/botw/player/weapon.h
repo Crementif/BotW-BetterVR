@@ -15,6 +15,8 @@ namespace Weapons {
     bool IsArrowNockedInRightHand();
     // a bow, the Sheikah Slate or the magnesis glove, which need the HUD to stay in front of the player
     bool IsAimingItemHeld();
+    // only while the game has nothing out and that weapon is on the back
+    bool CanDrawFromBack(EquipType type);
     WeaponMotionAnalyser& GetMotionAnalyser(uint32_t side);
     bool CanEngageTwoHandGrip();
 
