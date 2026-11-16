@@ -25,40 +25,51 @@ namespace Supporters {
         Tier tier;
     };
 
-    inline constexpr const char* LastUpdated = "2026-08-23";
+    inline constexpr const char* LastUpdated = "2026-11-16";
 
-    inline constexpr std::size_t HighTierCount = 7;
+    inline constexpr std::size_t HighTierCount = 10;
 
-    inline constexpr std::array<Supporter, 30> List = {{
-        { "GohTea", Platform::GITHUB, Tier::HIGH },
+    inline constexpr std::array<Supporter, 41> List = {{
         { "Alex Paton", Platform::GITHUB, Tier::HIGH },
         { "Braxus", Platform::PATREON, Tier::HIGH },
         { "Dash Schlotterbeck", Platform::GITHUB, Tier::HIGH },
+        { "GalacticStarShine", Platform::PATREON, Tier::HIGH },
+        { "JoeyAW", Platform::PATREON, Tier::HIGH },
+        { "Randomosity", Platform::PATREON, Tier::HIGH },
         { "Roy Takashi", Platform::PATREON, Tier::HIGH },
         { "Saeed Al-Ali", Platform::PATREON, Tier::HIGH },
+        { "SFmerp", Platform::PATREON, Tier::HIGH },
         { "TheGhostOfSmittyWerbenjagerma...", Platform::GITHUB, Tier::HIGH },
-        { "atari64", Platform::PATREON, Tier::STANDARD },
-        { "BigBossSaladin", Platform::PATREON, Tier::STANDARD },
-        { "JshodanVR", Platform::PATREON, Tier::STANDARD },
-        { "Lortal", Platform::PATREON, Tier::STANDARD },
-        { "Quinn's Modded Stuff", Platform::PATREON, Tier::STANDARD },
+        { "RattyTattySoup", Platform::PATREON, Tier::STANDARD },
+        { "Ahman Woods", Platform::PATREON, Tier::STANDARD },
+        { "Alextreme63", Platform::PATREON, Tier::STANDARD },
+        { "Chris", Platform::PATREON, Tier::STANDARD },
+        { "Cody Yates", Platform::PATREON, Tier::STANDARD },
+        { "Ethan Campbell", Platform::PATREON, Tier::STANDARD },
+        { "glarmer", Platform::PATREON, Tier::STANDARD },
+        { "Pete Deaver", Platform::PATREON, Tier::STANDARD },
         { "Rick Mathot", Platform::PATREON, Tier::STANDARD },
+        { "Scott Stevens", Platform::PATREON, Tier::STANDARD },
         { "Slimmoo", Platform::PATREON, Tier::STANDARD },
         { "Team Cemu", Platform::PATREON, Tier::STANDARD },
+        { "TheBlindEarthican", Platform::PATREON, Tier::STANDARD },
         { "theLemonadeHeadStand", Platform::PATREON, Tier::STANDARD },
+        { "Timothy Dawson", Platform::PATREON, Tier::STANDARD },
+        { "UsuallySpecial", Platform::PATREON, Tier::STANDARD },
+        { "WeisseSchildkroete", Platform::PATREON, Tier::STANDARD },
         { "Zach Rak", Platform::PATREON, Tier::STANDARD },
         { "Zerovolt0V", Platform::PATREON, Tier::STANDARD },
         { "beepsandblips", Platform::GITHUB, Tier::STANDARD },
-        { "Carlos4321", Platform::GITHUB, Tier::STANDARD },
-        { "darkmoldavite", Platform::GITHUB, Tier::STANDARD },
         { "giodude12", Platform::GITHUB, Tier::STANDARD },
+        { "GohTea", Platform::GITHUB, Tier::STANDARD },
         { "Memesy", Platform::GITHUB, Tier::STANDARD },
-        { "Nikita Fajitaa", Platform::GITHUB, Tier::STANDARD },
         { "Tim Dawson", Platform::GITHUB, Tier::STANDARD },
-        { "YeBoiDeLeau", Platform::GITHUB, Tier::STANDARD },
+        { "Zac C", Platform::GITHUB, Tier::STANDARD },
         { "Bearadactyle", Platform::PATREON, Tier::STANDARD },
-        { "Empajadores", Platform::PATREON, Tier::STANDARD },
+        { "BigBossSaladin", Platform::PATREON, Tier::STANDARD },
+        { "BoilingRat", Platform::PATREON, Tier::STANDARD },
+        { "LunarMoldavite", Platform::PATREON, Tier::STANDARD },
         { "peppered_eels", Platform::PATREON, Tier::STANDARD },
-        { "everyling-max", Platform::GITHUB, Tier::STANDARD },
+        { "Xaor Xin", Platform::PATREON, Tier::STANDARD },
     }};
 }
