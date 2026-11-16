@@ -148,6 +148,9 @@ static bool ShouldAdoptGameCameraYaw() {
     return !s_hasBaseYaw || !GameState::IsFirstPerson() || IsEventTurningCamera();
 }
 
+// the head's yaw when the cutscene took over the camera
+static std::optional<float> s_eventHeadYawDegrees;
+
 static float ConsumePendingCameraYawDelta() {
     const int32_t snapAngle = GetSettings().GetSnapTurnAngle();
     if (snapAngle <= 0) {
@@ -414,8 +417,17 @@ static void hook_UpdateCameraForGameplay(PPCInterpreter_t* hCPU) {
 
     const float gameYawDegrees = YawDegreesFromRotation(gameplayRotation);
     const float gameStickYawDelta = ConsumeGameStickYawDelta();
+    if (!IsEventTurningCamera()) {
+        s_eventHeadYawDegrees.reset();
+    }
+    else if (!s_eventHeadYawDegrees.has_value() && views.has_value()) {
+        s_eventHeadYawDegrees = YawDegreesFromRotation(glm::quat_cast(glm::fmat3(views->MiddlePose())));
+    }
     if (ShouldAdoptGameCameraYaw()) {
-        s_baseYawDegrees = gameYawDegrees;
+        const glm::fquat eventFacing = glm::angleAxis(glm::radians(-s_eventHeadYawDegrees.value_or(0.0f)), glm::fvec3(0.0f, 1.0f, 0.0f));
+        gameplayRotation = gameplayRotation * eventFacing;
+        existingGameMtx = glm::mat4_cast(glm::inverse(eventFacing)) * existingGameMtx;
+        s_baseYawDegrees = NormalizeDegrees(gameYawDegrees - s_eventHeadYawDegrees.value_or(0.0f));
         s_hasBaseYaw = true;
     }
     else {
