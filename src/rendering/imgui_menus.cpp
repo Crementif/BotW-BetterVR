@@ -1150,6 +1150,13 @@ void RND_Renderer::ImGuiOverlay::DrawControlsPage(bool* changed) {
         DrawPageNote("Third person is played with a regular controller, which you set up in Cemu's toolbar under Options > Input Settings.");
     }
 
+    if (BeginCard("##Rumble")) {
+        DrawSetting(ICON_MS_STADIA_CONTROLLER, "Rumble", [&]() {
+            DrawPercentSlider(settings.rumbleStrength, 0.0f, 100.0f, changed);
+        });
+        EndCard();
+    }
+
     if (DrawAdvancedHeader("##ControlsAdvanced")) {
         if (BeginCard("##Sticks", "Thumbsticks", false)) {
             DrawSetting(nullptr, "Stick Deadzone", [&]() {

@@ -585,6 +585,7 @@ struct ModSettings {
     EnumSetting<TurnMode> turnMode{ "TurnMode", TurnMode::SMOOTH_NORMAL };
     EnumSetting<SwingSensitivity> swingSensitivity{ "SwingSensitivity", SwingSensitivity::SWING_NORMAL };
     BoolSetting oneHitPerSwing{ "OneHitPerSwing", true };
+    FloatSetting rumbleStrength{ "RumbleStrength", 1.0f, 0.0f, 1.0f };
 
     static std::span<ModSettingBase* const> GetOptions() {
         return SettingRegistry();

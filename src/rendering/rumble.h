@@ -1,5 +1,6 @@
 #pragma once
 
+#include "utils/mod_settings.h"
 
 class RumbleManager {
 public:
@@ -161,7 +162,8 @@ public:
             // to ensure continuous feel without gaps.
             vibration.duration = (XrDuration)(0.03 * 1e9);
             vibration.frequency = (float)currentFrequency;
-            vibration.amplitude = (float)currentAmplitude;
+            vibration.amplitude = (float)currentAmplitude * GetSettings().rumbleStrength;
+            if (vibration.amplitude <= 0.0f) continue;
 
             XrHapticActionInfo haptic_info = { XR_TYPE_HAPTIC_ACTION_INFO };
             haptic_info.action = m_haptic_action;
@@ -245,7 +247,10 @@ void apply_haptic_infinite() {
         vibration.next = nullptr;
         vibration.duration = XR_INFINITE_DURATION;
         vibration.frequency = XR_FREQUENCY_UNSPECIFIED;
-        vibration.amplitude = 1.0f;
+        vibration.amplitude = GetSettings().rumbleStrength;
+        if (vibration.amplitude <= 0.0f) {
+            return;
+        }
 
         XrHapticActionInfo haptic_info = {};
         haptic_info.type = XR_TYPE_HAPTIC_ACTION_INFO;
