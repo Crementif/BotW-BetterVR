@@ -28,6 +28,8 @@ namespace Game {
         bool flatCamera;
         bool blackBars;
         bool loadingScreenVisible;
+        // the loading screens with a full-view white backdrop, FadeStatus_00 is the one shown while a save loads
+        bool loadingBackdropVisible;
         bool aimingItemHeld;
         bool cutsceneActive;
         bool cutsceneCameraSwitchable;

@@ -549,6 +549,11 @@ void RND_Renderer::ImGuiOverlay::Render(long frameIdx, bool renderBackground, bo
     }
     else {
         renderHUDBackground(VRManager::instance().XR->GetRenderer()->IsRendering3D(frameIdx), false);
+        // the game fade behind the HUD samples its corner, so this dims the loading screen's full-view backdrop too
+        if (game.loadingBackdropVisible) {
+            constexpr float LoadingScreenHudDimming = 0.55f;
+            backgroundDrawList->AddRectFilled(ImVec2(0, 0), windowSize, IM_COL32(0, 0, 0, (int)(LoadingScreenHudDimming * 255.0f)));
+        }
     }
 
     Game::DrawDebugWindows();

@@ -271,6 +271,7 @@ static void PublishPresentation() {
     presentation.flatCamera = GameState::UseFlatCameraPresentation();
     presentation.blackBars = GameState::UseBlackBarsDuringEvents();
     presentation.loadingScreenVisible = Screens::IsLoadingVisible();
+    presentation.loadingBackdropVisible = Screens::IsLoadingVisible() || Screens::IsVisible(ScreenId::FadeStatus_00);
     presentation.aimingItemHeld = Weapons::IsAimingItemHeld();
     presentation.cutsceneActive = Events::IsActive();
     presentation.cutsceneCameraSwitchable = Events::IsActive() && !GameState::IsShowingMenu();
