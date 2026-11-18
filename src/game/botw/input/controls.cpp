@@ -630,14 +630,14 @@ static void ProcessLeftHandInGameInput(
     }
 
     if (isGrabPressed) {
-        if (!state.preventGrabInputs && !Player::IsRiding()) {
+        if (!state.preventGrabInputs && !Player::IsRiding() && state.rightHandEquipType != EquipType::MagnetGlove) {
             buttonHold |= VPAD_BUTTON_A;
         }
     }
 
     // Master Sword QTE fix. is_riding_mount check to prevent conflict with master cycle brake function
     if (IsHandNotOverAnySlot(leftGesture) && !suppressGrabActions && s_grabButtons[0].IsLongHeld() && !Player::IsRiding()) {
-        if (!state.preventGrabInputs) {
+        if (!state.preventGrabInputs && state.rightHandEquipType != EquipType::MagnetGlove) {
             buttonHold |= VPAD_BUTTON_A;
         }
     }
@@ -745,14 +745,14 @@ static void ProcessRightHandInGameInput(
     }
 
     if (isGrabPressedShort) {
-        if (!state.preventGrabInputs) {
+        if (!state.preventGrabInputs && state.rightHandEquipType != EquipType::MagnetGlove) {
             buttonHold |= VPAD_BUTTON_A;
         }
     }
 
     // Master Sword QTE fix
     if (IsHandNotOverAnySlot(rightGesture) && !suppressGrabActions && s_grabButtons[1].IsLongHeld()) {
-        if (!state.preventGrabInputs) {
+        if (!state.preventGrabInputs && state.rightHandEquipType != EquipType::MagnetGlove) {
             buttonHold |= VPAD_BUTTON_A;
         }
     }
