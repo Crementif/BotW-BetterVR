@@ -152,6 +152,7 @@ struct HandGestureState {
     bool isCloseToWaist;
     bool isNearChestHeight;
     bool isOnLeftSide;  // true = left side of body, false = right side
+    bool isRaisedAsShield;
 };
 
 static bool ShouldOverrideFirstPersonTurning(bool inGame) {
@@ -247,6 +248,15 @@ static HandGestureState CalculateHandGesture(
     float shieldGuardOffsetY = std::lerp(MIN_SHIELD_GUARD_OFFSET_Y, MAX_SHIELD_GUARD_OFFSET_Y, glm::clamp(shieldGuardHeightT, 0.0f, 1.0f));
     glm::fvec3 chestPos = headsetPos - glm::fvec3(0.0f, shieldGuardOffsetY, 0.0f);
     gesture.isNearChestHeight = (handPos.y > chestPos.y);
+
+    // a resting hand in front of the belly or an arm stretched out sideways shouldn't raise the shield
+    constexpr float MIN_SHIELD_RAISED_OFFSET_Y = 0.30f;
+    constexpr float MAX_SHIELD_RAISED_OFFSET_Y = 0.45f;
+    constexpr float STANDING_SHIELD_RAISED_EXTRA_OFFSET_Y = 0.06f;
+    constexpr float MIN_SHIELD_RAISED_FORWARD = 0.15f;
+    constexpr float MAX_SHIELD_RAISED_SIDEWAYS = 0.35f;
+    float shieldRaisedOffsetY = std::lerp(MIN_SHIELD_RAISED_OFFSET_Y, MAX_SHIELD_RAISED_OFFSET_Y, glm::clamp(shieldGuardHeightT, 0.0f, 1.0f)) + (seated ? 0.0f : STANDING_SHIELD_RAISED_EXTRA_OFFSET_Y);
+    gesture.isRaisedAsShield = handPos.y > headsetPos.y - shieldRaisedOffsetY && forwardDot > MIN_SHIELD_RAISED_FORWARD && std::abs(rightDot) < MAX_SHIELD_RAISED_SIDEWAYS;
 
     return gesture;
 }
@@ -556,7 +566,7 @@ static void ProcessLeftHandInGameInput(
         Haptics::Play(RuneRumble);
 
     // Gesture enabled only when both melee weapon and shield are in hands to prevent 2 handed weapons and quick drawing shield 
-    if (!inputs.inGame.useLeftItem.currentState && state.leftHandEquipType == EquipType::Shield && state.rightHandEquipType == EquipType::Melee && (leftGesture.isNearChestHeight)) {
+    if (!inputs.inGame.useLeftItem.currentState && state.leftHandEquipType == EquipType::Shield && state.rightHandEquipType == EquipType::Melee && leftGesture.isRaisedAsShield) {
         buttonHold |= VPAD_BUTTON_ZL;
         rightStickSource.currentState.y = 0.2f; // Force disable the lock on view when holding shield
         state.isShieldGuarding = true;
