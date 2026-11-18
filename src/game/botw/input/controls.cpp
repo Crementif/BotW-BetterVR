@@ -190,7 +190,8 @@ static void UpdateFirstPersonTurning(const XrActionStateVector2f& rightStickSour
 static HandGestureState CalculateHandGesture(
     const glm::fvec3& handPos,
     const glm::fmat4& headsetMatrix,
-    const glm::fvec3& headsetPos
+    const glm::fvec3& headsetPos,
+    bool seated
 ) {
     HandGestureState gesture = {};
 
@@ -221,8 +222,11 @@ static HandGestureState CalculateHandGesture(
     glm::vec3 flatHandOffset = glm::vec3(headToHand.x, 0.0f, headToHand.z);
     
     constexpr float WAIST_BEHIND_OFFSET = -0.05f; //0.15f
-    float flatForwardDot = glm::dot(flatForward, flatHandOffset) + WAIST_BEHIND_OFFSET;
-    gesture.isBehindHeadWithWaistOffset = (flatForwardDot < 0.0f);
+    // seated players lean back, so their hips are in front of the head
+    constexpr float SEATED_WAIST_BEHIND_OFFSET = -0.15f;
+    const bool isBelowWaistHeight = handPos.y < headsetPos.y - WAIST_OFFSET_Y;
+    float flatForwardDot = glm::dot(flatForward, flatHandOffset) + (seated ? SEATED_WAIST_BEHIND_OFFSET : WAIST_BEHIND_OFFSET);
+    gesture.isBehindHeadWithWaistOffset = (flatForwardDot < 0.0f) && (!seated || isBelowWaistHeight);
     
     float rightDot = glm::dot(headsetRight, headToHand);
     gesture.isOnLeftSide = (rightDot < 0.0f);
@@ -237,8 +241,7 @@ static HandGestureState CalculateHandGesture(
     const glm::fvec3 mouthPos = headsetPos + headsetForward * MOUTH_FORWARD - glm::fvec3(0.0f, MOUTH_BELOW_EYES, 0.0f);
     gesture.isCloseToMouth = (glm::length2(handPos - mouthPos) < MOUTH_RADIUS_SQ);
     
-    glm::fvec3 waistPos = headsetPos - glm::fvec3(0.0f, WAIST_OFFSET_Y, 0.0f);
-    gesture.isCloseToWaist = (handPos.y < waistPos.y);
+    gesture.isCloseToWaist = isBelowWaistHeight;
 
     float shieldGuardHeightT = (headsetPos.y - SHIELD_GUARD_REFERENCE_HEIGHT_MIN) / (SHIELD_GUARD_REFERENCE_HEIGHT_MAX - SHIELD_GUARD_REFERENCE_HEIGHT_MIN);
     float shieldGuardOffsetY = std::lerp(MIN_SHIELD_GUARD_OFFSET_Y, MAX_SHIELD_GUARD_OFFSET_Y, glm::clamp(shieldGuardHeightT, 0.0f, 1.0f));
@@ -1119,8 +1122,9 @@ static void ProcessHandGesture(const std::optional<glm::fmat4>& headsetPose, Ope
         const auto leftHandPos = ToGLM(inputs.shared.poseLocation[0].pose.position);
         const auto rightHandPos = ToGLM(inputs.shared.poseLocation[1].pose.position);
         
-        leftGesture = CalculateHandGesture(leftHandPos, headsetMtx, headsetPos);
-        rightGesture = CalculateHandGesture(rightHandPos, headsetMtx, headsetPos);
+        const bool seated = GetSettings().GetPlayMode() == PlayMode::SEATED;
+        leftGesture = CalculateHandGesture(leftHandPos, headsetMtx, headsetPos, seated);
+        rightGesture = CalculateHandGesture(rightHandPos, headsetMtx, headsetPos, seated);
     }
 }
 
