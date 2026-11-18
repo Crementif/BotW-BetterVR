@@ -333,11 +333,21 @@ static float ResetButtonReserve() {
     return ImGui::GetFrameHeight() + 6.0f;
 }
 
-static void DrawPercentSlider(FloatSetting& setting, float minPercent, float maxPercent, bool* changed) {
+// an int slider over the steps, a float slider snapped to a grid gets stuck when the controller nudges it by less than a step
+static bool DrawSteppedSlider(float& value, float minValue, float maxValue, float step, const std::string& label) {
+    const int steps = (int)std::lround((maxValue - minValue) / step);
+    int index = std::clamp((int)std::lround((value - minValue) / step), 0, steps);
+    if (!ImGui::SliderInt("##value", &index, 0, steps, label.c_str(), ImGuiSliderFlags_NoInput))
+        return false;
+    value = minValue + (float)index * step;
+    return true;
+}
+
+static void DrawPercentSlider(FloatSetting& setting, float minPercent, float maxPercent, float stepPercent, bool* changed) {
     ImGui::PushID(setting.name);
     ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - ResetButtonReserve());
     float percent = setting * 100.0f;
-    if (ImGui::SliderFloat("##value", &percent, minPercent, maxPercent, "%.0f%%")) {
+    if (DrawSteppedSlider(percent, minPercent, maxPercent, stepPercent, fmt::format("{:.0f}%%", percent))) {
         setting = percent / 100.0f;
         *changed = true;
     }
@@ -366,11 +376,12 @@ static void DrawBowArcSlider(FloatSetting& setting, bool* changed) {
 }
 
 template <typename Format>
-static void DrawFloatSlider(FloatSetting& setting, float minValue, float maxValue, Format&& format, bool* changed) {
+static void DrawFloatSlider(FloatSetting& setting, float minValue, float maxValue, float step, Format&& format, bool* changed) {
     ImGui::PushID(setting.name);
     ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - ResetButtonReserve());
     float value = setting;
-    if (ImGui::SliderFloat("##value", &value, minValue, maxValue, format(value).c_str())) {
+    const bool moved = step > 0.0f ? DrawSteppedSlider(value, minValue, maxValue, step, format(value)) : ImGui::SliderFloat("##value", &value, minValue, maxValue, format(value).c_str());
+    if (moved) {
         setting = std::clamp(value, minValue, maxValue);
         *changed = true;
     }
@@ -928,7 +939,7 @@ void RND_Renderer::ImGuiOverlay::DrawPlaystylePage(bool* changed) {
     if (!firstPerson) {
         if (BeginCard("##ThirdPerson", "Third-Person Camera")) {
             DrawSetting(ICON_MS_ZOOM_OUT_MAP, "Camera Distance", [&]() {
-                DrawFloatSlider(settings.thirdPlayerDistance, 0.5f, 0.65f, [](float value) { return fmt::format("{:.2f}", value); }, changed);
+                DrawFloatSlider(settings.thirdPlayerDistance, 0.5f, 0.65f, 0.0f, [](float value) { return fmt::format("{:.2f}", value); }, changed);
             });
             EndCard();
         }
@@ -952,7 +963,7 @@ void RND_Renderer::ImGuiOverlay::DrawPlaystylePage(bool* changed) {
             });
         }
         DrawSetting(ICON_MS_EXPAND, "Height Adjustment", [&]() {
-            DrawFloatSlider(settings.playerHeightOffset, -0.5f, 1.0f, FormatHeightOffset, changed);
+            DrawFloatSlider(settings.playerHeightOffset, -0.5f, 1.0f, 0.0f, FormatHeightOffset, changed);
         });
         EndCard();
     }
@@ -1155,7 +1166,7 @@ void RND_Renderer::ImGuiOverlay::DrawControlsPage(bool* changed) {
 
     if (BeginCard("##Rumble")) {
         DrawSetting(ICON_MS_STADIA_CONTROLLER, "Rumble", [&]() {
-            DrawPercentSlider(settings.rumbleStrength, 0.0f, 100.0f, changed);
+            DrawPercentSlider(settings.rumbleStrength, 0.0f, 100.0f, 10.0f, changed);
         });
         EndCard();
     }
@@ -1163,10 +1174,10 @@ void RND_Renderer::ImGuiOverlay::DrawControlsPage(bool* changed) {
     if (DrawAdvancedHeader("##ControlsAdvanced")) {
         if (BeginCard("##Sticks", "Thumbsticks", false)) {
             DrawSetting(nullptr, "Stick Deadzone", [&]() {
-                DrawPercentSlider(settings.stickDeadzone, 0.0f, 50.0f, changed);
+                DrawPercentSlider(settings.stickDeadzone, 0.0f, 50.0f, 5.0f, changed);
             });
             DrawSetting(nullptr, "Direction Threshold", [&]() {
-                DrawPercentSlider(settings.axisThreshold, 10.0f, 90.0f, changed);
+                DrawPercentSlider(settings.axisThreshold, 10.0f, 90.0f, 5.0f, changed);
             });
             EndCard();
         }
@@ -1245,8 +1256,8 @@ void RND_Renderer::ImGuiOverlay::DrawDisplayPage(bool* changed) {
             }
         });
         DrawSetting(ICON_MS_OPEN_IN_FULL, "Distance & Size", [&]() {
-            DrawFloatSlider(settings.hudDistance, settings.hudDistance.min, settings.hudDistance.max, FormatDistance, changed);
-            DrawFloatSlider(settings.hudSize, settings.hudSize.min, settings.hudSize.max, [](float size) { return fmt::format("{:.2f}x size", size); }, changed);
+            DrawFloatSlider(settings.hudDistance, settings.hudDistance.min, settings.hudDistance.max, 0.05f, FormatDistance, changed);
+            DrawFloatSlider(settings.hudSize, settings.hudSize.min, settings.hudSize.max, 0.05f, [](float size) { return fmt::format("{:.2f}x size", size); }, changed);
         });
         EndCard();
     }
