@@ -1140,10 +1140,15 @@ void RND_Renderer::ImGuiOverlay::DrawControlsPage(bool* changed) {
 
     DrawPageHeader(ICON_MS_STADIA_CONTROLLER, "Controls");
 
-    if (firstPerson && BeginCard("##Buttons")) {
-        static constexpr EnumChoice<WalkingDirection> walkChoices[] = { { WalkingDirection::CAMERA, "Head" }, { WalkingDirection::CONTROLLER, "Hand" } };
-        DrawSetting(settings.walkingDirection == WalkingDirection::CONTROLLER ? ICON_MS_PAN_TOOL_ALT : ICON_MS_HEAD_MOUNTED_DEVICE, "Walk Direction", [&]() {
-            DrawEnumSegments(settings.walkingDirection, walkChoices, changed);
+    if (BeginCard("##Buttons")) {
+        if (firstPerson) {
+            static constexpr EnumChoice<WalkingDirection> walkChoices[] = { { WalkingDirection::CAMERA, "Head" }, { WalkingDirection::CONTROLLER, "Hand" } };
+            DrawSetting(settings.walkingDirection == WalkingDirection::CONTROLLER ? ICON_MS_PAN_TOOL_ALT : ICON_MS_HEAD_MOUNTED_DEVICE, "Walk Direction", [&]() {
+                DrawEnumSegments(settings.walkingDirection, walkChoices, changed);
+            });
+        }
+        DrawSetting(ICON_MS_RUMBLE, "Rumble", [&]() {
+            DrawPercentSlider(settings.rumbleStrength, 0.0f, 100.0f, 10.0f, changed);
         });
         EndCard();
     }
@@ -1162,13 +1167,6 @@ void RND_Renderer::ImGuiOverlay::DrawControlsPage(bool* changed) {
     }
     else {
         DrawPageNote("Third person is played with a regular controller, which you set up in Cemu's toolbar under Options > Input Settings.");
-    }
-
-    if (BeginCard("##Rumble")) {
-        DrawSetting(ICON_MS_STADIA_CONTROLLER, "Rumble", [&]() {
-            DrawPercentSlider(settings.rumbleStrength, 0.0f, 100.0f, 10.0f, changed);
-        });
-        EndCard();
     }
 
     if (DrawAdvancedHeader("##ControlsAdvanced")) {
