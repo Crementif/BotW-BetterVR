@@ -243,9 +243,12 @@ public:
         SetEnvironmentVariableW(L"DISABLE_LAYER_NV_PRESENT_1", L"1");
 #endif
         CemuSettings::Sync(settingsFile.parent_path() / "settings.xml", settingsFile);
-        static std::filesystem::path s_settingsFile = settingsFile;
-        std::atexit([] { CemuSettings::ShareBack(s_settingsFile, s_settingsFile.parent_path() / "settings.xml"); });
+        m_settingsFile = settingsFile;
         CemuSettings::Enforce(settingsFile);
+    }
+
+    void OnExit() override {
+        CemuSettings::ShareBack(m_settingsFile, m_settingsFile.parent_path() / "settings.xml");
     }
 
     // the OpenXR instance has to exist before Cemu loads the graphic packs, since the presets need the headset's resolution
@@ -387,6 +390,7 @@ public:
     }
 
 private:
+    std::filesystem::path m_settingsFile;
     bool m_available = false;
     bool m_active = false;
 };

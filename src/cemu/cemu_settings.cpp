@@ -54,6 +54,11 @@ void CemuSettings::Sync(const fs::path& cemuSettingsFile, const fs::path& settin
         }
         return;
     }
+    // ShareBack doesn't run when Cemu crashes or gets killed, so whichever file changed last wins
+    if (fs::last_write_time(settingsFile, error) > fs::last_write_time(cemuSettingsFile, error)) {
+        ShareBack(settingsFile, cemuSettingsFile);
+        return;
+    }
 
     pugi::xml_document document;
     if (!document.load_file(settingsFile.c_str())) {
