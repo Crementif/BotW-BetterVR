@@ -93,6 +93,14 @@ enum class RoomscaleBodyDriveMode : uint8_t {
 };
 
 static RoomscaleState s_roomscaleState;
+
+// the body warp lands in the player matrix later in the frame, so keep the old head offset until it does
+struct RoomscalePendingBodyMove {
+    bool active = false;
+    glm::fvec3 playerPos = {};
+    glm::fvec3 appliedHeadPos = {};
+};
+static RoomscalePendingBodyMove s_pendingBodyMove;
 static RoomscaleBodyDriveMode s_roomscaleBodyDriveMode = RoomscaleBodyDriveMode::DisabledNotInGame;
 
 constexpr float kMaxRoomscaleJumpDistanceSq = 0.25f;
@@ -352,10 +360,26 @@ static bool WouldRoomscaleResidualImproveWithAppliedDelta(glm::fvec3 appliedHead
     return glm::dot(newResidual, newResidual) + kMinRoomscaleMoveDistanceSq < glm::dot(oldResidual, oldResidual);
 }
 
+static std::optional<glm::fvec3> TryGetPlayerMtxPos() {
+    const uint32_t mtxAddress = Player::GetMtxAddress();
+    if (mtxAddress == 0) {
+        return std::nullopt;
+    }
+    return Guest::Get<BEMatrix34>(mtxAddress).getPos().getLE();
+}
+
 static bool CommitRoomscaleBodyMove(uint32_t scratchPtr, RoomscaleRaycastScratch& scratch, const glm::fvec3& worldPos, glm::fvec3 appliedHeadDelta) {
     appliedHeadDelta.y = 0.0f;
     if (!WouldRoomscaleResidualImproveWithAppliedDelta(appliedHeadDelta)) {
         return false;
+    }
+
+    if (!s_pendingBodyMove.active) {
+        if (std::optional<glm::fvec3> playerPos = TryGetPlayerMtxPos()) {
+            s_pendingBodyMove.playerPos = playerPos.value();
+            s_pendingBodyMove.appliedHeadPos = s_roomscaleState.appliedHeadPos;
+            s_pendingBodyMove.active = true;
+        }
     }
 
     scratch.currentPos = worldPos;
@@ -507,6 +531,7 @@ static void ClearRoomscaleResolveState() {
 }
 
 static void ResetRoomscaleState() {
+    s_pendingBodyMove.active = false;
     s_roomscaleState.hasPreviousHeadPos = false;
     s_roomscaleState.hasAppliedHeadPos = false;
     s_roomscaleState.isBlocked = false;
@@ -598,6 +623,7 @@ static void SetRoomscaleBodyDriveMode(RoomscaleBodyDriveMode mode) {
 }
 
 static void PrimeRoomscaleBaseline(const glm::fvec3& headPos) {
+    s_pendingBodyMove.active = false;
     s_roomscaleState.previousHeadPos = headPos;
     s_roomscaleState.appliedHeadPos = headPos;
     s_roomscaleState.trackedHeadPos = headPos;
@@ -712,6 +738,9 @@ glm::fvec3 Roomscale::GetAppliedHeadPosition() {
         }
     }
     if (s_roomscaleState.hasAppliedHeadPos) {
+        if (s_pendingBodyMove.active && TryGetPlayerMtxPos() == s_pendingBodyMove.playerPos) {
+            return s_pendingBodyMove.appliedHeadPos;
+        }
         return s_roomscaleState.appliedHeadPos;
     }
 
@@ -742,6 +771,8 @@ static void hook_BeginRoomscaleMovement(PPCInterpreter_t* hCPU) {
     if (playerController == 0 || controller != playerController) {
         return;
     }
+
+    s_pendingBodyMove.active = false;
 
     glm::fvec3 currentHeadPos = {};
     glm::fvec3 roomDelta = {};
