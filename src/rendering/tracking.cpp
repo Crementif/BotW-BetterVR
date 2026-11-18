@@ -20,6 +20,10 @@ bool Tracking::SupportsPositionalTracking() {
     return VRManager::instance().XR->m_capabilities.supportsPositional;
 }
 
+ControllerType Tracking::ActiveControllerType() {
+    return VRManager::instance().XR->m_capabilities.activeControllerType;
+}
+
 std::optional<Tracking::HeadViews> Tracking::Views() {
     const RND_Renderer* renderer = GetRenderer();
     if (renderer == nullptr) {

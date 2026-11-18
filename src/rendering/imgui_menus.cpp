@@ -1146,6 +1146,9 @@ void RND_Renderer::ImGuiOverlay::DrawControlsPage(bool* changed) {
             EndCard();
         }
     }
+    else if (VRManager::instance().XR->m_capabilities.activeControllerType == ControllerType::SteamFrame) {
+        DrawPageNote("In third person the Steam Frame controllers work like a Wii U GamePad. A, B, X and Y follow the GamePad's button positions, not the letters.");
+    }
     else {
         DrawPageNote("Third person is played with a regular controller, which you set up in Cemu's toolbar under Options > Input Settings.");
     }
@@ -1435,7 +1438,10 @@ static void DrawSteamFrameControlsPage() {
         EndCard();
     }
 
-    DrawPageNote("Swing to attack and raise your shield to guard. The next pages show where your gear sits on your body.");
+    if (GetSettings().GetCameraMode() == CameraMode::THIRD_PERSON)
+        DrawPageNote("This is the first-person layout. In third person the controllers work like a Wii U GamePad, with A, B, X and Y following the GamePad's button positions.");
+    else
+        DrawPageNote("Swing to attack and raise your shield to guard. The next pages show where your gear sits on your body.");
     DrawNavScrollStop("##FrameControlsBottom");
 }
 

@@ -43,6 +43,7 @@ struct ControllerActionBindings {
     XrAction cancelAction = XR_NULL_HANDLE;
     XrAction sprintAction = XR_NULL_HANDLE;
     XrAction scopeAction = XR_NULL_HANDLE;
+    XrAction thirdPersonJumpAction = XR_NULL_HANDLE;
     std::array<XrAction, 4> inGameDpadActions = {};
     std::array<XrAction, 4> inMenuDpadActions = {};
 };
@@ -344,6 +345,7 @@ inline void SuggestControllerBindings(XrInstance instance, const ControllerActio
             XrActionSuggestedBinding{ .action = a.run_interactAction, .binding = GetPath(instance, "/user/hand/right/input/a/click") },
             XrActionSuggestedBinding{ .action = a.cancelAction, .binding = GetPath(instance, "/user/hand/right/input/b/click") },
             XrActionSuggestedBinding{ .action = a.jumpAction, .binding = GetPath(instance, "/user/hand/right/input/x/click") },
+            XrActionSuggestedBinding{ .action = a.thirdPersonJumpAction, .binding = GetPath(instance, "/user/hand/right/input/y/click") },
             XrActionSuggestedBinding{ .action = a.useRune_dpadMenu_Action, .binding = GetPath(instance, "/user/hand/left/input/bumper/click") },
             XrActionSuggestedBinding{ .action = a.sprintAction, .binding = GetPath(instance, "/user/hand/right/input/bumper/click") },
             XrActionSuggestedBinding{ .action = a.inGame_modMenuAction, .binding = GetPath(instance, "/user/hand/left/input/view/click") },

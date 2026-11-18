@@ -598,6 +598,7 @@ void OpenXR::CreateActions() {
         createAction(m_gameplayActionSet, "cancel", "Cancel / Run / Put away (B Button)", XR_ACTION_TYPE_BOOLEAN_INPUT, m_cancelAction);
         createAction(m_gameplayActionSet, "sprint", "Run (Hold)", XR_ACTION_TYPE_BOOLEAN_INPUT, m_sprintAction);
         createAction(m_gameplayActionSet, "scope", "Open Scope", XR_ACTION_TYPE_BOOLEAN_INPUT, m_scopeAction);
+        createAction(m_gameplayActionSet, "thirdperson_jump", "Jump (Third person)", XR_ACTION_TYPE_BOOLEAN_INPUT, m_thirdPersonJumpAction);
         createAction(m_gameplayActionSet, "dpad_up", "D-pad Up (Rune menu)", XR_ACTION_TYPE_BOOLEAN_INPUT, m_inGameDpadActions[0]);
         createAction(m_gameplayActionSet, "dpad_right", "D-pad Right (Weapon or bow menu)", XR_ACTION_TYPE_BOOLEAN_INPUT, m_inGameDpadActions[1]);
         createAction(m_gameplayActionSet, "dpad_down", "D-pad Down (Whistle)", XR_ACTION_TYPE_BOOLEAN_INPUT, m_inGameDpadActions[2]);
@@ -668,6 +669,7 @@ void OpenXR::CreateActions() {
         bindings.cancelAction = m_cancelAction;
         bindings.sprintAction = m_sprintAction;
         bindings.scopeAction = m_scopeAction;
+        bindings.thirdPersonJumpAction = m_thirdPersonJumpAction;
         bindings.inGameDpadActions = m_inGameDpadActions;
         bindings.inMenuDpadActions = m_inMenuDpadActions;
 
@@ -868,6 +870,7 @@ std::optional<OpenXR::InputState> OpenXR::UpdateActions(XrTime predictedFrameTim
         readBoolean(m_cancelAction, EyeSide::RIGHT, newState.inGame.cancel, "Failed to get cancel action value!");
         readBoolean(m_sprintAction, EyeSide::RIGHT, newState.inGame.sprint, "Failed to get sprint action value!");
         readBoolean(m_scopeAction, EyeSide::RIGHT, newState.inGame.scope, "Failed to get scope action value!");
+        readBoolean(m_thirdPersonJumpAction, EyeSide::RIGHT, newState.inGame.thirdPersonJump, "Failed to get third-person jump action value!");
     }
     this->m_input.store(newState);
     return newState;

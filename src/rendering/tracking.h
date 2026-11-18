@@ -14,6 +14,7 @@ namespace Tracking {
 
     bool IsSessionRunning();
     bool SupportsPositionalTracking();
+    ControllerType ActiveControllerType();
 
     // take the views once per hook, two calls can end up in different XR frames
     std::optional<HeadViews> Views();

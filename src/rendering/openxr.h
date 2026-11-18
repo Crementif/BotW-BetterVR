@@ -76,6 +76,7 @@ public:
             XrActionStateBoolean cancel;
             XrActionStateBoolean sprint;
             XrActionStateBoolean scope;
+            XrActionStateBoolean thirdPersonJump;
         } inGame;
         struct InMenu {
             XrActionStateVector2f scroll;
@@ -172,6 +173,7 @@ private:
     XrAction m_cancelAction = XR_NULL_HANDLE;
     XrAction m_sprintAction = XR_NULL_HANDLE;
     XrAction m_scopeAction = XR_NULL_HANDLE;
+    XrAction m_thirdPersonJumpAction = XR_NULL_HANDLE;
     std::array<XrAction, 4> m_inGameDpadActions = {};
 
     XrAction m_rumbleAction = XR_NULL_HANDLE;

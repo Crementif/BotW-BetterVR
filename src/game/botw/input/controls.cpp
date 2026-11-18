@@ -923,6 +923,54 @@ static void ProcessRightTriggerBindings(
     }
 }
 
+// the Frame is a full gamepad, so third person puts its face buttons where the Wii U's are instead of going by the letters
+static bool UsesFrameGamepadLayout() {
+    return Tracking::ActiveControllerType() == ControllerType::SteamFrame && GetSettings().GetCameraMode() == CameraMode::THIRD_PERSON;
+}
+
+static void ProcessFrameGamepadInput(uint32_t& buttonHold, OpenXR::InputState& inputs, ControlState& state) {
+    for (size_t i = 0; i < s_dpadButtons.size(); ++i) {
+        if (s_dpadButtons[i].IsDown())
+            buttonHold |= DpadVpadButtons[i];
+    }
+
+    if (!state.inGame) {
+        if (!state.preventInputs) {
+            buttonHold |= ButtonIfHeld(inputs.inMenu.select, VPAD_BUTTON_B);
+            if (s_inventoryMapButton.IsDown())
+                buttonHold |= state.mapOpen ? VPAD_BUTTON_MINUS : VPAD_BUTTON_PLUS;
+        }
+        buttonHold |= ButtonIfHeld(inputs.inMenu.back, VPAD_BUTTON_A);
+        buttonHold |= ButtonIfHeld(inputs.inMenu.hold, VPAD_BUTTON_Y);
+        buttonHold |= ButtonIfHeld(inputs.inMenu.sort, VPAD_BUTTON_X);
+        buttonHold |= ButtonIfHeld(inputs.inMenu.leftTrigger, VPAD_BUTTON_L);
+        buttonHold |= ButtonIfHeld(inputs.inMenu.rightTrigger, VPAD_BUTTON_R);
+        return;
+    }
+
+    if (!state.preventInputs) {
+        buttonHold |= ButtonIfHeld(inputs.inGame.run_interact, VPAD_BUTTON_B);
+        buttonHold |= ButtonIfHeld(inputs.inGame.cancel, VPAD_BUTTON_A);
+        buttonHold |= ButtonIfHeld(inputs.inGame.jump_cancel, VPAD_BUTTON_Y);
+        buttonHold |= ButtonIfHeld(inputs.inGame.thirdPersonJump, VPAD_BUTTON_X);
+
+        if (s_inventoryMapButton.lastEvent == ButtonState::Event::ShortPress) {
+            buttonHold |= VPAD_BUTTON_PLUS;
+            state.mapOpen = false;
+        }
+        if (s_inventoryMapButton.IsLongHeld()) {
+            buttonHold |= VPAD_BUTTON_MINUS;
+            state.mapOpen = true;
+        }
+    }
+    buttonHold |= ButtonIfHeld(inputs.inGame.useRune_dpadMenu, VPAD_BUTTON_L);
+    buttonHold |= ButtonIfHeld(inputs.inGame.sprint, VPAD_BUTTON_R);
+    buttonHold |= ButtonIfHeld(inputs.inGame.useLeftItem, VPAD_BUTTON_ZL);
+    buttonHold |= ButtonIfHeld(inputs.inGame.useRightItem, VPAD_BUTTON_ZR);
+    buttonHold |= ButtonIfHeld(inputs.inGame.crouch_scope, VPAD_BUTTON_STICK_L);
+    buttonHold |= ButtonIfHeld(inputs.inGame.scope, VPAD_BUTTON_STICK_R);
+}
+
 static void ProcessMenuInput(
     uint32_t& buttonHold,
     OpenXR::InputState& inputs,
@@ -1420,12 +1468,18 @@ static void hook_InjectXRInput(PPCInterpreter_t* hCPU) {
     ProcessHandGesture(headsetPose, inputs, leftGesture, rightGesture, state);
     UpdatePullSlots(inputs, leftGesture, rightGesture);
 
-    KeepDpadMenuOpen(newXRBtnHold, state);
-    if (!isMenuOpen)
-        ProcessDpadButtons(newXRBtnHold, state, inputs.shared.inputTime);
+    const bool frameGamepad = !isMenuOpen && UsesFrameGamepadLayout();
+    if (!frameGamepad) {
+        KeepDpadMenuOpen(newXRBtnHold, state);
+        if (!isMenuOpen)
+            ProcessDpadButtons(newXRBtnHold, state, inputs.shared.inputTime);
+    }
 
     if (isMenuOpen) {
         Weapons::CancelDrops();
+    }
+    else if (frameGamepad) {
+        ProcessFrameGamepadInput(newXRBtnHold, inputs, state);
     }
     else if (state.inGame) {
         ProcessGameplayInput(newXRBtnHold, inputs, state, leftGesture, rightGesture, leftStickSource, rightStickSource, now, dt);
