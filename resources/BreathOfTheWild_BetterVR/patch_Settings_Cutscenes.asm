@@ -74,7 +74,7 @@ data_TableOfCutsceneEventsSettings:
 .string "Demo008_9,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: CDungeon entrance demo 1: door opening (for emergent lithograph)
 .string "Demo010_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Using the scope for the first time
 .string "Demo010_1,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Exiting the scope for the first time
-.string "Demo011_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Blood Moon
+.string "Demo011_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Blood Moon
 .string "Demo012_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF,PROMPT_ON" ; name: Horse equipment change demo
 .string "Demo013_0,FP_ON,PAN_OFF,HND_OFF,CTRL_OFF" ; name: Cucco angry demo
 .string "Demo014_0,FP_OFF,PAN_ON,HND_OFF,CTRL_OFF" ; name: Yiga assassin calling others demo
