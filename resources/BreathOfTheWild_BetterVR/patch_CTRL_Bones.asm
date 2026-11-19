@@ -3,9 +3,6 @@ moduleMatches = 0x6267BFD0
 
 .origin = codecave
 
-ModelUnitVtableOffset = 0x74
-ModelUnitSetMaterialVisibleVtableOffset = 0x1B4
-
 0x03C6FE5C = copyMatrix34:
 
 0x03821B64 = ksys_phys_ModelBoneAccessor_getBoneName:
@@ -65,19 +62,6 @@ mr r7, r29 ; pass the source gsys::ModelUnit* to the HLE hook
 bla import.coreinit.hook_ModifyBoneMatrix
 
 mr r6, r27
-
-; r9 = gsys::ModelUnit*, r10 = material index, r11 = visible
-cmpwi r9, 0
-beq custom_gsys_ModelUnit_getBoneLocalMatrix_Restore
-mr r3, r9
-mr r4, r10
-mr r5, r11
-lwz r12, ModelUnitVtableOffset(r3)
-lwz r12, ModelUnitSetMaterialVisibleVtableOffset(r12)
-mtctr r12
-bctrl
-
-custom_gsys_ModelUnit_getBoneLocalMatrix_Restore:
 
 lwz r0, 0x34(r1)
 mtlr r0

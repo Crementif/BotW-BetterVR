@@ -432,7 +432,6 @@ static void hook_ModifyBoneMatrix(PPCInterpreter_t* hCPU) {
     const uint32_t modelUnitPtr = hCPU->gpr[7];
     hCPU->gpr[7] = 0;
     hCPU->gpr[8] = 0;
-    hCPU->gpr[9] = 0;
 
     const uint32_t gsysModelPtr = hCPU->gpr[3];
     const uint32_t matrixPtr = hCPU->gpr[4];
@@ -466,7 +465,7 @@ static void hook_ModifyBoneMatrix(PPCInterpreter_t* hCPU) {
         s_twoHandGrip = {};
         s_armPoseFrame = {};
         s_twoHandGripActive = false;
-        HeadVisibility::OnSkeletonRoot();
+        HeadVisibility::Apply(!GameState::IsThirdPerson() && GameState::IsInGame());
     }
 
     auto writeBoneMatrix = [&](const glm::mat4x3& mtx, const glm::fvec3& scale) {
@@ -481,9 +480,6 @@ static void hook_ModifyBoneMatrix(PPCInterpreter_t* hCPU) {
     };
 
     const bool isThirdPerson = GameState::IsThirdPerson() || !GameState::IsInGame();
-
-    // one material per bone, so a whole head model converges well within a single frame
-    HeadVisibility::SubmitNextMaterial(hCPU, !isThirdPerson);
 
     if (isThirdPerson) {
         // wrist is game-animated in third person

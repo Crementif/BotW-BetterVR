@@ -21,9 +21,16 @@ static constexpr uint32_t ModelUnitMaterialArrayOffset = 0xA4;
 static constexpr uint32_t ModelUnitMaterialStride = 0x40;
 static constexpr uint32_t ModelUnitVtableOffset = 0x74;
 static constexpr uint32_t ModelUnitVtableAddress = 0x1034AB98;
+static constexpr uint32_t ModelUnitDirtyFlagsOffset = 0x00;
+static constexpr uint32_t ModelUnitViewOptionsOffset = 0x3C;
+static constexpr uint32_t ModelUnitMaterialStatesOffset = 0x44;
+static constexpr uint32_t ModelUnitViewNumOffset = 0x90;
+static constexpr uint32_t MaterialResDataOffset = 0x48;
+static constexpr uint32_t MaterialResRenderFlagsOffset = 0xC4;
 static constexpr uint32_t MaterialNameRelativeOffset = 0x04;
 static constexpr uint32_t ModelUnitCountSanityMax = 256;
 static constexpr int32_t MaterialNameMaxRelativeOffset = 0x04000000; // 64MB
+static constexpr uint16_t RenderViewOptionMainPass = 1 << 0;
 
 static std::string_view GetModelUnitMaterialName(uint32_t materialArray, uint16_t materialIdx) {
     uint32_t materialPtr = 0;
@@ -41,16 +48,14 @@ static std::string_view GetModelUnitMaterialName(uint32_t materialArray, uint16_
 struct HeadMaterialRef {
     uint32_t unitPtr;
     uint16_t materialIdx;
+
+    bool operator==(const HeadMaterialRef&) const = default;
 };
 
 static std::array<HeadMaterialRef, 32> s_playerHeadMaterials{};
 static uint32_t s_playerHeadMaterialCount = 0;
-static uint32_t s_playerHeadMaterialCursor = 0;
-static bool s_playerHeadMaterialsRefreshedThisFrame = false;
-
-void HeadVisibility::OnSkeletonRoot() {
-    s_playerHeadMaterialsRefreshedThisFrame = false;
-}
+static std::array<HeadMaterialRef, 32> s_hiddenMaterials{};
+static uint32_t s_hiddenMaterialCount = 0;
 
 static void CollectHeadMaterialsFromModel(uint32_t gsysModelPtr, bool headgear) {
     uint32_t unitCount = 0;
@@ -125,20 +130,64 @@ static bool IsLiveModelUnit(uint32_t unitPtr) {
     return vtablePtr == ModelUnitVtableAddress;
 }
 
-void HeadVisibility::SubmitNextMaterial(PPCInterpreter_t* hCPU, bool hideHead) {
-    if (!s_playerHeadMaterialsRefreshedThisFrame) {
-        RefreshPlayerHeadMaterials();
-        s_playerHeadMaterialsRefreshedThisFrame = true;
-    }
-    if (s_playerHeadMaterialCount == 0) return;
+static bool IsMainPassEnabledByDefault(const HeadMaterialRef& material) {
+    const uint32_t materialArray = Guest::Get<uint32_t>(material.unitPtr + ModelUnitMaterialArrayOffset).getLE();
+    if (materialArray == 0) return true;
+    const uint32_t materialPtr = Guest::Get<uint32_t>(materialArray + material.materialIdx * ModelUnitMaterialStride).getLE();
+    if (materialPtr == 0) return true;
+    const uint32_t materialResData = Guest::Get<uint32_t>(materialPtr + MaterialResDataOffset).getLE();
+    if (materialResData == 0) return true;
+    return (Guest::Get<uint32_t>(materialResData + MaterialResRenderFlagsOffset).getLE() & 1) != 0;
+}
 
-    const HeadMaterialRef& headMaterial = s_playerHeadMaterials[s_playerHeadMaterialCursor++ % s_playerHeadMaterialCount];
-    if (!IsLiveModelUnit(headMaterial.unitPtr)) {
-        s_playerHeadMaterialCount = 0;
+// same writes as gsys::ModelUnit's render view option setter at 0x039E4934, option 1 (shadow) is left alone
+static void SetMainPassEnabled(const HeadMaterialRef& material, bool enabled) {
+    const uint32_t viewOptions = Guest::Get<uint32_t>(material.unitPtr + ModelUnitViewOptionsOffset).getLE();
+    if (viewOptions == 0) return;
+    const uint8_t viewNum = Guest::Get<uint8_t>(material.unitPtr + ModelUnitViewNumOffset).getLE();
+
+    bool changed = false;
+    for (uint32_t view = 0; view < viewNum; view++) {
+        const uint32_t optionsAddress = viewOptions + 12 * (material.materialIdx * viewNum + view) + 2;
+        const uint16_t options = Guest::Get<uint16_t>(optionsAddress).getLE();
+        const uint16_t newOptions = enabled ? (options | RenderViewOptionMainPass) : (options & ~RenderViewOptionMainPass);
+        if (newOptions == options) continue;
+        Guest::Set<uint16_t>(optionsAddress, newOptions);
+        changed = true;
+    }
+    if (!changed) return;
+
+    Guest::Set<uint8_t>(material.unitPtr + ModelUnitDirtyFlagsOffset, Guest::Get<uint8_t>(material.unitPtr + ModelUnitDirtyFlagsOffset).getLE() | 1);
+    const uint32_t materialStates = Guest::Get<uint32_t>(material.unitPtr + ModelUnitMaterialStatesOffset).getLE();
+    if (materialStates == 0) return;
+    const uint32_t stateFlagsAddress = materialStates + 12 * material.materialIdx + 6;
+    Guest::Set<uint16_t>(stateFlagsAddress, Guest::Get<uint16_t>(stateFlagsAddress).getLE() | 2);
+}
+
+static void RestoreMaterial(const HeadMaterialRef& material) {
+    if (IsLiveModelUnit(material.unitPtr) && IsMainPassEnabledByDefault(material))
+        SetMainPassEnabled(material, true);
+}
+
+void HeadVisibility::Apply(bool hideHead) {
+    if (!hideHead) {
+        for (uint32_t i = 0; i < s_hiddenMaterialCount; i++)
+            RestoreMaterial(s_hiddenMaterials[i]);
+        s_hiddenMaterialCount = 0;
         return;
     }
 
-    hCPU->gpr[9] = headMaterial.unitPtr;
-    hCPU->gpr[10] = headMaterial.materialIdx;
-    hCPU->gpr[11] = hideHead ? 0 : 1;
+    RefreshPlayerHeadMaterials();
+    const auto currentHead = std::span(s_playerHeadMaterials.data(), s_playerHeadMaterialCount);
+    for (uint32_t i = 0; i < s_hiddenMaterialCount; i++) {
+        if (std::ranges::find(currentHead, s_hiddenMaterials[i]) == currentHead.end())
+            RestoreMaterial(s_hiddenMaterials[i]);
+    }
+
+    s_hiddenMaterialCount = 0;
+    for (const HeadMaterialRef& material : currentHead) {
+        if (!IsLiveModelUnit(material.unitPtr)) continue;
+        SetMainPassEnabled(material, false);
+        s_hiddenMaterials[s_hiddenMaterialCount++] = material;
+    }
 }

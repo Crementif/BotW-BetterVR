@@ -3,8 +3,6 @@
 namespace HeadVisibility {
     bool IsFaceBone(std::string_view boneName);
 
-    // Link's root bone is the first one of a frame, which is when the material list is rebuilt
-    void OnSkeletonRoot();
-    // returns one material per call through r9-r11 for the patch to show or hide
-    void SubmitNextMaterial(PPCInterpreter_t* hCPU, bool hideHead);
+    // run on Link's root bone, hides the head from the camera passes but keeps it in the shadow pass
+    void Apply(bool hideHead);
 }
