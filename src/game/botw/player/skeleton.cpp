@@ -427,6 +427,22 @@ static glm::mat4 ResolveArmTargetModel(const BoneFrameContext& ctx, OpenXR::EyeS
 // taken once on the root bone so all bones use the same controller sample
 static OpenXR::InputState s_skeletonPassInputs = {};
 
+// the matrix the arms were last posed against, the player's own can still change before his model takes it
+static std::optional<BEMatrix34> s_posedPlayerMtx;
+
+static void hook_ShouldReposePlayer(PPCInterpreter_t* hCPU) {
+    hCPU->instructionPointer = hCPU->sprNew.LR;
+
+    const uint32_t actor = hCPU->gpr[3];
+    hCPU->gpr[3] = 0;
+    if (actor == 0 || actor != Player::GetAddress() || !s_posedPlayerMtx.has_value())
+        return;
+
+    const BEMatrix34 playerMtx = Guest::Get<BEMatrix34>(Player::GetMtxAddress());
+    if (std::memcmp(&playerMtx, &s_posedPlayerMtx.value(), sizeof(BEMatrix34)) != 0)
+        hCPU->gpr[3] = 1;
+}
+
 static void hook_ModifyBoneMatrix(PPCInterpreter_t* hCPU) {
     hCPU->instructionPointer = hCPU->sprNew.LR;
     const uint32_t modelUnitPtr = hCPU->gpr[7];
@@ -445,6 +461,9 @@ static void hook_ModifyBoneMatrix(PPCInterpreter_t* hCPU) {
     const uint32_t playerActor = Player::GetAddress();
     if (modelName.getLE() != "GameROMPlayer" || playerActor == 0 || Guest::Get<uint32_t>(playerActor + 0x330).getLE() != gsysModelPtr)
         return;
+
+    if (boneName == "Skl_Root")
+        s_posedPlayerMtx.reset();
 
     const bool isLeft = boneName.ends_with("_L");
     const OpenXR::EyeSide side = isLeft ? OpenXR::EyeSide::LEFT : OpenXR::EyeSide::RIGHT;
@@ -495,7 +514,10 @@ static void hook_ModifyBoneMatrix(PPCInterpreter_t* hCPU) {
     }
 
     glm::fvec3 boneScale = Guest::Get<BEVec3>(scalePtr).getLE();
-    const glm::fmat4 playerMtx4 = glm::fmat4(Guest::Get<BEMatrix34>(Player::GetMtxAddress()).getLEMatrix());
+    const BEMatrix34 playerMtx = Guest::Get<BEMatrix34>(Player::GetMtxAddress());
+    if (boneName == "Skl_Root")
+        s_posedPlayerMtx = playerMtx;
+    const glm::fmat4 playerMtx4 = glm::fmat4(playerMtx.getLEMatrix());
     const glm::mat4 cameraMtx = Camera::GetFreshReferenceMtx();
 
     const OpenXR::InputState& inputs = s_skeletonPassInputs;
@@ -729,4 +751,5 @@ static void hook_ModifyBoneMatrix(PPCInterpreter_t* hCPU) {
 
 void Skeleton::RegisterHooks() {
     CemuHost::RegisterHook("hook_ModifyBoneMatrix", &hook_ModifyBoneMatrix);
+    CemuHost::RegisterHook("hook_ShouldReposePlayer", &hook_ShouldReposePlayer);
 }

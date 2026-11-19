@@ -77,3 +77,30 @@ blr
 ; hooks ksys::phys::ModelBoneAccessor::copyModelPoseToHavok at 0382094C to get the custom bone matrix instead of the original one
 0x03820C38 = lis r8, custom_gsys_ModelUnit_getBoneLocalMatrix@ha
 0x03820C3C = addi r9, r8, custom_gsys_ModelUnit_getBoneLocalMatrix@l
+
+0x034BFBF0 = copyActorPhysicsPoseToHavok:
+
+; the player's matrix can still change after his pose went to Havok, so he gets posed again against the one his model takes
+reposePlayerForFinalMatrix:
+stwu r1, -0x10(r1)
+mflr r0
+stw r0, 0x14(r1)
+
+mr r3, r29 ; r29 = Actor*
+bla import.coreinit.hook_ShouldReposePlayer
+cmpwi r3, 0
+beq reposePlayerForFinalMatrix_Done
+cmpwi r30, 0 ; r30 = ActorPhysics*
+beq reposePlayerForFinalMatrix_Done
+mr r3, r30
+bl copyActorPhysicsPoseToHavok
+
+reposePlayerForFinalMatrix_Done:
+lwz r0, 0x14(r1)
+mtlr r0
+addi r1, r1, 0x10
+lwz r10, 0x330(r29)
+blr
+
+; Actor::updateModelMatrix, right before the model takes the actor's matrix
+0x037A6A1C = bla reposePlayerForFinalMatrix
