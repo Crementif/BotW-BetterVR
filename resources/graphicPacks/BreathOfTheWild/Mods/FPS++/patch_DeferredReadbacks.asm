@@ -79,6 +79,15 @@ blr
 0x036E9EF0 = bla bakeTerrainColorUnorm ; Terrain colour bake, RGBA8
 0x036E9F0C = bla bakeTerrainColorFloat ; Terrain colour bake, RGBA32F
 
+; rune targeting reads its ID readback and coverage query a frame later, deferring them made the target flicker
+idAnalyzerQueryBegin:
+lis r11, fullSyncDrawDones@ha
+li r12, 4
+stw r12, fullSyncDrawDones@l(r11)
+ba import.gx2.GX2QueryBegin
+
+0x038B29BC = bla idAnalyzerQueryBegin ; gfx::IDAnalyzer
+
 ; Cemu reports a GPU occlusion query that hasn't finished as having 0 samples, which would hide objects.
 ; A CPU query reports that it isn't ready yet instead, which the game handles. Also fixes distant NPCs stuttering
 ; in OpenGL with "Full sync at GX2DrawDone()" turned off.
