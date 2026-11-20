@@ -25,12 +25,12 @@ static constexpr uint32_t ModelUnitDirtyFlagsOffset = 0x00;
 static constexpr uint32_t ModelUnitViewOptionsOffset = 0x3C;
 static constexpr uint32_t ModelUnitMaterialStatesOffset = 0x44;
 static constexpr uint32_t ModelUnitViewNumOffset = 0x90;
-static constexpr uint32_t MaterialResDataOffset = 0x48;
-static constexpr uint32_t MaterialResRenderFlagsOffset = 0xC4;
 static constexpr uint32_t MaterialNameRelativeOffset = 0x04;
 static constexpr uint32_t ModelUnitCountSanityMax = 256;
 static constexpr int32_t MaterialNameMaxRelativeOffset = 0x04000000; // 64MB
-static constexpr uint16_t RenderViewOptionMainPass = 1 << 0;
+// option 4 is the camera passes (the game clears it for uking_enable_hide_normal_pass), options 0/1 are the shadow
+static constexpr uint16_t RenderViewOptionNormalPass = 1 << 4;
+static constexpr uint32_t MaterialStateSelectableZPrePass = 0x8000;
 
 static std::string_view GetModelUnitMaterialName(uint32_t materialArray, uint16_t materialIdx) {
     uint32_t materialPtr = 0;
@@ -54,7 +54,13 @@ struct HeadMaterialRef {
 
 static std::array<HeadMaterialRef, 32> s_playerHeadMaterials{};
 static uint32_t s_playerHeadMaterialCount = 0;
-static std::array<HeadMaterialRef, 32> s_hiddenMaterials{};
+struct HiddenMaterial {
+    HeadMaterialRef ref;
+    uint32_t hiddenViews;
+    bool hiddenSelectableZPrePass;
+};
+
+static std::array<HiddenMaterial, 32> s_hiddenMaterials{};
 static uint32_t s_hiddenMaterialCount = 0;
 
 static void CollectHeadMaterialsFromModel(uint32_t gsysModelPtr, bool headgear) {
@@ -130,43 +136,62 @@ static bool IsLiveModelUnit(uint32_t unitPtr) {
     return vtablePtr == ModelUnitVtableAddress;
 }
 
-static bool IsMainPassEnabledByDefault(const HeadMaterialRef& material) {
-    const uint32_t materialArray = Guest::Get<uint32_t>(material.unitPtr + ModelUnitMaterialArrayOffset).getLE();
-    if (materialArray == 0) return true;
-    const uint32_t materialPtr = Guest::Get<uint32_t>(materialArray + material.materialIdx * ModelUnitMaterialStride).getLE();
-    if (materialPtr == 0) return true;
-    const uint32_t materialResData = Guest::Get<uint32_t>(materialPtr + MaterialResDataOffset).getLE();
-    if (materialResData == 0) return true;
-    return (Guest::Get<uint32_t>(materialResData + MaterialResRenderFlagsOffset).getLE() & 1) != 0;
+static void MarkMaterialDirty(const HeadMaterialRef& material) {
+    Guest::Set<uint8_t>(material.unitPtr + ModelUnitDirtyFlagsOffset, Guest::Get<uint8_t>(material.unitPtr + ModelUnitDirtyFlagsOffset).getLE() | 1);
+    const uint32_t stateFlagsAddress = Guest::Get<uint32_t>(material.unitPtr + ModelUnitMaterialStatesOffset).getLE() + 12 * material.materialIdx + 6;
+    Guest::Set<uint16_t>(stateFlagsAddress, Guest::Get<uint16_t>(stateFlagsAddress).getLE() | 2);
 }
 
-// same writes as gsys::ModelUnit's render view option setter at 0x039E4934, option 1 (shadow) is left alone
-static void SetMainPassEnabled(const HeadMaterialRef& material, bool enabled) {
+// same writes as the game's hide_normal_pass setup in sub_33EB704, the shadow options are left alone
+static void HideFromNormalPass(HiddenMaterial& hidden) {
+    const HeadMaterialRef& material = hidden.ref;
     const uint32_t viewOptions = Guest::Get<uint32_t>(material.unitPtr + ModelUnitViewOptionsOffset).getLE();
-    if (viewOptions == 0) return;
-    const uint8_t viewNum = Guest::Get<uint8_t>(material.unitPtr + ModelUnitViewNumOffset).getLE();
+    const uint32_t materialStates = Guest::Get<uint32_t>(material.unitPtr + ModelUnitMaterialStatesOffset).getLE();
+    const uint32_t viewNum = Guest::Get<uint8_t>(material.unitPtr + ModelUnitViewNumOffset).getLE();
+    if (viewOptions == 0 || materialStates == 0 || viewNum > 32) return;
 
     bool changed = false;
     for (uint32_t view = 0; view < viewNum; view++) {
         const uint32_t optionsAddress = viewOptions + 12 * (material.materialIdx * viewNum + view) + 2;
         const uint16_t options = Guest::Get<uint16_t>(optionsAddress).getLE();
-        const uint16_t newOptions = enabled ? (options | RenderViewOptionMainPass) : (options & ~RenderViewOptionMainPass);
-        if (newOptions == options) continue;
-        Guest::Set<uint16_t>(optionsAddress, newOptions);
+        if ((options & RenderViewOptionNormalPass) == 0) continue;
+        Guest::Set<uint16_t>(optionsAddress, options & ~RenderViewOptionNormalPass);
+        hidden.hiddenViews |= 1u << view;
         changed = true;
     }
-    if (!changed) return;
 
-    Guest::Set<uint8_t>(material.unitPtr + ModelUnitDirtyFlagsOffset, Guest::Get<uint8_t>(material.unitPtr + ModelUnitDirtyFlagsOffset).getLE() | 1);
-    const uint32_t materialStates = Guest::Get<uint32_t>(material.unitPtr + ModelUnitMaterialStatesOffset).getLE();
-    if (materialStates == 0) return;
-    const uint32_t stateFlagsAddress = materialStates + 12 * material.materialIdx + 6;
-    Guest::Set<uint16_t>(stateFlagsAddress, Guest::Get<uint16_t>(stateFlagsAddress).getLE() | 2);
+    const uint32_t stateAddress = materialStates + 12 * material.materialIdx;
+    const uint32_t state = Guest::Get<uint32_t>(stateAddress).getLE();
+    if ((state & MaterialStateSelectableZPrePass) != 0) {
+        Guest::Set<uint32_t>(stateAddress, state & ~MaterialStateSelectableZPrePass);
+        hidden.hiddenSelectableZPrePass = true;
+        changed = true;
+    }
+
+    if (changed)
+        MarkMaterialDirty(material);
 }
 
-static void RestoreMaterial(const HeadMaterialRef& material) {
-    if (IsLiveModelUnit(material.unitPtr) && IsMainPassEnabledByDefault(material))
-        SetMainPassEnabled(material, true);
+static void RestoreMaterial(const HiddenMaterial& hidden) {
+    const HeadMaterialRef& material = hidden.ref;
+    if (!IsLiveModelUnit(material.unitPtr)) return;
+    const uint32_t viewOptions = Guest::Get<uint32_t>(material.unitPtr + ModelUnitViewOptionsOffset).getLE();
+    const uint32_t materialStates = Guest::Get<uint32_t>(material.unitPtr + ModelUnitMaterialStatesOffset).getLE();
+    const uint32_t viewNum = Guest::Get<uint8_t>(material.unitPtr + ModelUnitViewNumOffset).getLE();
+    if (viewOptions == 0 || materialStates == 0 || viewNum > 32) return;
+
+    for (uint32_t view = 0; view < viewNum; view++) {
+        if ((hidden.hiddenViews & (1u << view)) == 0) continue;
+        const uint32_t optionsAddress = viewOptions + 12 * (material.materialIdx * viewNum + view) + 2;
+        Guest::Set<uint16_t>(optionsAddress, Guest::Get<uint16_t>(optionsAddress).getLE() | RenderViewOptionNormalPass);
+    }
+
+    if (hidden.hiddenSelectableZPrePass) {
+        const uint32_t stateAddress = materialStates + 12 * material.materialIdx;
+        Guest::Set<uint32_t>(stateAddress, Guest::Get<uint32_t>(stateAddress).getLE() | MaterialStateSelectableZPrePass);
+    }
+
+    MarkMaterialDirty(material);
 }
 
 void HeadVisibility::Apply(bool hideHead) {
@@ -179,15 +204,22 @@ void HeadVisibility::Apply(bool hideHead) {
 
     RefreshPlayerHeadMaterials();
     const auto currentHead = std::span(s_playerHeadMaterials.data(), s_playerHeadMaterialCount);
-    for (uint32_t i = 0; i < s_hiddenMaterialCount; i++) {
-        if (std::ranges::find(currentHead, s_hiddenMaterials[i]) == currentHead.end())
-            RestoreMaterial(s_hiddenMaterials[i]);
+    std::array<HiddenMaterial, 32> previouslyHidden = s_hiddenMaterials;
+    const uint32_t previouslyHiddenCount = s_hiddenMaterialCount;
+    for (uint32_t i = 0; i < previouslyHiddenCount; i++) {
+        if (std::ranges::find(currentHead, previouslyHidden[i].ref) == currentHead.end())
+            RestoreMaterial(previouslyHidden[i]);
     }
 
     s_hiddenMaterialCount = 0;
     for (const HeadMaterialRef& material : currentHead) {
         if (!IsLiveModelUnit(material.unitPtr)) continue;
-        SetMainPassEnabled(material, false);
-        s_hiddenMaterials[s_hiddenMaterialCount++] = material;
+        HiddenMaterial hidden = { material, 0, false };
+        for (uint32_t i = 0; i < previouslyHiddenCount; i++) {
+            if (previouslyHidden[i].ref == material)
+                hidden = previouslyHidden[i];
+        }
+        HideFromNormalPass(hidden);
+        s_hiddenMaterials[s_hiddenMaterialCount++] = hidden;
     }
 }
