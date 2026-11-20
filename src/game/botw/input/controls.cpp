@@ -916,7 +916,11 @@ static void ProcessRightTriggerBindings(
     else {
         // a fist or thumbs up holds the grip too, so only a bare trigger pull draws
         const bool makingFist = s_grabButtons[1].IsDown();
-        if (state.lastEquipTypeHeld == EquipType::Melee && !makingFist && Weapons::CanDrawFromBack(EquipType::Melee)) {
+        if (Player::IsRiding(true) && HAS_FLAG(Player::GetMoveFlags(), PlayerMoveBitFlags::IS_RIDING_HORSE)) {
+            buttonHold |= VPAD_BUTTON_L;
+            Haptics::Play(rightRumbleFixed);
+        }
+        else if (state.lastEquipTypeHeld == EquipType::Melee && !makingFist && Weapons::CanDrawFromBack(EquipType::Melee)) {
             buttonHold |= VPAD_BUTTON_Y;
             Haptics::Play(rightRumbleFixed);
         }
@@ -930,10 +934,6 @@ static void ProcessRightTriggerBindings(
                 Haptics::Play(rightRumbleFixed);
                 Haptics::Play(leftRumbleFixed);
             }
-        }
-        else if (Player::IsRiding(true)) {
-            buttonHold |= VPAD_BUTTON_Y;  // Soothe the horse
-            Haptics::Play(rightRumbleFixed);
         }
     }
 }
