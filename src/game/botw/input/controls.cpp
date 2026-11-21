@@ -874,16 +874,26 @@ static void ProcessRightTriggerBindings(
     ControlState& state,
     HandGestureState rightGesture
 ) {
+    constexpr RumbleParameters rightRumbleFixed = { true, 1, RumbleType::Fixed, 0.5f, false, 0.25, 0.3f, 0.3f };
+    const bool triggerHeld = inputs.inGame.useRightItem.currentState;
+    const bool handsOccupied = state.hasSomethingInLeftHand || state.hasSomethingInRightHand;
+
+    // On horseback, soothe before considering shortcuts for items that are still stowed.
+    if (triggerHeld && !handsOccupied && !state.handThrowCarrying && Player::IsRiding(true)) {
+        buttonHold |= VPAD_BUTTON_L;
+        Haptics::Play(rightRumbleFixed);
+        return;
+    }
+
     if (IsHandOverRightShoulderSlot(rightGesture))
         return;
 
-    if (!inputs.inGame.useRightItem.currentState) {
+    if (!triggerHeld) {
         Haptics::Stop(1, RumbleType::Raising);
         state.triggerPressedOverBodySlot = false;
         return;
     }
     
-    constexpr RumbleParameters rightRumbleFixed = { true, 1, RumbleType::Fixed, 0.5f, false, 0.25, 0.3f, 0.3f };
     constexpr RumbleParameters leftRumbleFixed = { true, 0, RumbleType::Fixed, 0.5f, false, 0.25, 0.3f, 0.3f };
     constexpr RumbleParameters rightRumbleInfiniteRaiseBow = { true, 1, RumbleType::Raising, 0.5f, true, 1.0, 0.25f, 0.25f };
     constexpr RumbleParameters rightRumbleInfiniteRaiseWeaponThrow = { true, 1, RumbleType::Raising, 0.5f, true, 1.0, 0.25f, 0.25f };
@@ -893,7 +903,7 @@ static void ProcessRightTriggerBindings(
     if (state.handThrowCarrying)
         return;
 
-    if (state.hasSomethingInLeftHand || state.hasSomethingInRightHand) {
+    if (handsOccupied) {
         if (state.isThrowableObjectHeld) {
             Haptics::Play(rightRumbleFixed);
             buttonHold |= VPAD_BUTTON_R;  // Throw object

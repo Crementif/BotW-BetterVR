@@ -99,6 +99,8 @@ With Valve Index Controllers you can use the A button.
 With Steam Frame Controllers you can use the View button on the left controller.
 For Xbox/Playstation etc. controllers, long press the Start button and use the mouse for changing settings.
 
+In first person, pull the right trigger with empty hands to soothe your horse. To use a weapon on horseback, draw it from its body slot first.
+
 You can find the controller image here (click to enlarge):  
 <a href="resources/controller_help.png">
 <img src="resources/controller_help.png" width="540" alt="BetterVR controls and gestures">
